@@ -1,12 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Salesync.Application.Interfaces.Repositories;
 using Salesync.Domain.Entities;
-using Salesync.Domain.Interfaces.Repositories;
 using Salesync.Infrastructure.Data;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Salesync.Infrastructure.Repositories
 {

@@ -1,4 +1,4 @@
-﻿namespace Salesync.Domain.Interfaces.Repositories
+﻿namespace Salesync.Application.Interfaces.Repositories
 {
     public interface IUnitOfWork
     {

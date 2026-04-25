@@ -1,4 +1,4 @@
-﻿using Salesync.Domain.Interfaces.Repositories;
+﻿using Salesync.Application.Interfaces.Repositories;
 using Salesync.Infrastructure.Data;
 
 namespace Salesync.Infrastructure.Repositories
