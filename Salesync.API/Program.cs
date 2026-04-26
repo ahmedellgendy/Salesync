@@ -1,6 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
+using Salesync.Application.Interfaces.Repositories;
+using Salesync.Application.Mappings;
+using Salesync.Application.Services;
 using Salesync.Infrastructure.Data;
+using Salesync.Infrastructure.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,9 +20,17 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
+
+
 // Database Connection
 builder.Services.AddDbContext<SalesyncDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
+builder.Services.AddScoped<IBranchService, BranchService>();
+builder.Services.AddAutoMapper(typeof(MappingProfile));
+
 
 var app = builder.Build();
 

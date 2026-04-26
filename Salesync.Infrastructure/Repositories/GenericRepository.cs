@@ -8,10 +8,12 @@ namespace Salesync.Infrastructure.Repositories
     public class GenericRepository<T> : IGenericRepository<T> where T : BaseEntity
     {
         private readonly SalesyncDbContext _context;
+        private readonly DbSet<T> _dbSet;
 
         public GenericRepository(SalesyncDbContext context)
         {
             _context = context;
+                _dbSet = _context.Set<T>();
         }
 
         public async Task<IEnumerable<T>> GetAllAsync() => await _context.Set<T>().ToListAsync();
