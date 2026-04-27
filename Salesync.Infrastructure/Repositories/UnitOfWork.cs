@@ -9,13 +9,16 @@ namespace Salesync.Infrastructure.Repositories
         private readonly SalesyncDbContext _context;
 
         public IGenericRepository<Branch> Branches { get; }
-        public UnitOfWork(SalesyncDbContext context) 
+        public IGenericRepository<Warehouse> Warehouses { get; }
+
+        public UnitOfWork(SalesyncDbContext context)
         {
             _context = context;
             Branches = new GenericRepository<Branch>(_context);
+            Warehouses = new GenericRepository<Warehouse>(_context);
         }
 
 
-        public async Task<int> CompleteAsync()=> await _context.SaveChangesAsync();
+        public async Task<int> CompleteAsync() => await _context.SaveChangesAsync();
     }
 }

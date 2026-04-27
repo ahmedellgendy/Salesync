@@ -20,7 +20,9 @@ namespace Salesync.API.Controllers
         [HttpGet]
         public async Task<IActionResult> GetBranches()
         {
-            var branches = await _context.Branches.ToListAsync();
+            var branches = await _context.Branches
+                                         .Where(b=>b.IsActive==true)
+                                         .ToListAsync();
             return Ok(branches);
 
         }
@@ -30,7 +32,7 @@ namespace Salesync.API.Controllers
         public async Task<IActionResult> GetBranch(int id)
         {
             var branch = await _context.Branches.FindAsync(id);
-            if (branch == null)
+            if (branch == null && branch.IsActive== false)
             {
                 return NotFound();
             }

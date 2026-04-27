@@ -26,11 +26,15 @@ builder.Services.AddSwaggerGen(c =>
 builder.Services.AddDbContext<SalesyncDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+
+// Services register
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
 builder.Services.AddScoped<IBranchService, BranchService>();
-builder.Services.AddAutoMapper(typeof(MappingProfile));
+builder.Services.AddScoped<IWarehouseService, WarehouseService>();
 
+// AutoMapper
+builder.Services.AddAutoMapper(typeof(MappingProfile));
 
 var app = builder.Build();
 

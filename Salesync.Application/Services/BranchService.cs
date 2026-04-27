@@ -1,5 +1,5 @@
 ﻿using AutoMapper;
-using Salesync.Application.Dtos;
+using Salesync.Application.Dtos.BranchDto;
 using Salesync.Application.Interfaces.Repositories;
 
 namespace Salesync.Application.Services
@@ -24,7 +24,7 @@ namespace Salesync.Application.Services
             var branch = await _unitOfWork.Branches.GetByIdAsync(id);
             return _mapper.Map<BranchDto?>(branch);
         }
-        public Task AddBranchAsync(BranchDto branchDto)
+        public Task CreateBranchAsync(BranchDto branchDto)
         {
             throw new NotImplementedException();
         }

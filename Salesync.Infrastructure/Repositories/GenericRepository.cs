@@ -13,15 +13,15 @@ namespace Salesync.Infrastructure.Repositories
         public GenericRepository(SalesyncDbContext context)
         {
             _context = context;
-                _dbSet = _context.Set<T>();
+            _dbSet = _context.Set<T>();
         }
 
         public async Task<IEnumerable<T>> GetAllAsync() => await _context.Set<T>().ToListAsync();
         public async Task<T?> GetByIdAsync(int id) => await _context.Set<T>().FindAsync(id);
-        public async Task AddAsync(T entity) => await _context.Set<T>().AddAsync(entity);
+        public async Task CreateAsync(T entity) => await _context.Set<T>().AddAsync(entity);
         public void UpdateAsync(T entity) => _context.Set<T>().Update(entity);
         public void DeleteAsync(T entity) => _context.Set<T>().Remove(entity);
 
-        
+
     }
 }

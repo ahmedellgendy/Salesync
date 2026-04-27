@@ -1,4 +1,4 @@
-﻿using Salesync.Application.Dtos;
+﻿using Salesync.Application.Dtos.BranchDto;
 
 namespace Salesync.Application.Interfaces.Repositories
 {
@@ -6,7 +6,7 @@ namespace Salesync.Application.Interfaces.Repositories
     {
         Task<IEnumerable<BranchDto>> GetAllAsync();
         Task<BranchDto?> GetBranchByIdAsync(int id);
-        Task AddBranchAsync(BranchDto branchDto);
+        Task CreateBranchAsync(BranchDto branchDto);
         Task UpdateBranchAsync(BranchDto branchDto);
         Task DeleteBranchAsync(int id);
     }

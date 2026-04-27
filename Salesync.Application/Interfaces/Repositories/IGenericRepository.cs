@@ -6,7 +6,7 @@ namespace Salesync.Application.Interfaces.Repositories
     {
         Task<T?> GetByIdAsync(int id);
         Task<IEnumerable<T>> GetAllAsync();
-        Task AddAsync(T entity);
+        Task CreateAsync(T entity);
         void UpdateAsync(T entity);
         void DeleteAsync(T entity);
     }

@@ -1,4 +1,4 @@
-﻿namespace Salesync.Application.Dtos
+﻿namespace Salesync.Application.Dtos.BranchDto
 {
     public class BranchDto
     {
