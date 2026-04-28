@@ -32,6 +32,7 @@ builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
 builder.Services.AddScoped<IBranchService, BranchService>();
 builder.Services.AddScoped<IWarehouseService, WarehouseService>();
+builder.Services.AddScoped<IProductService, ProductService>();
 
 // AutoMapper
 builder.Services.AddAutoMapper(typeof(MappingProfile));
