@@ -10,12 +10,14 @@ namespace Salesync.Infrastructure.Repositories
 
         public IGenericRepository<Branch> Branches { get; }
         public IGenericRepository<Warehouse> Warehouses { get; }
+        public IGenericRepository<Product> Products { get; }
 
         public UnitOfWork(SalesyncDbContext context)
         {
             _context = context;
             Branches = new GenericRepository<Branch>(_context);
             Warehouses = new GenericRepository<Warehouse>(_context);
+            Products = new GenericRepository<Product>(_context);
         }
 
 
