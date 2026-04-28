@@ -1,7 +1,8 @@
 ﻿namespace Salesync.Application.Dtos.ProductDto
 {
-    public class ProductDto
+    public class UpdateProductDto
     {
+        public int Id { get; set; }
         public required string Name { get; set; }
         public required string Description { get; set; }
         public required string SKU { get; set; }
@@ -14,8 +15,5 @@
         public int MaxStockLevel { get; set; }
         public required string Unit { get; set; }
         public int? WarehouseId { get; set; }
-        public string? WarehouseName { get; set; }
-
-
     }
 }
