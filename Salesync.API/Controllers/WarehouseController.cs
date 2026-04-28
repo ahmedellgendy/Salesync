@@ -14,10 +14,10 @@ namespace Salesync.API.Controllers
         public WarehouseController(IWarehouseService warehouseService)
         {
             _warehouseService = warehouseService;
-            
+
         }
 
-        
+
         [HttpGet]  // GET: api/Warehouse --> Get All Warehouses
         public async Task<IActionResult> GetAllAsync()
         {
@@ -25,7 +25,7 @@ namespace Salesync.API.Controllers
             return Ok(wareHouses);
         }
 
-        
+
         [HttpGet("{id}")] // GET: api/Warehouse/id --> Get Warehouse By Id 
         public async Task<IActionResult> GetByIdAsync(int id)
         {
@@ -37,7 +37,7 @@ namespace Salesync.API.Controllers
 
         }
 
-        
+
         [HttpPost]  // POST: api/Warehouse --> Create New Warehouse
         public async Task<IActionResult> CreateAsync([FromBody] CreateWarehouseDto warehouseDto)
         {
@@ -49,6 +49,17 @@ namespace Salesync.API.Controllers
             return Ok(warehouseDto);
         }
 
+        [HttpDelete("{id}")] // DELETE: api/Warhouse --> Delete Warehouse 
+        public async Task<IActionResult> DeleteAsync(int id)
+        {
+            var warehouse = await _warehouseService.DeleteAsync(id);
+            
+            if(!warehouse)
+                return NotFound($"Warehouse with id {id} not found");
+
+            return NoContent();
+
+        }
 
     }
 }
