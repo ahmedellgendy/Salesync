@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Salesync.Infrastructure.Data;
 
@@ -11,9 +12,11 @@ using Salesync.Infrastructure.Data;
 namespace Salesync.Infrastructure.Migrations
 {
     [DbContext(typeof(SalesyncDbContext))]
-    partial class SalesyncDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260428082855_UpdateCustomerAndProductClasses")]
+    partial class UpdateCustomerAndProductClasses
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

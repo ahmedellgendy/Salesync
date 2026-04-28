@@ -5,6 +5,7 @@
         // Basic Info
         public required string Name { get; set; }
         public required string Description { get; set; }
+        public required string SKU { get; set; } 
         public required string Barcode { get; set; }
         
         // Price Info
