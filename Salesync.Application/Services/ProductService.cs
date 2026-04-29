@@ -41,17 +41,19 @@ namespace Salesync.Application.Services
             return _mapper.Map<ProductDto>(product);
 
         }
-        public async Task<ProductDto> UpdateAsync(UpdateProductDto updateProductDto)
+        public async Task<ProductDto> UpdateAsync(int id,UpdateProductDto updateProductDto)
         {
-            var product = _mapper.Map<Product>(updateProductDto);
+            var existingProduct = await _unitOfWork.Products.GetByIdAsync(id);
+            if (existingProduct == null)
+                throw new Exception($"Product with id {id} Not Found");
 
-            _unitOfWork.Products.UpdateAsync(product);
+            _mapper.Map(updateProductDto, existingProduct);
             await _unitOfWork.CompleteAsync();
 
-            return _mapper.Map<ProductDto>(product);
+            return _mapper.Map<ProductDto>(existingProduct);
         }
 
-        public async Task<bool> DeleteAsync(int id)
+        public async Task DeleteAsync(int id)
         {
             var product = await _unitOfWork.Products.GetByIdAsync(id);
             if (product == null)
@@ -60,9 +62,8 @@ namespace Salesync.Application.Services
             _unitOfWork.Products.DeleteAsync(product);
             await _unitOfWork.CompleteAsync();
 
-            return true;
         }
 
-
+        
     }
 }

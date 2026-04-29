@@ -14,10 +14,10 @@ namespace Salesync.Application.Mappings
             CreateMap<Branch, BranchDto>().ReverseMap();
 
             CreateMap<Warehouse, WarehouseDto>();
-            CreateMap<CreateWarehouseDto, Warehouse>();
+            CreateMap<CreateWarehouseDto, Warehouse>().ReverseMap();
             CreateMap<UpdateWarehouseDto, Warehouse>();
 
-            CreateMap<Product, ProductDto>();
+            CreateMap<Product, ProductDto>().ReverseMap();
             CreateMap<CreateProductDto, Product>();
             CreateMap<UpdateProductDto, Product>();
 

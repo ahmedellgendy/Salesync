@@ -7,7 +7,7 @@ namespace Salesync.Application.Interfaces.Repositories
         Task<IEnumerable<ProductDto>> GetAllAsync();
         Task<ProductDto> GetByIdAsync(int id);
         Task<ProductDto> CreateAsync(CreateProductDto createProductDto);
-        Task<ProductDto> UpdateAsync(UpdateProductDto updateProductDto);
+        Task<ProductDto> UpdateAsync(int id, UpdateProductDto updateProductDto);
         Task DeleteAsync(int id);
     }
 }
