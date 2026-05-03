@@ -7,6 +7,7 @@ namespace Salesync.Application.Interfaces.Repositories
         IGenericRepository<Branch> Branches { get; }
         IGenericRepository<Warehouse> Warehouses { get; }
         IGenericRepository<Product> Products { get; }
+        IGenericRepository<Customer> Customers { get; }
         Task<int> CompleteAsync();
     }
 }

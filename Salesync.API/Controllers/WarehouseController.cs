@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Salesync.Application.Dtos.WarehouseDto;
-using Salesync.Application.Interfaces.Repositories;
+using Salesync.Application.Interfaces.Services;
 using Salesync.Domain.Entities;
 
 namespace Salesync.API.Controllers

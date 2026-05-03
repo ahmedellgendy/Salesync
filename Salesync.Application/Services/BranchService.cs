@@ -1,6 +1,7 @@
 ﻿using AutoMapper;
 using Salesync.Application.Dtos.BranchDto;
 using Salesync.Application.Interfaces.Repositories;
+using Salesync.Application.Interfaces.Services;
 
 namespace Salesync.Application.Services
 {

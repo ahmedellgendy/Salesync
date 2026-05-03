@@ -1,6 +1,6 @@
 ﻿using Salesync.Application.Dtos.WarehouseDto;
 
-namespace Salesync.Application.Interfaces.Repositories
+namespace Salesync.Application.Interfaces.Services
 {
     public interface IWarehouseService
     {

@@ -1,6 +1,7 @@
 ﻿using AutoMapper;
 using Salesync.Application.Dtos.ProductDto;
 using Salesync.Application.Interfaces.Repositories;
+using Salesync.Application.Interfaces.Services;
 using Salesync.Domain.Entities;
 
 namespace Salesync.Application.Services

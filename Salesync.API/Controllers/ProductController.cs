@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Salesync.Application.Dtos.ProductDto;
-using Salesync.Application.Interfaces.Repositories;
+using Salesync.Application.Interfaces.Services;
 
 namespace Salesync.API.Controllers
 {

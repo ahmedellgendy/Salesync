@@ -9,5 +9,6 @@ namespace Salesync.Application.Interfaces.Repositories
         Task CreateAsync(T entity);
         void UpdateAsync(T entity);
         void DeleteAsync(T entity);
+        Task<bool> AnyAsync(Func<object, bool> value);
     }
 }

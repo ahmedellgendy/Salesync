@@ -1,6 +1,6 @@
 ﻿using Salesync.Application.Dtos.ProductDto;
 
-namespace Salesync.Application.Interfaces.Repositories
+namespace Salesync.Application.Interfaces.Services
 {
     public interface IProductService
     {
