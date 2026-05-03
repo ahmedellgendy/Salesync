@@ -1,5 +1,6 @@
 ﻿using AutoMapper;
 using Salesync.Application.Dtos.BranchDto;
+using Salesync.Application.Dtos.CustomerDto;
 using Salesync.Application.Dtos.ProductDto;
 using Salesync.Application.Dtos.WarehouseDto;
 using Salesync.Domain.Entities;
@@ -20,6 +21,10 @@ namespace Salesync.Application.Mappings
             CreateMap<Product, ProductDto>().ReverseMap();
             CreateMap<CreateProductDto, Product>();
             CreateMap<UpdateProductDto, Product>();
+
+            CreateMap<Customer, CustomerDto>().ReverseMap();
+            CreateMap<CreateCustomerDto, Customer>().ReverseMap();
+            CreateMap<UpdateCustomerDto, Customer>();
 
         }
     }
