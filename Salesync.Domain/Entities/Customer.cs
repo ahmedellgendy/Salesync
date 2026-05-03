@@ -1,4 +1,6 @@
-﻿namespace Salesync.Domain.Entities
+﻿using Salesync.Domain.Enums;
+
+namespace Salesync.Domain.Entities
 {
     public class Customer : BaseEntity
     {
@@ -22,7 +24,7 @@
         // Business Information
         public decimal CreditLimit { get; set; } 
         public decimal CurrentBalance { get; set; } 
-        public CustomerStatus Status { get; set; } = CustomerStatus.Active;
+        public CustomerStatus Status { get; set; } = CustomerStatus.Pending;
 
 
         // Tracking
@@ -37,18 +39,6 @@
 
 
 
-        public enum CustomerType
-        {
-            Individual = 1,
-            Corporate = 2
-        }
-
-        public enum CustomerStatus
-        {
-            Active = 1,
-            Inactive = 2,
-            Blocked = 3,
-            Pending = 4,
-        }
+        
     }
 }
