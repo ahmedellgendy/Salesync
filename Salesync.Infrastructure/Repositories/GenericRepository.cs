@@ -22,6 +22,6 @@ namespace Salesync.Infrastructure.Repositories
         public void UpdateAsync(T entity) => _context.Set<T>().Update(entity);
         public void DeleteAsync(T entity) => _context.Set<T>().Remove(entity);
 
-
+        
     }
 }

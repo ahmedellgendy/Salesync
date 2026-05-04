@@ -40,6 +40,8 @@ namespace Salesync.Application.Services
             // Map from Dto to Customer to save at db
             var customer = _mapper.Map<Customer>(createCustomerDto);
             await _unitOfWork.Customers.CreateAsync(customer);
+            await _unitOfWork.CompleteAsync();
+
             return _mapper.Map<CustomerDto>(customer);
         }
 
