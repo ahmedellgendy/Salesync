@@ -1,16 +1,31 @@
+using FluentValidation;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
+using Salesync.Application;
 using Salesync.Application.Interfaces.Repositories;
 using Salesync.Application.Interfaces.Services;
 using Salesync.Application.Mappings;
 using Salesync.Application.Services;
+using Salesync.Application.Validators.Customer;
 using Salesync.Infrastructure.Data;
 using Salesync.Infrastructure.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .ConfigureApiBehaviorOptions(options=>
+    {
+        options.InvalidModelStateResponseFactory = context =>
+        {
+            return new BadRequestObjectResult(context.ModelState);
+        };
+    });
+
+builder.Services.AddValidatorsFromAssemblyContaining<CustomerCreateValidator>();
+builder.Services.AddValidatorsFromAssemblyContaining<ApplicationAssemblyMarker>();
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {

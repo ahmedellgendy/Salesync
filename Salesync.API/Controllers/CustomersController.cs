@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using FluentValidation;
+using Microsoft.AspNetCore.Mvc;
 using Salesync.Application.Dtos.CustomerDto;
 using Salesync.Application.Interfaces.Services;
 
@@ -9,10 +10,13 @@ namespace Salesync.API.Controllers
     public class CustomersController : ControllerBase
     {
         private readonly ICustomerService _customerService;
+        private readonly IValidator<CreateCustomerDto> _createValidator;
 
-        public CustomersController(ICustomerService customerService)
+        public CustomersController(ICustomerService customerService, IValidator<CreateCustomerDto> createValidator)
+
         {
             _customerService = customerService;
+            _createValidator = createValidator;
         }
 
 
@@ -36,9 +40,12 @@ namespace Salesync.API.Controllers
         [HttpPost] // POST: api/customers
         public async Task<IActionResult> Create([FromBody] CreateCustomerDto createCustomerDto)
         {
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
+            // Validation
+            var validationResult = await _createValidator.ValidateAsync(createCustomerDto);
+            if (!validationResult.IsValid)
+                return BadRequest(validationResult.Errors);
 
+            
             var createdCustomer = await _customerService.CreateAsync(createCustomerDto);
             return CreatedAtAction(nameof(GetById), new { id = createdCustomer.Id }, new
             {
@@ -54,8 +61,6 @@ namespace Salesync.API.Controllers
 
             await _customerService.DeleteAsync(id);
             return Ok($"Customer with id '{id}' deleted successfully.");
-
-
 
         }
     }

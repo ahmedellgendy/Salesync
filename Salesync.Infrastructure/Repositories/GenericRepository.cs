@@ -2,6 +2,7 @@
 using Salesync.Application.Interfaces.Repositories;
 using Salesync.Domain.Entities;
 using Salesync.Infrastructure.Data;
+using System.Linq.Expressions;
 
 namespace Salesync.Infrastructure.Repositories
 {
@@ -22,6 +23,13 @@ namespace Salesync.Infrastructure.Repositories
         public void UpdateAsync(T entity) => _context.Set<T>().Update(entity);
         public void DeleteAsync(T entity) => _context.Set<T>().Remove(entity);
 
+        public async Task<IEnumerable<T>> FindAsync(Expression<Func<T, bool>> predicate)=> await _context.Set<T>().Where(predicate).ToListAsync();
         
+
+        public async Task<T> AddAsync(T entity)
+        {
+            await _context.Set<T>().AddAsync(entity);
+            return entity;
+        }
     }
 }
