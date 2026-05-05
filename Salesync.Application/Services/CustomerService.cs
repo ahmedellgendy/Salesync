@@ -47,11 +47,11 @@ namespace Salesync.Application.Services
 
         public async Task<CustomerDto> UpdateAsync(int id, UpdateCustomerDto updateCustomerDto)
         {
-            var customer = _unitOfWork.Customers.GetByIdAsync(id);
+            var customer = await _unitOfWork.Customers.GetByIdAsync(id);
             if (customer == null)
                 throw new Exception($"Customer with id '{id}' not found.");
 
-            await _mapper.Map(updateCustomerDto, customer);
+            _mapper.Map(updateCustomerDto, customer);
 
             await _unitOfWork.CompleteAsync();
 

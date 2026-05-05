@@ -37,6 +37,22 @@ namespace Salesync.API.Controllers
             return Ok(customer);
         }
 
+        [HttpPut("{id}")] // PUT: api/customers/{id}
+        public async Task<IActionResult> Update(int id, [FromBody] UpdateCustomerDto updateCustomerDto)
+        {
+            // Validation - Check the ID in the URL matches the ID in the body
+            if (id != updateCustomerDto.Id)
+                return BadRequest("ID in URL does not match ID in body.");
+
+            var updatedCustomer = await _customerService.UpdateAsync(id, updateCustomerDto);
+            return Ok(new
+            {
+                Message = "Customer updated successfully..",
+                Customer = updatedCustomer
+            });
+
+        }
+
         [HttpPost] // POST: api/customers
         public async Task<IActionResult> Create([FromBody] CreateCustomerDto createCustomerDto)
         {

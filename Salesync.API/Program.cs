@@ -55,6 +55,7 @@ builder.Services.AddScoped<ICustomerService, CustomerService>();
 // AutoMapper
 builder.Services.AddAutoMapper(typeof(MappingProfile));
 
+
 var app = builder.Build();
 
 // Configure pipeline
