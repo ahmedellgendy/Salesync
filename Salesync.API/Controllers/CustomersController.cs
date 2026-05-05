@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Salesync.Application.Dtos.CustomerDto;
 using Salesync.Application.Interfaces.Services;
+using Salesync.Application.Validators.Customer;
 
 namespace Salesync.API.Controllers
 {
@@ -11,12 +12,14 @@ namespace Salesync.API.Controllers
     {
         private readonly ICustomerService _customerService;
         private readonly IValidator<CreateCustomerDto> _createValidator;
+        private readonly IValidator<UpdateCustomerDto> _updateValidator;
 
-        public CustomersController(ICustomerService customerService, IValidator<CreateCustomerDto> createValidator)
+        public CustomersController(ICustomerService customerService, IValidator<CreateCustomerDto> createValidator, IValidator<UpdateCustomerDto> updateValidator)
 
         {
             _customerService = customerService;
             _createValidator = createValidator;
+            _updateValidator = updateValidator;
         }
 
 
@@ -40,10 +43,22 @@ namespace Salesync.API.Controllers
         [HttpPut("{id}")] // PUT: api/customers/{id}
         public async Task<IActionResult> Update(int id, [FromBody] UpdateCustomerDto updateCustomerDto)
         {
-            // Validation - Check the ID in the URL matches the ID in the body
+            // 1.FluentValidation - Validate data format
+            var validationResult = await _updateValidator.ValidateAsync(updateCustomerDto);
+            if (!validationResult.IsValid)
+            {
+                return BadRequest(new
+                {
+                    Message = "Validation failed",
+                    Errors = validationResult.Errors.Select(e => e.ErrorMessage)
+                });
+            }
+
+            // 2.Check the ID in the URL matches the ID in the body
             if (id != updateCustomerDto.Id)
                 return BadRequest("ID in URL does not match ID in body.");
 
+            // UPDATE Customer
             var updatedCustomer = await _customerService.UpdateAsync(id, updateCustomerDto);
             return Ok(new
             {
@@ -61,7 +76,7 @@ namespace Salesync.API.Controllers
             if (!validationResult.IsValid)
                 return BadRequest(validationResult.Errors);
 
-            
+
             var createdCustomer = await _customerService.CreateAsync(createCustomerDto);
             return CreatedAtAction(nameof(GetById), new { id = createdCustomer.Id }, new
             {
