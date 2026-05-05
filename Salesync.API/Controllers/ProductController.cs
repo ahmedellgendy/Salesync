@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using FluentValidation;
+using Microsoft.AspNetCore.Mvc;
+using Salesync.Application.Dtos.CustomerDto;
 using Salesync.Application.Dtos.ProductDto;
 using Salesync.Application.Interfaces.Services;
 
@@ -9,10 +11,14 @@ namespace Salesync.API.Controllers
     public class ProductController : ControllerBase
     {
         private readonly IProductService _productService;
+        private readonly IValidator<CreateProductDto> _createValidator;
+        private readonly IValidator<UpdateProductDto> _updateValidator;
 
-        public ProductController(IProductService productService)
+        public ProductController(IProductService productService, IValidator<CreateProductDto> createValidator, IValidator<UpdateProductDto> updateValidator)
         {
             _productService = productService;
+            _createValidator = createValidator;
+            _updateValidator = updateValidator;
         }
 
         [HttpGet]  // GET: api/product
@@ -40,8 +46,17 @@ namespace Salesync.API.Controllers
         [HttpPost]  // POST: api/product --> Create New Product
         public async Task<IActionResult> CreateAsync([FromBody] CreateProductDto createProductDto)
         {
-            if (createProductDto == null)
-                return BadRequest();
+            // FluentValidation - Validate data format
+            var validationResult = await _createValidator.ValidateAsync(createProductDto);
+            if (!validationResult.IsValid)
+            {
+                return BadRequest(new
+                {
+                    Message = "Validation failed",
+                    Errors = validationResult.Errors.Select(e => e.ErrorMessage)
+                });
+            }
+
             var createdProduct = await _productService.CreateAsync(createProductDto);
 
             return Ok(createdProduct);
@@ -50,10 +65,25 @@ namespace Salesync.API.Controllers
         [HttpPut("{id:int}")] // PUT: api/product/id --> Update Product
         public async Task<IActionResult> UpdateAsync(int id, [FromBody] UpdateProductDto updateProductDto)
         {
-            if (updateProductDto == null)
-                return BadRequest();
+            // FluentValidation 
+            var validationResult = await _updateValidator.ValidateAsync(updateProductDto);
+            if (!validationResult.IsValid)
+            {
+                return BadRequest(new
+                {
+                    Message = "Validation failed",
+                    Errors = validationResult.Errors.Select(e => e.ErrorMessage)
+                });
+            }
+
             var updatedProduct = await _productService.UpdateAsync(id, updateProductDto);
-            return Ok(updatedProduct);
+
+            return Ok(new
+            {
+                Message = "Product Updated Successfully..",
+                Product = updatedProduct
+
+            });
         }
         [HttpDelete("{id}")]  //DELETE: api/product/id --> Delete Product
         public async Task<IActionResult> DeleteAsync(int id)

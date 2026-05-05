@@ -20,12 +20,12 @@ namespace Salesync.Application.Mappings
 
             CreateMap<Product, ProductDto>().ReverseMap();
             CreateMap<CreateProductDto, Product>();
-            CreateMap<UpdateProductDto, Product>();
+            CreateMap<UpdateProductDto, Product>().ForAllMembers(o => o.Condition((src, dest, srcMember) => srcMember != null));
+
 
             CreateMap<Customer, CustomerDto>().ReverseMap();
             CreateMap<CreateCustomerDto, Customer>().ReverseMap();
-            CreateMap<UpdateCustomerDto, Customer>()
-                .ForAllMembers(o => o.Condition((src, dest, srcMember) => srcMember != null));
+            CreateMap<UpdateCustomerDto, Customer>().ForAllMembers(o => o.Condition((src, dest, srcMember) => srcMember != null));
 
         }
     }

@@ -24,7 +24,6 @@ builder.Services.AddControllers()
     });
 
 builder.Services.AddValidatorsFromAssemblyContaining<CustomerCreateValidator>();
-builder.Services.AddValidatorsFromAssemblyContaining<CustomerUpdateValidator>();
 builder.Services.AddValidatorsFromAssemblyContaining<ApplicationAssemblyMarker>();
 
 builder.Services.AddEndpointsApiExplorer();
