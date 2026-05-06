@@ -1,8 +1,6 @@
 using FluentValidation;
-using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
 using Salesync.Application;
 using Salesync.Application.Interfaces.Repositories;
@@ -12,7 +10,6 @@ using Salesync.Application.Services;
 using Salesync.Application.Validators.Customer;
 using Salesync.Infrastructure.Data;
 using Salesync.Infrastructure.Repositories;
-using Salesync.Application.Validators;
 
 
 var builder = WebApplication.CreateBuilder(args);

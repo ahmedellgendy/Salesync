@@ -1,4 +1,5 @@
 ﻿using AutoMapper;
+using FluentValidation;
 using Salesync.Application.Dtos.CustomerDto;
 using Salesync.Application.Interfaces.Repositories;
 using Salesync.Application.Interfaces.Services;
@@ -10,10 +11,14 @@ namespace Salesync.Application.Services
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
-        public CustomerService(IUnitOfWork unitOfWork, IMapper mapper)
+        private readonly IValidator<CreateCustomerDto> _createValidator;
+        private readonly IValidator<UpdateCustomerDto> _updateValidator;
+        public CustomerService(IUnitOfWork unitOfWork, IMapper mapper, IValidator<CreateCustomerDto> createValidator, IValidator<UpdateCustomerDto> updateValidator)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
+            _createValidator = createValidator;
+            _updateValidator = updateValidator;
         }
 
         public async Task<IEnumerable<CustomerDto>> GetAllAsync()
@@ -30,6 +35,11 @@ namespace Salesync.Application.Services
 
         public async Task<CustomerDto> CreateAsync(CreateCustomerDto createCustomerDto)
         {
+            // FluentValidation - Validate data format
+            var validationResult = await _createValidator.ValidateAsync(createCustomerDto);
+            if (!validationResult.IsValid)
+                throw new ValidationException(validationResult.Errors);
+
             // Check if a customer with the same email already exists
             var allCustomers = await _unitOfWork.Customers.GetAllAsync();
             if (allCustomers.Any(c => c.Email == createCustomerDto.Email))
@@ -47,6 +57,11 @@ namespace Salesync.Application.Services
 
         public async Task<CustomerDto> UpdateAsync(int id, UpdateCustomerDto updateCustomerDto)
         {
+            // FluentValidation - Validate data format
+            var validationResult = await _updateValidator.ValidateAsync(updateCustomerDto);
+            if (!validationResult.IsValid)
+                throw new ValidationException(validationResult.Errors);
+
             var customer = await _unitOfWork.Customers.GetByIdAsync(id);
             if (customer == null)
                 throw new Exception($"Customer with id '{id}' not found.");

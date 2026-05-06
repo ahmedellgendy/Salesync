@@ -1,6 +1,4 @@
-﻿using FluentValidation;
-using Microsoft.AspNetCore.Mvc;
-using Salesync.Application.Dtos.CustomerDto;
+﻿using Microsoft.AspNetCore.Mvc;
 using Salesync.Application.Dtos.ProductDto;
 using Salesync.Application.Interfaces.Services;
 
