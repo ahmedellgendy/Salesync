@@ -1,4 +1,5 @@
 ﻿using AutoMapper;
+using FluentValidation;
 using Salesync.Application.Dtos.ProductDto;
 using Salesync.Application.Interfaces.Repositories;
 using Salesync.Application.Interfaces.Services;
@@ -10,11 +11,15 @@ namespace Salesync.Application.Services
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
+        private readonly IValidator<CreateProductDto> _createValidator;
+        private readonly IValidator<UpdateProductDto> _updateValidator;
 
-        public ProductService(IUnitOfWork unitOfWork, IMapper mapper)
+        public ProductService(IUnitOfWork unitOfWork, IMapper mapper, IValidator<CreateProductDto> createValidator, IValidator<UpdateProductDto> updateValidator)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
+            _createValidator = createValidator;
+            _updateValidator = updateValidator;
         }
 
         public async Task<IEnumerable<ProductDto>> GetAllAsync()
@@ -31,7 +36,12 @@ namespace Salesync.Application.Services
         }
         public async Task<ProductDto> CreateAsync(CreateProductDto createProductDto)
         {
-            // Map from Dto to Product to save at db
+            // FluentValidation - Validate data format
+            var validationResult = await _createValidator.ValidateAsync(createProductDto);
+            if (!validationResult.IsValid)
+                throw new ValidationException(validationResult.Errors);
+
+            // Map from Dto to Product 
             var product = _mapper.Map<Product>(createProductDto);
 
             // Save Product at Db
@@ -42,8 +52,14 @@ namespace Salesync.Application.Services
             return _mapper.Map<ProductDto>(product);
 
         }
-        public async Task<ProductDto> UpdateAsync(int id,UpdateProductDto updateProductDto)
+        public async Task<ProductDto> UpdateAsync(int id, UpdateProductDto updateProductDto)
         {
+
+            // FluentValidation - Validate data format
+            var validationResult = await _updateValidator.ValidateAsync(updateProductDto);
+            if (!validationResult.IsValid)
+                throw new ValidationException(validationResult.Errors);
+
             var existingProduct = await _unitOfWork.Products.GetByIdAsync(id);
             if (existingProduct == null)
                 throw new Exception($"Product with id {id} Not Found");
@@ -65,6 +81,6 @@ namespace Salesync.Application.Services
 
         }
 
-        
+
     }
 }
