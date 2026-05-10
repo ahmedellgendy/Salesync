@@ -1,7 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Salesync.Application.Dtos.WarehouseDto;
 using Salesync.Application.Interfaces.Services;
-using Salesync.Domain.Entities;
 
 namespace Salesync.API.Controllers
 {
@@ -41,13 +40,20 @@ namespace Salesync.API.Controllers
         [HttpPost]  // POST: api/Warehouse --> Create New Warehouse
         public async Task<IActionResult> CreateAsync([FromBody] CreateWarehouseDto warehouseDto)
         {
-            if (warehouseDto == null)
-                return BadRequest();
-
             await _warehouseService.CreateAsync(warehouseDto);
-
             return Ok(warehouseDto);
         }
+
+        [HttpPut("{id}")]  // PUT: api/Warehouse/id --> Update Warehouse
+        public async Task<IActionResult> UpdateAsync(int id, [FromBody] UpdateWarehouseDto warehouseDto)
+        {
+            var updatedWarehouse = await _warehouseService.UpdateAsync(id,warehouseDto);
+            return Ok(new
+            {
+                Message = $"Warehouse with id {id} updated successfully",
+                UpdatedWarehouse = updatedWarehouse
+            });
+        } 
 
         [HttpDelete("{id}")] // DELETE: api/Warhouse --> Delete Warehouse 
         public async Task<IActionResult> DeleteAsync(int id)

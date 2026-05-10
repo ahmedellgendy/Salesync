@@ -18,7 +18,6 @@ namespace Salesync.API.Middleware
         {
             _logger.LogError(exception, "An error occurred: {Message}", exception.Message);
 
-            // التعامل مع ValidationException من FluentValidation
             if (exception is ValidationException validationException)
             {
                 var errors = validationException.Errors
@@ -42,7 +41,7 @@ namespace Salesync.API.Middleware
                 return true;
             }
 
-            // أي Exception تاني (عام)
+
             var genericError = new ProblemDetails
             {
                 Status = (int)HttpStatusCode.InternalServerError,
@@ -50,7 +49,7 @@ namespace Salesync.API.Middleware
                 Detail = exception.Message,
                 Instance = httpContext.Request.Path
             };
-
+                          
             httpContext.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
             await httpContext.Response.WriteAsJsonAsync(genericError, cancellationToken);
 

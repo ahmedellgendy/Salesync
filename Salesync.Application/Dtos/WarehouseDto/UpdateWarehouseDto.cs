@@ -2,7 +2,7 @@
 {
     public class UpdateWarehouseDto
     {
-        public int BranchId { get; set; }
+        public int? BranchId { get; set; }
         public required string Name { get; set; }
         public required string Location { get; set; }
     }
