@@ -13,6 +13,8 @@ namespace Salesync.Application.Mappings
         public MappingProfile()
         {
             CreateMap<Branch, BranchDto>().ReverseMap();
+            CreateMap<CreateBranchDto, Branch>();
+            CreateMap<UpdateBranchDto, Branch>().ForAllMembers(o => o.Condition((src, dest, srcMember) => srcMember != null));
 
             CreateMap<Warehouse, WarehouseDto>();
             CreateMap<CreateWarehouseDto, Warehouse>().ReverseMap();
