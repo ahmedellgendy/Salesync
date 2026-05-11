@@ -48,8 +48,7 @@ namespace Salesync.API.Controllers
             });
         }
 
-        // update an existing branch
-        [HttpPut("{id}")]
+        [HttpPut("{id}")] // PUT: api/branches/{id}
         public async Task<IActionResult> UpdateBranch(int id, [FromBody] UpdateBranchDto updateBranchDto)
         {
             var updatedBranch = await _branchService.UpdateBranchAsync(id, updateBranchDto);
@@ -60,8 +59,7 @@ namespace Salesync.API.Controllers
             });
         }
 
-        // delete a branch
-        [HttpDelete("{id}")]
+        [HttpDelete("{id}")] // Delete: api/branches/{id}
         public async Task<IActionResult> DeleteBranch(int id)
         {
             await _branchService.DeleteBranchAsync(id);

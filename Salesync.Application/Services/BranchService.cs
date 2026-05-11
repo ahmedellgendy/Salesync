@@ -1,4 +1,5 @@
 ﻿using AutoMapper;
+using FluentValidation;
 using Salesync.Application.Dtos.BranchDto;
 using Salesync.Application.Interfaces.Repositories;
 using Salesync.Application.Interfaces.Services;
@@ -10,11 +11,15 @@ namespace Salesync.Application.Services
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
+        private readonly IValidator<CreateBranchDto> _createValidator;
+        private readonly IValidator<UpdateBranchDto> _updateValidator;
 
-        public BranchService(IUnitOfWork unitOfWork, IMapper mapper)
+        public BranchService(IUnitOfWork unitOfWork, IMapper mapper, IValidator<CreateBranchDto> createValidator, IValidator<UpdateBranchDto> updateValidator)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
+            _createValidator = createValidator;
+            _updateValidator = updateValidator;
         }
         public async Task<IEnumerable<BranchDto>> GetAllAsync()
         {
@@ -30,6 +35,10 @@ namespace Salesync.Application.Services
         }
         public async Task<BranchDto> CreateBranchAsync(CreateBranchDto createBranchDto)
         {
+            var validationResult = await _createValidator.ValidateAsync(createBranchDto);
+            if (!validationResult.IsValid)
+                throw new ValidationException(validationResult.Errors);
+
             var branch = _mapper.Map<Branch>(createBranchDto);
             branch.CreatedAt = DateTime.UtcNow;
             branch.IsActive = true;
@@ -38,9 +47,12 @@ namespace Salesync.Application.Services
             await _unitOfWork.CompleteAsync();
             return _mapper.Map<BranchDto>(branch);
         }
-
         public async Task<BranchDto> UpdateBranchAsync(int id, UpdateBranchDto updateBranchDto)
         {
+            var validationResult = await _updateValidator.ValidateAsync(updateBranchDto);
+            if (!validationResult.IsValid)
+                throw new ValidationException(validationResult.Errors);
+
             var updatedBranch = await _unitOfWork.Branches.GetByIdAsync(id);
             if (updatedBranch == null || !updatedBranch.IsActive)
                 throw new Exception($"Branch with Id {id} not found or inactive.");
@@ -52,7 +64,6 @@ namespace Salesync.Application.Services
 
             return _mapper.Map<BranchDto>(updatedBranch);
         }
-
         public async Task DeleteBranchAsync(int id)
         {
             var branch = await _unitOfWork.Branches.GetByIdAsync(id);
