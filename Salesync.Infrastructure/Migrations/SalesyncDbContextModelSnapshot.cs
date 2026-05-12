@@ -63,7 +63,7 @@ namespace Salesync.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Branches");
+                    b.ToTable("Branches", (string)null);
                 });
 
             modelBuilder.Entity("Salesync.Domain.Entities.Customer", b =>
@@ -151,7 +151,7 @@ namespace Salesync.Infrastructure.Migrations
 
                     b.HasIndex("BranchId");
 
-                    b.ToTable("Customers");
+                    b.ToTable("Customers", (string)null);
                 });
 
             modelBuilder.Entity("Salesync.Domain.Entities.Product", b =>
@@ -225,7 +225,7 @@ namespace Salesync.Infrastructure.Migrations
 
                     b.HasIndex("WarehouseId");
 
-                    b.ToTable("Products");
+                    b.ToTable("Products", (string)null);
                 });
 
             modelBuilder.Entity("Salesync.Domain.Entities.Warehouse", b =>
@@ -266,7 +266,7 @@ namespace Salesync.Infrastructure.Migrations
 
                     b.HasIndex("BranchId");
 
-                    b.ToTable("Warehouses");
+                    b.ToTable("Warehouses", (string)null);
                 });
 
             modelBuilder.Entity("Salesync.Domain.Entities.Customer", b =>

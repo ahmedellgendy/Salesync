@@ -8,35 +8,12 @@ namespace Salesync.Infrastructure.Data
         public SalesyncDbContext(DbContextOptions<SalesyncDbContext> options) : base(options)
         {
         }
-
-
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
 
-            // Configuration for product
-            modelBuilder.Entity<Product>()
-                .Property(p => p.UnitPrice)
-                .HasPrecision(18, 2);
-            modelBuilder.Entity<Product>()
-                .Property(p => p.CostPrice)
-                .HasPrecision(18, 2);
-            modelBuilder.Entity<Product>()
-                .Property(p => p.DiscountPercentage)
-                .HasPrecision(18, 2);
-
-
-            // Configuration for customer 
-            modelBuilder.Entity<Customer>()
-                .Property(c => c.CreditLimit)
-                .HasPrecision(18, 2);
-            modelBuilder.Entity<Customer>()
-                .Property(c => c.CurrentBalance)
-                .HasPrecision(18, 2);
-            modelBuilder.Entity<Customer>()
-                .Property(c => c.TotalPurchaseAmount)
-                .HasPrecision(18, 2);
-
+            // Apply all configurations from the assembly
+            modelBuilder.ApplyConfigurationsFromAssembly(typeof(SalesyncDbContext).Assembly);
         }
 
         public DbSet<Branch> Branches { get; set; }
