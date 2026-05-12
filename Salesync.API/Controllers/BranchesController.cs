@@ -1,6 +1,8 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Salesync.Application.Dtos.BranchDto;
 using Salesync.Application.Interfaces.Services;
+using Salesync.API.Responses;
+
 
 namespace Salesync.API.Controllers
 {
@@ -19,11 +21,11 @@ namespace Salesync.API.Controllers
         public async Task<IActionResult> GetBranches()
         {
             var branches = await _branchService.GetAllAsync();
-
-            if (branches == null || !branches.Any())
-                return NoContent();
-
-            return Ok(branches);
+            return Ok(ApiResponse<IEnumerable<BranchDto>>.SuccessResponse(
+            branches,
+            "Branches retrieved successfully",
+            200
+        ));
         }
 
         [HttpGet("{id}")] // GET: api/branches/{id} 
@@ -32,38 +34,47 @@ namespace Salesync.API.Controllers
             var branch = await _branchService.GetBranchByIdAsync(id);
 
             if (branch == null || !branch.IsActive)
-                return NotFound(new { Message = $"Branch with ID {id} not found or inactive" });
+                return NotFound(ApiResponse<BranchDto>.NotFoundResponse($"Branch with ID {id} not found or inactive"));
 
-            return Ok(branch);
+            return Ok(ApiResponse<BranchDto>.SuccessResponse(
+                branch,
+                "Branch retrieved successfully",
+                200
+            ));
         }
 
         [HttpPost] // POST: api/branches
         public async Task<IActionResult> CreateAsync([FromBody] CreateBranchDto createBranchDto)
         {
             var createdBranch = await _branchService.CreateBranchAsync(createBranchDto);
-            return Ok(new
-            {
-                Message = $"Branch is created successfully",
-                Branch = createdBranch
-            });
+            return CreatedAtAction(nameof(GetBranch), new { id = createdBranch.Id },
+            ApiResponse<BranchDto>.SuccessResponse(
+                createdBranch,
+                "Branch created successfully",
+                201
+            ));
         }
 
         [HttpPut("{id}")] // PUT: api/branches/{id}
         public async Task<IActionResult> UpdateBranch(int id, [FromBody] UpdateBranchDto updateBranchDto)
         {
             var updatedBranch = await _branchService.UpdateBranchAsync(id, updateBranchDto);
-            return Ok(new
-            {
-                Message = $"Branch with ID {id} updated successfully",
-                Branch = updatedBranch
-            });
+            return Ok(ApiResponse<BranchDto>.SuccessResponse(
+            updatedBranch,
+            "Branch updated successfully",
+            200
+        ));
         }
 
         [HttpDelete("{id}")] // Delete: api/branches/{id}
         public async Task<IActionResult> DeleteBranch(int id)
         {
             await _branchService.DeleteBranchAsync(id);
-            return Ok(new { Message = $"Branch with ID {id} deleted successfully" });
+            return Ok(ApiResponse<object>.SuccessResponse(
+                        null,
+                        $"Branch with ID {id} deleted successfully",
+                        200
+                    ));
         }
 
     }
