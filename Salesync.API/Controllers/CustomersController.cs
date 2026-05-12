@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Salesync.API.Responses;
 using Salesync.Application.Dtos.CustomerDto;
 using Salesync.Application.Interfaces.Services;
 
@@ -10,7 +11,7 @@ namespace Salesync.API.Controllers
     public class CustomersController : ControllerBase
     {
         private readonly ICustomerService _customerService;
-        
+
         public CustomersController(ICustomerService customerService)
 
         {
@@ -22,7 +23,11 @@ namespace Salesync.API.Controllers
         public async Task<IActionResult> GetAll()
         {
             var customers = await _customerService.GetAllAsync();
-            return Ok(customers);
+            return Ok(ApiResponse<IEnumerable<CustomerDto>>.SuccessResponse(
+            customers,
+            "Customers retrieved successfully",
+            200
+            ));
         }
 
         [HttpGet("{id}")] // GET: api/customers/{id}
@@ -30,20 +35,25 @@ namespace Salesync.API.Controllers
         {
             var customer = await _customerService.GetByIdAsync(id);
             if (customer == null)
-                return NotFound($"Customer with id '{id}' not found.");
+                return NotFound(ApiResponse<CustomerDto>.NotFoundResponse($"Customer with ID {id} not found"));
 
-            return Ok(customer);
+            return Ok(ApiResponse<CustomerDto>.SuccessResponse(
+                customer,
+                "Customer retrieved successfully",
+                200
+            ));
         }
 
         [HttpPost] // POST: api/customers
         public async Task<IActionResult> Create([FromBody] CreateCustomerDto createCustomerDto)
         {
             var createdCustomer = await _customerService.CreateAsync(createCustomerDto);
-            return CreatedAtAction(nameof(GetById), new { id = createdCustomer.Id }, new
-            {
-                Message = "Customer created successfully..",
-                CustomerDto = createdCustomer
-            });
+
+            return CreatedAtAction(nameof(GetById), new { id = createdCustomer.Id },
+             ApiResponse<CustomerDto>.SuccessResponse(
+                 createdCustomer,
+                 "Customer created successfully"
+                 ));
         }
 
         [HttpPut("{id}")] // PUT: api/customers/{id}
@@ -51,16 +61,14 @@ namespace Salesync.API.Controllers
         {
             // Check the ID in the URL matches the ID in the body
             if (id != updateCustomerDto.Id)
-                return BadRequest("ID in URL does not match ID in body.");
+                return BadRequest(ApiResponse<object>.ErrorResponse("ID in URL does not match ID in body"));
 
             // UPDATE Customer
             var updatedCustomer = await _customerService.UpdateAsync(id, updateCustomerDto);
-            return Ok(new
-            {
-                Message = "Customer updated successfully..",
-                Customer = updatedCustomer
-            });
-
+            return Ok(ApiResponse<CustomerDto>.SuccessResponse(
+                updatedCustomer,
+                "Customer updated successfully"
+                ));
         }
 
         [HttpDelete("{id}")] // DELETE: api/customers/{id}
@@ -68,7 +76,10 @@ namespace Salesync.API.Controllers
         {
 
             await _customerService.DeleteAsync(id);
-            return Ok($"Customer with id '{id}' deleted successfully.");
+            return Ok(ApiResponse<object>.SuccessResponse(
+                null,
+                $"Customer with ID {id} deleted successfully"
+                ));
 
         }
     }

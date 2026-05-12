@@ -55,7 +55,7 @@ namespace Salesync.Application.Services
 
             var updatedBranch = await _unitOfWork.Branches.GetByIdAsync(id);
             if (updatedBranch == null || !updatedBranch.IsActive)
-                throw new Exception($"Branch with Id {id} not found or inactive.");
+                throw new KeyNotFoundException($"Branch with Id {id} not found or inactive.");
 
             _mapper.Map(updateBranchDto, updatedBranch);
             updatedBranch.UpdatedAt = DateTime.UtcNow;
@@ -67,8 +67,8 @@ namespace Salesync.Application.Services
         public async Task DeleteBranchAsync(int id)
         {
             var branch = await _unitOfWork.Branches.GetByIdAsync(id);
-            if(branch == null || !branch.IsActive)
-                throw new Exception($"Branch with Id {id} not found or already inactive.");
+            if (branch == null || !branch.IsActive)
+                throw new KeyNotFoundException($"Branch with Id {id} not found or already inactive.");
 
             branch.IsActive = false;
             branch.UpdatedAt = DateTime.UtcNow;
