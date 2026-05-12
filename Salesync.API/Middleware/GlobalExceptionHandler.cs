@@ -1,6 +1,7 @@
 ﻿using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using Salesync.API.Responses;
 using System.Net;
 
 namespace Salesync.API.Middleware
@@ -16,42 +17,65 @@ namespace Salesync.API.Middleware
 
         public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
         {
-            _logger.LogError(exception, "An error occurred: {Message}", exception.Message);
+            _logger.LogError(exception, exception.Message);
 
-            if (exception is ValidationException validationException)
+            ApiResponse<object> response;
+            int statusCode;
+
+            switch (exception)
             {
-                var errors = validationException.Errors
-                    .GroupBy(e => e.PropertyName)
-                    .ToDictionary(
-                        g => g.Key,
-                        g => g.Select(e => e.ErrorMessage).ToArray()
-                    );
+                // Handle validation exceptions
+                case ValidationException validationException:
+                    statusCode = (int)HttpStatusCode.BadRequest;
+                    response = ApiResponse<object>.ValidationErrorResponse(
+                        validationException.Errors
+                        .Select(e => e.ErrorMessage)
+                        .Distinct()
+                        .ToList(),
+                        "Validation Error"
+                        );
+                    break;
 
-                var problemDetails = new ProblemDetails
-                {
-                    Status = (int)HttpStatusCode.BadRequest,
-                    Title = "Validation Error",
-                    Detail = "One or more validation errors occurred",
-                    Instance = httpContext.Request.Path
-                };
-                problemDetails.Extensions["errors"] = errors;
+                // Handle not found exceptions
+                case KeyNotFoundException:
+                    statusCode = (int)HttpStatusCode.NotFound;
+                    response = ApiResponse<object>.NotFoundResponse(
+                        exception.Message
+                        );
+                    break;
 
-                httpContext.Response.StatusCode = (int)HttpStatusCode.BadRequest;
-                await httpContext.Response.WriteAsJsonAsync(problemDetails, cancellationToken);
-                return true;
+                // handle bad request exceptions
+                case ArgumentException:
+                    statusCode = (int)HttpStatusCode.BadRequest;
+                    response = ApiResponse<object>.ErrorResponse(
+                        exception.Message,
+                        statusCode
+                        );
+                    break;
+
+                // unauthorized access exceptions
+                case UnauthorizedAccessException:
+                    statusCode = (int)HttpStatusCode.Unauthorized;
+                    response = ApiResponse<object>.ErrorResponse(
+                        exception.Message,
+                        statusCode
+                        );
+                    break;
+
+                    // internal server errors   
+                    default:
+                    statusCode = (int)HttpStatusCode.InternalServerError;
+                    response = ApiResponse<object>.ErrorResponse(
+                        "Internal Server Error.",
+                        statusCode
+                        );
+                    break;
             }
 
+            httpContext.Response.StatusCode = statusCode;
+            httpContext.Response.ContentType = "application/json";
 
-            var genericError = new ProblemDetails
-            {
-                Status = (int)HttpStatusCode.InternalServerError,
-                Title = "An error occurred",
-                Detail = exception.Message,
-                Instance = httpContext.Request.Path
-            };
-                          
-            httpContext.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
-            await httpContext.Response.WriteAsJsonAsync(genericError, cancellationToken);
+            await httpContext.Response.WriteAsJsonAsync(response, cancellationToken);
 
             return true;
         }
