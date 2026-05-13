@@ -31,7 +31,7 @@ namespace Salesync.Application.Services
         public async Task<WarehouseDto?> GetByIdAsync(int id)
         {
             var warehouse = await _unitOfWork.Warehouses.GetByIdAsync(id);
-            return _mapper.Map<WarehouseDto>(warehouse);
+            return warehouse == null ? null : _mapper.Map<WarehouseDto>(warehouse);
         }
         public async Task<WarehouseDto> CreateAsync(CreateWarehouseDto warehouseDto)
         {
@@ -39,6 +39,14 @@ namespace Salesync.Application.Services
             var validationResult = await _createValidator.ValidateAsync(warehouseDto);
             if (!validationResult.IsValid)
                 throw new ValidationException(validationResult.Errors);
+
+            // Check if branch exists
+            var branch = await _unitOfWork.Branches
+                .GetByIdAsync(warehouseDto.BranchId);
+
+            if (branch == null)
+                throw new Exception("Branch does not exist.");
+
 
             var warehouse = _mapper.Map<Warehouse>(warehouseDto);
 
@@ -62,7 +70,16 @@ namespace Salesync.Application.Services
             // get the existing warehouse
             var warehouse = await _unitOfWork.Warehouses.GetByIdAsync(id);
             if (warehouse == null)
-                throw new Exception($"Warehouse {id} not found");
+                throw new KeyNotFoundException($"Warehouse with ID {id} not found");
+
+            if (warehouseDto.BranchId.HasValue)
+            {
+                var branch = await _unitOfWork.Branches
+                    .GetByIdAsync(warehouseDto.BranchId.Value);
+
+                if (branch == null)
+                    throw new KeyNotFoundException("Branch does not exist.");
+            }
 
             _mapper.Map(warehouseDto, warehouse);
 
@@ -80,18 +97,13 @@ namespace Salesync.Application.Services
         {
             var warehouse = await _unitOfWork.Warehouses.GetByIdAsync(id);
             if (warehouse == null)
-            {
-                throw new Exception($"Warehouse {id} not found");
-            }
+                throw new KeyNotFoundException($"Warehouse with ID {id} not found");
 
-            _unitOfWork.Warehouses.DeleteAsync(warehouse);
+            _unitOfWork.Warehouses.Delete(warehouse);
             await _unitOfWork.CompleteAsync();
-
             return true;
+
         }
-
-
-
 
     }
 }

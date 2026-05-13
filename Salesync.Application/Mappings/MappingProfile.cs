@@ -18,7 +18,8 @@ namespace Salesync.Application.Mappings
 
             CreateMap<Warehouse, WarehouseDto>();
             CreateMap<CreateWarehouseDto, Warehouse>().ReverseMap();
-            CreateMap<UpdateWarehouseDto, Warehouse>().ForAllMembers(o => o.Condition((src, dest, srcMember) => srcMember != null));
+            CreateMap<UpdateWarehouseDto, Warehouse>().ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
+
 
             CreateMap<Product, ProductDto>().ReverseMap();
             CreateMap<CreateProductDto, Product>();

@@ -67,9 +67,9 @@ namespace Salesync.API.Controllers
         }
 
         [HttpDelete("{id}")] // Delete: api/branches/{id}
-        public async Task<IActionResult> DeleteBranch(int id)
+        public async Task<IActionResult> Delete(int id)
         {
-            await _branchService.DeleteBranchAsync(id);
+            await _branchService.DeleteAsync(id);
             return Ok(ApiResponse<object>.SuccessResponse(
                         null,
                         $"Branch with ID {id} deleted successfully",

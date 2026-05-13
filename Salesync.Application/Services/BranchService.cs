@@ -64,7 +64,7 @@ namespace Salesync.Application.Services
 
             return _mapper.Map<BranchDto>(updatedBranch);
         }
-        public async Task DeleteBranchAsync(int id)
+        public async Task DeleteAsync(int id)
         {
             var branch = await _unitOfWork.Branches.GetByIdAsync(id);
             if (branch == null || !branch.IsActive)

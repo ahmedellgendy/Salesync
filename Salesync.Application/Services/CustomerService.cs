@@ -77,7 +77,7 @@ namespace Salesync.Application.Services
             if (customer == null)
                 throw new KeyNotFoundException($"Customer with id '{id}' not found.");
 
-            _unitOfWork.Customers.DeleteAsync(customer);
+            _unitOfWork.Customers.Delete(customer);
             await _unitOfWork.CompleteAsync();
 
         }

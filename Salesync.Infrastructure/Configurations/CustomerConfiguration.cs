@@ -11,6 +11,9 @@ namespace Salesync.Infrastructure.Configurations
             builder.ToTable("Customers");
             builder.HasKey(c => c.Id);
 
+            builder.Property(c => c.Id)
+                .UseIdentityColumn();
+
             builder.Property(c => c.Name)
                 .IsRequired()
                 .HasMaxLength(100);

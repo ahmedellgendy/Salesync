@@ -7,7 +7,7 @@ namespace Salesync.Application.Interfaces.Services
         Task<IEnumerable<WarehouseDto>> GetAllAsync();
         Task<WarehouseDto?> GetByIdAsync(int id);
         Task<WarehouseDto> CreateAsync(CreateWarehouseDto warehouseDto);
-        Task<WarehouseDto> UpdateAsync(int id,UpdateWarehouseDto warehouseDto);
+        Task<WarehouseDto> UpdateAsync(int id, UpdateWarehouseDto warehouseDto);
         Task<bool> DeleteAsync(int id);
     }
 }

@@ -8,6 +8,6 @@ namespace Salesync.Application.Interfaces.Services
         Task<BranchDto?> GetBranchByIdAsync(int id);
         Task<BranchDto> CreateBranchAsync(CreateBranchDto createBranchDto);
         Task<BranchDto> UpdateBranchAsync(int id, UpdateBranchDto updateBranchDto);
-        Task DeleteBranchAsync(int id);
+        Task DeleteAsync(int id);
     }
 }

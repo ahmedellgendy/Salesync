@@ -11,6 +11,9 @@ namespace Salesync.Infrastructure.Configurations
             builder.ToTable("Branches");
             builder.HasKey(b => b.Id);
 
+            builder.Property(b => b.Id)
+                .UseIdentityColumn();
+
             builder.Property(b => b.Name)
                 .IsRequired()
                 .HasMaxLength(100);

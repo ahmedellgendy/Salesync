@@ -49,8 +49,7 @@ namespace Salesync.API.Controllers
         {
             var createdCustomer = await _customerService.CreateAsync(createCustomerDto);
 
-            return CreatedAtAction(nameof(GetById), new { id = createdCustomer.Id },
-             ApiResponse<CustomerDto>.SuccessResponse(
+            return Ok(ApiResponse<CustomerDto>.SuccessResponse(
                  createdCustomer,
                  "Customer created successfully"
                  ));
