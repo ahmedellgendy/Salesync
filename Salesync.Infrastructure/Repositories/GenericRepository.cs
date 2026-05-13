@@ -21,7 +21,7 @@ namespace Salesync.Infrastructure.Repositories
         public async Task<T?> GetByIdAsync(int id) => await _context.Set<T>().FindAsync(id);
         public async Task CreateAsync(T entity) => await _context.Set<T>().AddAsync(entity);
         public void UpdateAsync(T entity) => _context.Set<T>().Update(entity);
-        public void DeleteAsync(T entity) => _context.Set<T>().Remove(entity);
+        public void Delete(T entity) => _context.Set<T>().Remove(entity);
 
         public async Task<IEnumerable<T>> FindAsync(Expression<Func<T, bool>> predicate)=> await _context.Set<T>().Where(predicate).ToListAsync();
         

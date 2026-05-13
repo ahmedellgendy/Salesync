@@ -43,9 +43,7 @@ namespace Salesync.Application.Services
             // Check if a customer with the same email already exists
             var allCustomers = await _unitOfWork.Customers.GetAllAsync();
             if (allCustomers.Any(c => c.Email == createCustomerDto.Email))
-            {
-                throw new Exception($"A customer with the email '{createCustomerDto.Email}' already exists.");
-            }
+                throw new ArgumentException($"A customer with the email '{createCustomerDto.Email}' already exists.");
 
             // Map from Dto to Customer to save at db
             var customer = _mapper.Map<Customer>(createCustomerDto);
@@ -64,7 +62,7 @@ namespace Salesync.Application.Services
 
             var customer = await _unitOfWork.Customers.GetByIdAsync(id);
             if (customer == null)
-                throw new Exception($"Customer with id '{id}' not found.");
+                throw new KeyNotFoundException($"Customer with id '{id}' not found.");
 
             _mapper.Map(updateCustomerDto, customer);
 
@@ -77,14 +75,12 @@ namespace Salesync.Application.Services
         {
             var customer = await _unitOfWork.Customers.GetByIdAsync(id);
             if (customer == null)
-                throw new Exception($"Customer with id '{id}' not found.");
+                throw new KeyNotFoundException($"Customer with id '{id}' not found.");
 
-            _unitOfWork.Customers.DeleteAsync(customer);
+            _unitOfWork.Customers.Delete(customer);
             await _unitOfWork.CompleteAsync();
 
         }
-
-
 
     }
 }

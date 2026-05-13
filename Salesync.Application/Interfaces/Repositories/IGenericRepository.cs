@@ -9,7 +9,7 @@ namespace Salesync.Application.Interfaces.Repositories
         Task<IEnumerable<T>> GetAllAsync();
         Task CreateAsync(T entity);
         void UpdateAsync(T entity);
-        void DeleteAsync(T entity);
+        void Delete(T entity);
 
         Task<IEnumerable<T>> FindAsync(Expression<Func<T, bool>> predicate);
         Task<T> AddAsync(T entity);

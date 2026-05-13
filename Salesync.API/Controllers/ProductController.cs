@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Salesync.API.Responses;
 using Salesync.Application.Dtos.ProductDto;
 using Salesync.Application.Interfaces.Services;
 
@@ -9,7 +10,7 @@ namespace Salesync.API.Controllers
     public class ProductController : ControllerBase
     {
         private readonly IProductService _productService;
-        
+
         public ProductController(IProductService productService)
         {
             _productService = productService;
@@ -19,47 +20,56 @@ namespace Salesync.API.Controllers
         public async Task<IActionResult> GetAllAsync()
         {
             var products = await _productService.GetAllAsync();
-            if (products == null)
-                return NoContent();
 
-            return Ok(products);
+            return Ok(ApiResponse<IEnumerable<ProductDto>>.SuccessResponse(
+                      products,
+                      "products retrieved successfully",
+                      200
+                      ));
         }
 
         [HttpGet("{id}")]  // GET: api/product/id
         public async Task<IActionResult> GetByIdAsync(int id)
         {
             var product = await _productService.GetByIdAsync(id);
-
             if (product == null)
-                return NotFound($"product with id {id} not found");
+                return NotFound(ApiResponse<object>.NotFoundResponse($"Product with ID {id} not found"));
 
-            return Ok(product);
-
+            return Ok(ApiResponse<ProductDto>.SuccessResponse(
+                      product,
+                      "product retrieved successfully",
+                      200
+                      ));
         }
 
         [HttpPost]  // POST: api/product --> Create New Product
         public async Task<IActionResult> CreateAsync([FromBody] CreateProductDto createProductDto)
         {
             var createdProduct = await _productService.CreateAsync(createProductDto);
-            return Ok(createdProduct);
+            return Ok(ApiResponse<ProductDto>.SuccessResponse(createdProduct, "Product created successfully", 201));
+
         }
 
         [HttpPut("{id:int}")] // PUT: api/product/id --> Update Product
         public async Task<IActionResult> UpdateAsync(int id, [FromBody] UpdateProductDto updateProductDto)
         {
-            var updatedProduct = await _productService.UpdateAsync(id, updateProductDto);
-            return Ok(new
-            {
-                Message = "Product Updated Successfully..",
-                Product = updatedProduct
+            if (id != updateProductDto.Id)
+                return BadRequest(ApiResponse<object>.ErrorResponse("ID in URL does not match ID in body", 400));
 
-            });
+            var updatedProduct = await _productService.UpdateAsync(id, updateProductDto);
+            return Ok(ApiResponse<ProductDto>.SuccessResponse(
+                updatedProduct,
+                "product updated successfully."
+                ));
         }
         [HttpDelete("{id}")]  //DELETE: api/product/id --> Delete Product
         public async Task<IActionResult> DeleteAsync(int id)
         {
             await _productService.DeleteAsync(id);
-            return NoContent();
+            return Ok(ApiResponse<object>.SuccessResponse(
+                      null,
+                      $"Product with ID {id} deleted successfully"
+                      ));
         }
     }
 }

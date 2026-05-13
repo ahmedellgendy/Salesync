@@ -2,6 +2,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
+using Salesync.API.Middleware;
 using Salesync.Application;
 using Salesync.Application.Interfaces.Repositories;
 using Salesync.Application.Interfaces.Services;
@@ -27,6 +28,10 @@ builder.Services.AddControllers()
 
 builder.Services.AddValidatorsFromAssemblyContaining<CustomerCreateValidator>();
 builder.Services.AddValidatorsFromAssemblyContaining<ApplicationAssemblyMarker>();
+
+// Exception Handler
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -67,6 +72,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Salesync API v1"));
 }
 
+
+app.UseExceptionHandler();
 app.UseHttpsRedirection();
 app.UseAuthorization();
 app.MapControllers();

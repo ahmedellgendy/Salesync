@@ -25,13 +25,11 @@ namespace Salesync.Application.Services
         public async Task<IEnumerable<ProductDto>> GetAllAsync()
         {
             var products = await _unitOfWork.Products.GetAllAsync();
-
             return _mapper.Map<IEnumerable<ProductDto>>(products);
         }
         public async Task<ProductDto> GetByIdAsync(int id)
         {
             var product = await _unitOfWork.Products.GetByIdAsync(id);
-
             return _mapper.Map<ProductDto>(product);
         }
         public async Task<ProductDto> CreateAsync(CreateProductDto createProductDto)
@@ -62,25 +60,22 @@ namespace Salesync.Application.Services
 
             var existingProduct = await _unitOfWork.Products.GetByIdAsync(id);
             if (existingProduct == null)
-                throw new Exception($"Product with id {id} Not Found");
+                throw new KeyNotFoundException($"Product with id {id} Not Found");
 
             _mapper.Map(updateProductDto, existingProduct);
             await _unitOfWork.CompleteAsync();
 
             return _mapper.Map<ProductDto>(existingProduct);
         }
-
         public async Task DeleteAsync(int id)
         {
             var product = await _unitOfWork.Products.GetByIdAsync(id);
             if (product == null)
-                throw new Exception($"Product with id {id} Not Found");
+                throw new KeyNotFoundException($"Product with id {id} Not Found");
 
-            _unitOfWork.Products.DeleteAsync(product);
+            _unitOfWork.Products.Delete(product);
             await _unitOfWork.CompleteAsync();
 
         }
-
-
     }
 }

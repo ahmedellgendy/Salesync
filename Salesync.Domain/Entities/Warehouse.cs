@@ -8,5 +8,8 @@
         
         // Navigation Properties
         public Branch Branch { get; set; } = null!;
+
+        public ICollection<Product> Products { get; set; } = new List<Product>();
+
     }
 }
