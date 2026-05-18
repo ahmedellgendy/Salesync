@@ -1,4 +1,4 @@
-﻿using Salesync.Domain.Entities;
+﻿using Salesync.Domain.Modules.MasterData.Entities;
 
 namespace Salesync.Application.Interfaces.Repositories
 {

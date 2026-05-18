@@ -1,4 +1,4 @@
-﻿using Salesync.Domain.Entities;
+﻿using Salesync.Domain.Common;
 using System.Linq.Expressions;
 
 namespace Salesync.Application.Interfaces.Repositories

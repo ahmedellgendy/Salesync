@@ -5,12 +5,12 @@ using Microsoft.OpenApi.Models;
 using Salesync.API.Middleware;
 using Salesync.Application;
 using Salesync.Application.Interfaces.Repositories;
-using Salesync.Application.Interfaces.Services;
 using Salesync.Application.Mappings;
-using Salesync.Application.Services;
-using Salesync.Application.Validators.Customer;
+using Salesync.Application.Modules.MasterData.Interfaces.Services;
+using Salesync.Application.Modules.MasterData.Services;
+using Salesync.Application.Modules.MasterData.Validators.Customer;
 using Salesync.Infrastructure.Data;
-using Salesync.Infrastructure.Repositories;
+using Salesync.Infrastructure.Repositories.Common;
 
 
 var builder = WebApplication.CreateBuilder(args);
