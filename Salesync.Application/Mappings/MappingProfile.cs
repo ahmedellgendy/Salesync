@@ -1,9 +1,9 @@
 ﻿using AutoMapper;
-using Salesync.Application.Dtos.BranchDto;
-using Salesync.Application.Dtos.CustomerDto;
-using Salesync.Application.Dtos.ProductDto;
-using Salesync.Application.Dtos.WarehouseDto;
-using Salesync.Domain.Entities;
+using Salesync.Application.Modules.MasterData.Dtos.BranchDto;
+using Salesync.Application.Modules.MasterData.Dtos.CustomerDto;
+using Salesync.Application.Modules.MasterData.Dtos.ProductDto;
+using Salesync.Application.Modules.MasterData.Dtos.WarehouseDto;
+using Salesync.Domain.Modules.MasterData.Entities;
 
 
 namespace Salesync.Application.Mappings
