@@ -5,10 +5,14 @@ namespace Salesync.Application.Modules.MasterData.Validators.Product
 {
     public class UpdateProductValidator : AbstractValidator<UpdateProductDto>
     {
-        public UpdateProductValidator() 
+        public UpdateProductValidator()
         {
             RuleFor(x => x.Id)
                 .NotEmpty();
+
+            RuleFor(x => x.ItemCode)
+            .MaximumLength(50)
+            .When(x => x.ItemCode != null);
 
             RuleFor(x => x.Name)
                 .MaximumLength(150)
@@ -27,29 +31,16 @@ namespace Salesync.Application.Modules.MasterData.Validators.Product
                 .When(x => x.Barcode != null);
 
             RuleFor(x => x.UnitPrice)
-                .GreaterThan(0)
-                .When(x => x.UnitPrice.HasValue);
+               .GreaterThanOrEqualTo(0)
+               .WithMessage("Unit price must be 0 or more.");
 
             RuleFor(x => x.CostPrice)
                 .GreaterThanOrEqualTo(0)
-                .When(x => x.CostPrice.HasValue);
+                .WithMessage("Cost price must be 0 or more.");
 
             RuleFor(x => x.DiscountPercentage)
                 .InclusiveBetween(0, 100)
                 .When(x => x.DiscountPercentage.HasValue);
-
-            RuleFor(x => x.StockQuantity)
-                .GreaterThanOrEqualTo(0)
-                .When(x => x.StockQuantity.HasValue);
-
-            RuleFor(x => x.MinStockLevel)
-                .GreaterThanOrEqualTo(0)
-                .When(x => x.MinStockLevel.HasValue);
-
-            RuleFor(x => x.MaxStockLevel)
-                .GreaterThan(x => x.MinStockLevel)
-                .When(x => x.MaxStockLevel.HasValue && x.MinStockLevel.HasValue)
-                .WithMessage("Max stock must be greater than Min stock.");
 
             RuleFor(x => x.Unit)
                 .MaximumLength(20)
