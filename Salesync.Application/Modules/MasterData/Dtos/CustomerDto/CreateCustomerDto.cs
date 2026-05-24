@@ -4,27 +4,44 @@ namespace Salesync.Application.Modules.MasterData.Dtos.CustomerDto
 {
     public class CreateCustomerDto
     {
-        // Basic Information (required)
-        public required string Name { get; set; }
-        public required string Phone { get; set; }
-        public required string Email { get; set; }
+        // Basic Info
+        public string Name { get; set; } = string.Empty;
+        public string? Phone { get; set; }
+        public string? Email { get; set; }
 
-        // Address Information (required)
-        public required string Address { get; set; }
-        public string? City { get; set; }
-        public string? State { get; set; }
-        public string? PostalCode { get; set; }
+        // Address
         public string? Country { get; set; }
+        public string? Address { get; set; }
+        public string? Area { get; set; }
+        public string? City { get; set; }
+        public string? District { get; set; }
+        public string? Region { get; set; }
+        public string? PostalCode { get; set; }
 
-        // Customer Type 
-        public CustomerType Type { get; set; } = CustomerType.Individual;
-        public string? CompanyName { get; set; }
+        // GPS
+        public decimal? Latitude { get; set; }
+        public decimal? Longitude { get; set; }
 
-        // Business Information 
-        public decimal CreditLimit { get; set; } = 0;
-        public CustomerStatus Status { get; set; } = CustomerStatus.Pending;
+        // Classification
+        public string? CategoryCode { get; set; }
+        public string? SalesSectorCode { get; set; }
+        public string? ClassId { get; set; }
+        public CustomerType Type { get; set; }
 
-        // Relations 
+        // Payment
+        public bool AllowCash { get; set; } = true;
+        public bool AllowCheck { get; set; }
+        public bool AllowCreditCard { get; set; }
+        public string? PaymentTermsCode { get; set; }
+
+        // Credit
+        public decimal CreditLimit { get; set; }
+        public decimal OrderCeiling { get; set; }
+
+        public string? AccountNumber { get; set; }
+        public string? TaxId { get; set; }
+        public string? PriceId { get; set; }
+
         public int? BranchId { get; set; }
     }
 }

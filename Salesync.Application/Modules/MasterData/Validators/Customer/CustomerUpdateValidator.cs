@@ -7,6 +7,10 @@ namespace Salesync.Application.Modules.MasterData.Validators.Customer
     {
         public CustomerUpdateValidator()
         {
+            RuleFor(x => x.Id)
+               .GreaterThan(0)
+               .WithMessage("Invalid customer Id.");
+
             RuleFor(x => x.Name)
                 .NotEmpty()
                 .WithMessage("Name is required.")
@@ -15,11 +19,13 @@ namespace Salesync.Application.Modules.MasterData.Validators.Customer
 
             RuleFor(x => x.Email)
                 .EmailAddress()
-                .WithMessage("Invalid email format.");
+                .WithMessage("Invalid email format.")
+                .When(x => !string.IsNullOrWhiteSpace(x.Email));
 
             RuleFor(x => x.Phone)
-                .Matches(@"^(010|011|012|015)[0-9]{8}$")
-                .WithMessage("Invalid phone number format.Must be Egyptian number like 01062972156");
+                .Matches(@"^(01)[0-9]{9}$")
+                .WithMessage("Invalid Egyptian phone number format.")
+                .When(x => !string.IsNullOrWhiteSpace(x.Phone));
         }
     }
 }

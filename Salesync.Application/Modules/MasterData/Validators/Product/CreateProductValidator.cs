@@ -7,6 +7,12 @@ namespace Salesync.Application.Modules.MasterData.Validators.Product
     {
         public CreateProductValidator()
         {
+            RuleFor(x => x.ItemCode)
+                .NotEmpty()
+                .WithMessage("Item code is required.")
+                .MaximumLength(50)
+                .WithMessage("Item code cannot exceed 50 characters.");
+
             RuleFor(x => x.Name)
                 .NotEmpty()
                 .WithMessage("Product name is required.")
@@ -37,15 +43,14 @@ namespace Salesync.Application.Modules.MasterData.Validators.Product
                 .InclusiveBetween(0, 100)
                 .When(x => x.DiscountPercentage.HasValue);
 
-            RuleFor(x => x.StockQuantity)
-                .GreaterThanOrEqualTo(0);
-
             RuleFor(x => x.MinStockLevel)
                 .GreaterThanOrEqualTo(0);
 
             RuleFor(x => x.MaxStockLevel)
-                .GreaterThan(x => x.MinStockLevel)
-                .WithMessage("Max stock must be greater than Min stock.");
+                .GreaterThanOrEqualTo(0)
+                .GreaterThanOrEqualTo(x => x.MinStockLevel)
+                .WithMessage("Max stock must be greater than or equal to min stock.")
+                .When(x => x.MaxStockLevel > 0);
 
             RuleFor(x => x.Unit)
                 .NotEmpty()
