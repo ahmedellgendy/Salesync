@@ -14,6 +14,10 @@ namespace Salesync.Infrastructure.Configurations.MasterData
             builder.Property(w => w.Id)
                 .UseIdentityColumn();
 
+            builder.Property(w => w.WarehouseCode)
+                .IsRequired()
+                .HasMaxLength(50);
+
             builder.Property(w => w.Name)
                 .IsRequired()
                 .HasMaxLength(100);
@@ -22,11 +26,20 @@ namespace Salesync.Infrastructure.Configurations.MasterData
                 .IsRequired()
                 .HasMaxLength(200);
 
-            builder.Property(w => w.CreatedAt)
-                .IsRequired();
+            builder.Property(w => w.Latitude)
+                .HasPrecision(18, 10);
+
+            builder.Property(w => w.Longitude)
+                .HasPrecision(18, 10);
+
+            builder.Property(w => w.ErrorRadius)
+                .HasPrecision(18, 2);
+
+            builder.Property(e => e.CreatedAt)
+                .IsRequired()
+                .HasDefaultValueSql("GETUTCDATE()");
 
             builder.Property(w => w.IsActive)
-                .IsRequired()
                 .HasDefaultValue(true);
 
             // Relationships
@@ -41,7 +54,9 @@ namespace Salesync.Infrastructure.Configurations.MasterData
                 .OnDelete(DeleteBehavior.Restrict);
 
             // Indexes
-            builder.HasIndex(w => w.Name);
+            builder.HasIndex(w => w.WarehouseCode).IsUnique();
+            builder.HasIndex(w => new { w.BranchId, w.Type });
+
         }
     }
 }

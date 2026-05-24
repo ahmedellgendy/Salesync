@@ -42,7 +42,8 @@ namespace Salesync.Infrastructure.Configurations.MasterData
                 .HasDefaultValue(0);
 
             builder.Property(p => p.CreatedAt)
-                .IsRequired();
+                .IsRequired()
+                .HasDefaultValueSql("GETUTCDATE()");
 
             builder.Property(p => p.IsActive)
                 .IsRequired()
