@@ -10,12 +10,17 @@ using Salesync.Application.Modules.MasterData.Interfaces.Services;
 using Salesync.Application.Modules.MasterData.Services;
 using Salesync.Application.Modules.MasterData.Validators.Customer;
 using Salesync.Infrastructure.Data;
+using Salesync.Infrastructure.DependencyInjection;
+using Salesync.Infrastructure.Extensions;
 using Salesync.Infrastructure.Repositories.Common;
+using Salesync.Infrastructure.Seeds;
 
 
 var builder = WebApplication.CreateBuilder(args);
 
+
 // Add services to the container.
+
 builder.Services.AddControllers()
     .ConfigureApiBehaviorOptions(options =>
     {
@@ -25,11 +30,13 @@ builder.Services.AddControllers()
         };
     });
 
+builder.Services.AddInfrastructureServices(builder.Configuration);
+builder.Services.AddMasterDataModule(builder.Configuration);
+builder.Services.AddIdentityServices(builder.Configuration);
+builder.Services.AddApplicationServices();
 
-builder.Services.AddValidatorsFromAssemblyContaining<CustomerCreateValidator>();
-builder.Services.AddValidatorsFromAssemblyContaining<ApplicationAssemblyMarker>();
+builder.Services.AddAutoMapper(typeof(MappingProfile));
 
-// Exception Handler
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
 
@@ -43,27 +50,14 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-
-
-// Database Connection
-builder.Services.AddDbContext<SalesyncDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
-
-
-// Services register
-builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
-builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
-builder.Services.AddScoped<IBranchService, BranchService>();
-builder.Services.AddScoped<IWarehouseService, WarehouseService>();
-builder.Services.AddScoped<IProductService, ProductService>();
-builder.Services.AddScoped<ICustomerService, CustomerService>();
-
-
-// AutoMapper
-builder.Services.AddAutoMapper(typeof(MappingProfile));
-
-
 var app = builder.Build();
+
+// Seed roles
+using (var scope = app.Services.CreateScope())
+{
+    await IdentitySeeder.SeedRolesAsync(scope.ServiceProvider);
+    await IdentitySeeder.SeedAdminUserAsync(scope.ServiceProvider);
+}
 
 // Configure pipeline
 if (app.Environment.IsDevelopment())
@@ -72,9 +66,9 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Salesync API v1"));
 }
 
-
 app.UseExceptionHandler();
 app.UseHttpsRedirection();
+app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
