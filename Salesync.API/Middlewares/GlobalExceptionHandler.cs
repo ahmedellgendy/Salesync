@@ -1,6 +1,5 @@
 ﻿using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics;
-using Microsoft.AspNetCore.Mvc;
 using Salesync.API.Responses;
 using System.Net;
 
@@ -24,7 +23,7 @@ namespace Salesync.API.Middleware
 
             switch (exception)
             {
-                // Handle validation exceptions
+                // Handle validation exceptions - 400 Bad Request
                 case ValidationException validationException:
                     statusCode = (int)HttpStatusCode.BadRequest;
                     response = ApiResponse<object>.ValidationErrorResponse(
@@ -36,7 +35,7 @@ namespace Salesync.API.Middleware
                         );
                     break;
 
-                // Handle not found exceptions
+                // Handle not found exceptions - 404 Not Found
                 case KeyNotFoundException:
                     statusCode = (int)HttpStatusCode.NotFound;
                     response = ApiResponse<object>.NotFoundResponse(
@@ -44,7 +43,7 @@ namespace Salesync.API.Middleware
                         );
                     break;
 
-                // handle bad request exceptions
+                // handle bad request exceptions - 400 Bad Request
                 case ArgumentException:
                     statusCode = (int)HttpStatusCode.BadRequest;
                     response = ApiResponse<object>.ErrorResponse(
@@ -53,7 +52,7 @@ namespace Salesync.API.Middleware
                         );
                     break;
 
-                // unauthorized access exceptions
+                // unauthorized access exceptions - 401 Unauthorized
                 case UnauthorizedAccessException:
                     statusCode = (int)HttpStatusCode.Unauthorized;
                     response = ApiResponse<object>.ErrorResponse(
@@ -62,14 +61,25 @@ namespace Salesync.API.Middleware
                         );
                     break;
 
-                    // internal server errors   
-                    default:
+                // handle conflict exceptions - 409 Conflict
+                case InvalidOperationException:
+                    statusCode = (int)HttpStatusCode.Conflict; 
+                    response = ApiResponse<object>.ErrorResponse(
+                        exception.Message,
+                        statusCode
+                    );
+                    break;
+
+                // internal server errors - 500 Internal Server Error    
+                default:
                     statusCode = (int)HttpStatusCode.InternalServerError;
                     response = ApiResponse<object>.ErrorResponse(
                         "Internal Server Error.",
                         statusCode
                         );
                     break;
+
+
             }
 
             httpContext.Response.StatusCode = statusCode;

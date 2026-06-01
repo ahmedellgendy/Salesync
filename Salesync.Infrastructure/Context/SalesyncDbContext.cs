@@ -1,9 +1,11 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Salesync.Domain.Modules.MasterData.Entities;
+using Salesync.Infrastructure.Modules.Identity.Entities;
 
 namespace Salesync.Infrastructure.Data
 {
-    public class SalesyncDbContext : DbContext
+    public class SalesyncDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, string>
     {
         public SalesyncDbContext(DbContextOptions<SalesyncDbContext> options) : base(options)
         {

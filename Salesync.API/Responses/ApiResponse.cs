@@ -54,5 +54,16 @@
                 StatusCode = 404
             };
         }
+
+        // conflict response
+        public static ApiResponse<T> ConflictResponse(string message = "Resource already exists")
+        {
+            return new ApiResponse<T>
+            {
+                Success = false,
+                Message = message,
+                StatusCode = 409
+            };
+        }
     }
 }
