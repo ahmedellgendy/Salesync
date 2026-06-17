@@ -17,7 +17,6 @@ namespace Salesync.Application.Modules.SalesRep.Dtos.SalesRepDto
         public bool? AllowCreditOverride { get; set; }
         public bool? ProofOfVisit { get; set; }
         public int? MaxVisitsWithoutProof { get; set; }
-        public bool? IsActive { get; set; }
         public int? BusinessUnitId { get; set; }
     }
 }

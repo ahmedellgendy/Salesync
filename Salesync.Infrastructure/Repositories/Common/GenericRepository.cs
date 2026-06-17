@@ -17,8 +17,8 @@ namespace Salesync.Infrastructure.Repositories.Common
             _dbSet = _context.Set<T>();
         }
 
-        public async Task<IEnumerable<T>> GetAllAsync() => await _dbSet.ToListAsync();
-        public async Task<T?> GetByIdAsync(int id) => await _dbSet.FindAsync(id);
+        public async Task<IEnumerable<T>> GetAllAsync() => await _dbSet.Where(x => x.IsActive).ToListAsync();
+        public async Task<T?> GetByIdAsync(int id) => await _dbSet.FirstOrDefaultAsync(x => x.Id == id && x.IsActive);
         public async Task AddAsync(T entity) => await _dbSet.AddAsync(entity);
         public void Update(T entity) => _dbSet.Update(entity);
         public void Delete(T entity) => _dbSet.Remove(entity);

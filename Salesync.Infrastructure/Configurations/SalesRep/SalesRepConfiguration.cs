@@ -45,6 +45,11 @@ namespace Salesync.Infrastructure.Configurations.SalesRep
                 .OnDelete(DeleteBehavior.Restrict)
                 .IsRequired(false);
 
+            builder.HasMany(s => s.SalesRepRoutes)
+                .WithOne(sr => sr.SalesRep)
+                .HasForeignKey(sr => sr.SalesRepId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             // Indexes
             builder.HasIndex(s => s.SalesRepCode)
                 .IsUnique();

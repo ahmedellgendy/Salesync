@@ -21,14 +21,14 @@ namespace Salesync.Application.Modules.SalesRep.Services
         }
         public async Task<IEnumerable<SalesRepDto>> GetAllAsync()
         {
-            var salesReps = await _unitOfWork.SalesReps.FindAsync(x => x.IsActive);
+            var salesReps = await _unitOfWork.SalesReps.GetAllAsync();
             return _mapper.Map<IEnumerable<SalesRepDto>>(salesReps);
         }
         public async Task<SalesRepDto> GetByIdAsync(int id)
         {
-            var salesRep = await _unitOfWork.SalesReps.FindAsync(x => x.Id == id && x.IsActive)
+            var salesRep = await _unitOfWork.SalesReps.GetByIdAsync(id)
                 ?? throw new KeyNotFoundException($"SalesRep with id {id} not found.");
-            return _mapper.Map<SalesRepDto>(salesRep.FirstOrDefault());
+            return _mapper.Map<SalesRepDto>(salesRep);
         }
         public async Task<SalesRepDto> CreateAsync(CreateSalesRepDto dto)
         {

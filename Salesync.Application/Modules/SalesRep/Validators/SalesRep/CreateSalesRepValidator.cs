@@ -8,7 +8,6 @@ namespace Salesync.Application.Modules.SalesRep.Validators.SalesRep
     {
         public CreateSalesRepValidator()
         {
-
             RuleFor(x => x.SalesRepCode)
                 .NotEmpty().WithMessage("SalesRep Code is required.")
                 .MaximumLength(15).WithMessage("Phone must not exceed 15 characters.");
