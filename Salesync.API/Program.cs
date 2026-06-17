@@ -26,7 +26,24 @@ builder.Services.AddControllers()
     {
         options.InvalidModelStateResponseFactory = context =>
         {
-            return new BadRequestObjectResult(context.ModelState);
+            //return new BadRequestObjectResult(context.ModelState);
+            var errors = context.ModelState
+                .Where(e => e.Value?.Errors.Count > 0)
+                .ToDictionary(
+                    e => e.Key,
+                    e => e.Value!.Errors.Select(x => x.ErrorMessage).ToArray()
+                );
+
+            var response = new
+            {
+                success = false,
+                message = "Invalid request data. Please check your input.",
+                data = (object?)null,
+                errors = errors,
+                statusCode = 400
+            };
+
+            return new BadRequestObjectResult(response);
         };
     });
 

@@ -73,7 +73,7 @@ namespace Salesync.Application.Modules.MasterData.Services
             branch.IsActive = false;
             branch.UpdatedAt = DateTime.UtcNow;
 
-            _unitOfWork.Branches.UpdateAsync(branch);
+            _unitOfWork.Branches.Update(branch);
             await _unitOfWork.CompleteAsync();
         }
     }
