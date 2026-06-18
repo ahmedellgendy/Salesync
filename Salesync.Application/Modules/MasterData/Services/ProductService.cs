@@ -43,7 +43,7 @@ namespace Salesync.Application.Modules.MasterData.Services
             var product = _mapper.Map<Product>(createProductDto);
 
             // Save Product at Db
-            await _unitOfWork.Products.CreateAsync(product);
+            await _unitOfWork.Products.AddAsync(product);
             await _unitOfWork.CompleteAsync();
 
             // Return Created Product

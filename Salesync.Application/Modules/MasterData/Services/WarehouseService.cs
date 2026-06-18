@@ -51,7 +51,7 @@ namespace Salesync.Application.Modules.MasterData.Services
             var warehouse = _mapper.Map<Warehouse>(warehouseDto);
 
             // Create the warehouse in the database
-            await _unitOfWork.Warehouses.CreateAsync(warehouse);
+            await _unitOfWork.Warehouses.AddAsync(warehouse);
 
             // Save changes to the database
             await _unitOfWork.CompleteAsync();
@@ -84,7 +84,7 @@ namespace Salesync.Application.Modules.MasterData.Services
             _mapper.Map(warehouseDto, warehouse);
 
             // Update the warehouse in the database
-            _unitOfWork.Warehouses.UpdateAsync(warehouse);
+            _unitOfWork.Warehouses.Update(warehouse);
 
             // Save changes to the database
             await _unitOfWork.CompleteAsync();

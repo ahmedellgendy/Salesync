@@ -7,11 +7,12 @@ namespace Salesync.Application.Interfaces.Repositories
     {
         Task<T?> GetByIdAsync(int id);
         Task<IEnumerable<T>> GetAllAsync();
-        Task CreateAsync(T entity);
-        void UpdateAsync(T entity);
+        Task AddAsync(T entity);
+        void Update(T entity);
         void Delete(T entity);
-
         Task<IEnumerable<T>> FindAsync(Expression<Func<T, bool>> predicate);
-        Task<T> AddAsync(T entity);
+        Task<bool> ExistsAsync(Expression<Func<T, bool>> predicate);
+        IQueryable<T> GetQueryable();  
+
     }
 }
