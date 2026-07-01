@@ -34,6 +34,36 @@ namespace Salesync.Application.Modules.Sales.Services
             invoice.InvoiceNumber = GenerateInvoiceNumber();
             invoice.Status = InvoiceStatus.Draft;
             invoice.PaymentStatus = PaymentStatus.Pending;
+            invoice.CreatedAt = DateTime.UtcNow;
+            invoice.IsActive = true;
+
+
+            invoice.InvoiceItems.Clear();
+
+            foreach (var itemDto in dto.Items)
+            {
+                var product = await _unitOfWork.Products.GetByIdAsync(itemDto.ProductId)
+                    ?? throw new KeyNotFoundException($"Product with id {itemDto.ProductId} not found.");
+
+                var invoiceItem = new InvoiceItem
+                {
+                    ProductId = itemDto.ProductId,
+                    ProductName = product.Name,
+                    ItemCode = product.ItemCode,
+                    Quantity = itemDto.Quantity,
+                    BonusQuantity = itemDto.BonusQuantity,
+                    UnitPrice = product.UnitPrice,
+                    DiscountPercentage = itemDto.DiscountPercentage,
+                    DiscountAmount = (product.UnitPrice * itemDto.Quantity) * (itemDto.DiscountPercentage / 100),
+                    NetAmount = (product.UnitPrice * itemDto.Quantity) - ((product.UnitPrice * itemDto.Quantity) * (itemDto.DiscountPercentage / 100))
+                };
+
+                invoice.InvoiceItems.Add(invoiceItem);
+            }
+
+            invoice.SubTotal = invoice.InvoiceItems.Sum(i => i.NetAmount);
+            invoice.TotalAmount = invoice.SubTotal - invoice.DiscountAmount + invoice.TaxAmount;
+
 
             await _unitOfWork.Invoices.AddAsync(invoice);
             await _unitOfWork.CompleteAsync();

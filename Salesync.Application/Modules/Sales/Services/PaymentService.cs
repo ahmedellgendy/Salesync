@@ -28,6 +28,10 @@ namespace Salesync.Application.Modules.Sales.Services
             var invoice = await _unitOfWork.Invoices.GetByIdAsync(dto.InvoiceId)
                 ?? throw new KeyNotFoundException($"Invoice with id {dto.InvoiceId} not found.");
 
+            var remaining = invoice.TotalAmount - invoice.PaidAmount;
+            if (dto.Amount > remaining)
+                throw new InvalidOperationException($"Payment amount exceeds remaining balance of {remaining}.");
+
             var payment = _mapper.Map<Payment>(dto);
             payment.PaymentNumber = GeneratePaymentNumber();
             payment.CustomerId = invoice.CustomerId;
