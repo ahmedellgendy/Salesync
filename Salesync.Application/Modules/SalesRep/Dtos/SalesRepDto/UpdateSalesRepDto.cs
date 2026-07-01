@@ -1,4 +1,4 @@
-﻿using Salesync.Domain.Common.Enums;
+﻿using Salesync.Domain.Common.Enums.SalesRep;
 
 namespace Salesync.Application.Modules.SalesRep.Dtos.SalesRepDto
 {

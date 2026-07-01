@@ -19,4 +19,8 @@
     <ProjectReference Include="..\Salesync.Domain\Salesync.Domain.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Modules\Sales\Validators\" />
+  </ItemGroup>
+
 </Project>

@@ -3,10 +3,16 @@ using Salesync.Application.Modules.MasterData.Dtos.BranchDto;
 using Salesync.Application.Modules.MasterData.Dtos.CustomerDto;
 using Salesync.Application.Modules.MasterData.Dtos.ProductDto;
 using Salesync.Application.Modules.MasterData.Dtos.WarehouseDto;
+using Salesync.Application.Modules.Sales.Dtos.Invoice;
+using Salesync.Application.Modules.Sales.Dtos.InvoiceItem;
+using Salesync.Application.Modules.Sales.Dtos.InvoiceReturn;
+using Salesync.Application.Modules.Sales.Dtos.Payment;
+using Salesync.Application.Modules.Sales.Dtos.SalesRepSession;
 using Salesync.Application.Modules.SalesRep.Dtos.RouteCustomerDto;
 using Salesync.Application.Modules.SalesRep.Dtos.RouteDto;
 using Salesync.Application.Modules.SalesRep.Dtos.SalesRepDto;
 using Salesync.Domain.Modules.MasterData.Entities;
+using Salesync.Domain.Modules.Sales.Entities;
 using Salesync.Domain.Modules.SalesRep.Entities;
 
 
@@ -49,6 +55,29 @@ namespace Salesync.Application.Mappings
             CreateMap<RouteCustomer, RouteCustomerDto>();
             CreateMap<CreateRouteCustomerDto, RouteCustomer>();
             CreateMap<UpdateRouteCustomerDto, RouteCustomer>().ForAllMembers(o => o.Condition((src, dest, srcMember) => srcMember != null));
+
+            #endregion
+
+            #region Sales
+
+            CreateMap<SalesRepSession, SalesRepSessionDto>();
+            CreateMap<CreateSalesRepSessionDto, SalesRepSession>();
+
+            CreateMap<Invoice, InvoiceDto>();
+            CreateMap<CreateInvoiceDto, Invoice>();
+            CreateMap<UpdateInvoiceDto, Invoice>()
+                .ForAllMembers(o => o.Condition((src, dest, srcMember) => srcMember != null));
+
+            CreateMap<InvoiceItem, InvoiceItemDto>();
+            CreateMap<CreateInvoiceItemDto, InvoiceItem>();
+
+            CreateMap<Payment, PaymentDto>();
+            CreateMap<CreatePaymentDto, Payment>();
+
+            CreateMap<InvoiceReturn, InvoiceReturnDto>();
+            CreateMap<CreateInvoiceReturnDto, InvoiceReturn>();
+
+            CreateMap<CreateInvoiceReturnItemDto, InvoiceReturnItem>();
 
             #endregion
         }

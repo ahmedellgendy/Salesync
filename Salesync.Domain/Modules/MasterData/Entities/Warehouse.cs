@@ -1,5 +1,5 @@
 ﻿using Salesync.Domain.Common;
-using Salesync.Domain.Common.Enums;
+using Salesync.Domain.Common.Enums.MasterData;
 
 namespace Salesync.Domain.Modules.MasterData.Entities
 {

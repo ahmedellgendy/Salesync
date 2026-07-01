@@ -1,4 +1,4 @@
-﻿namespace Salesync.Domain.Common.Enums
+﻿namespace Salesync.Domain.Common.Enums.MasterData
 {
     public enum CustomerStatus
     {
