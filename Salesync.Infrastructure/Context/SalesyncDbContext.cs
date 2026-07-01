@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Salesync.Domain.Modules.MasterData.Entities;
+using Salesync.Domain.Modules.Sales.Entities;
 using Salesync.Domain.Modules.SalesRep.Entities;
 using Salesync.Infrastructure.Modules.Identity.Entities;
 
@@ -34,5 +35,15 @@ namespace Salesync.Infrastructure.Data
 
         #endregion
 
+        #region Sales Dbsets
+
+        public DbSet<SalesRepSession> SalesRepSessions { get; set; }
+        public DbSet<Invoice> Invoices { get; set; }
+        public DbSet<InvoiceItem> InvoiceItems { get; set; }
+        public DbSet<InvoiceReturn> InvoiceReturns { get; set; }
+        public DbSet<InvoiceReturnItem> InvoiceReturnItems { get; set; }
+        public DbSet<Payment> Payments { get; set; }
+
+        #endregion
     }
 }

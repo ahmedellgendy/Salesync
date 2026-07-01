@@ -1,4 +1,5 @@
 ﻿using Salesync.Domain.Modules.MasterData.Entities;
+using Salesync.Domain.Modules.Sales.Entities;
 using Salesync.Domain.Modules.SalesRep.Entities;
 
 namespace Salesync.Application.Interfaces.Repositories
@@ -15,6 +16,14 @@ namespace Salesync.Application.Interfaces.Repositories
         IGenericRepository<SalesRep> SalesReps { get; }
         IGenericRepository<Route> Routes { get; }
         IGenericRepository<RouteCustomer> RouteCustomers { get; }
+
+        // Sales Module
+        IGenericRepository<SalesRepSession> SalesRepSessions { get; }
+        IGenericRepository<Invoice> Invoices { get; }
+        IGenericRepository<InvoiceItem> InvoiceItems { get; }
+        IGenericRepository<InvoiceReturn> InvoiceReturns { get; }
+        IGenericRepository<InvoiceReturnItem> InvoiceReturnItems { get; }
+        IGenericRepository<Payment> Payments { get; }
 
         Task<int> CompleteAsync();
     }

@@ -13,7 +13,7 @@ namespace Salesync.Infrastructure.Seeds
             var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
             var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<ApplicationRole>>();
 
-            var roles = new[] { "Admin", "User" };
+            var roles = new[] { "Admin", "SalesRep", "Supervisor", "User" };
             foreach (var role in roles)
             {
                 if (!await roleManager.RoleExistsAsync(role))

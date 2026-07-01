@@ -1,4 +1,4 @@
-﻿using Salesync.Domain.Common.Enums;
+﻿using Salesync.Domain.Common.Enums.MasterData;
 
 namespace Salesync.Application.Modules.MasterData.Dtos.WarehouseDto
 {

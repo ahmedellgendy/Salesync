@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel;
 
-namespace Salesync.Domain.Common.Enums
+namespace Salesync.Domain.Common.Enums.SalesRep
 {
     public enum SalesRepType
     {
