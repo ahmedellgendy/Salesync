@@ -49,6 +49,16 @@ namespace Salesync.API.Controllers.Sales
             return Ok(ApiResponse<InvoiceDto>.SuccessResponse(result, "Invoice updated successfully"));
         }
 
+
+        [HttpPut("{id}/confirm")]
+        [Authorize(Roles = "Admin,Supervisor,SalesRep")]
+        public async Task<IActionResult> ConfirmAsync(int id)
+        {
+            var result = await _invoiceService.ConfirmAsync(id);
+            return Ok(ApiResponse<InvoiceDto>.SuccessResponse(result, "Invoice confirmed successfully"));
+        }
+
+
         [HttpPut("{id}/cancel")] // PUT: api/invoice/id/cancel
         [Authorize(Roles = "Admin,Supervisor")]
         public async Task<IActionResult> CancelAsync(int id)

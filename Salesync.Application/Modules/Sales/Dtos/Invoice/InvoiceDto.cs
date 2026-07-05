@@ -1,4 +1,5 @@
-﻿using Salesync.Domain.Common.Enums.Sales;
+﻿using Salesync.Application.Modules.Sales.Dtos.InvoiceItem;
+using Salesync.Domain.Common.Enums.Sales;
 
 namespace Salesync.Application.Modules.Sales.Dtos.Invoice
 {
@@ -20,5 +21,8 @@ namespace Salesync.Application.Modules.Sales.Dtos.Invoice
         public decimal PaidAmount { get; set; }
         public string? Notes { get; set; }
         public DateTime CreatedAt { get; set; }
+
+        public List<InvoiceItemDto> InvoiceItems { get; set; } = new();
+
     }
 }

@@ -8,6 +8,7 @@ namespace Salesync.Application.Modules.Sales.Interfaces
         Task<InvoiceDto> GetByIdAsync(int id);
         Task<InvoiceDto> CreateAsync(CreateInvoiceDto dto);
         Task<InvoiceDto> UpdateAsync(int id, UpdateInvoiceDto dto);
+        Task<InvoiceDto> ConfirmAsync(int id);
         Task CancelAsync(int id);
     }
 }

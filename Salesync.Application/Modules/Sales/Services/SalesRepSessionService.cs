@@ -81,6 +81,7 @@ namespace Salesync.Application.Modules.Sales.Services
             session.Status = DayStatus.Closed;
             session.EndTime = DateTime.UtcNow;
             session.UpdatedAt = DateTime.UtcNow;
+            session.IsActive = false;
 
             _unitOfWork.SalesRepSessions.Update(session);
             await _unitOfWork.CompleteAsync();
