@@ -1,5 +1,8 @@
 ﻿using AutoMapper;
+using FluentValidation;
+using Microsoft.EntityFrameworkCore;
 using Salesync.Application.Interfaces.Repositories;
+using Salesync.Application.Interfaces.Services;
 using Salesync.Application.Modules.Sales.Dtos.Invoice;
 using Salesync.Application.Modules.Sales.Interfaces;
 using Salesync.Domain.Common.Enums.Sales;
@@ -11,11 +14,17 @@ namespace Salesync.Application.Modules.Sales.Services
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
+        private readonly IValidator<CreateInvoiceDto> _createInvoiceValidator;
+        private readonly ICurrentUserService _currentUser;
 
-        public InvoiceService(IUnitOfWork unitOfWork, IMapper mapper)
+
+
+        public InvoiceService(IUnitOfWork unitOfWork, IMapper mapper, IValidator<CreateInvoiceDto> createInvoiceValidator, ICurrentUserService currentUser)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
+            _createInvoiceValidator = createInvoiceValidator;
+            _currentUser = currentUser;
         }
         public async Task<IEnumerable<InvoiceDto>> GetAllAsync()
         {
@@ -24,19 +33,87 @@ namespace Salesync.Application.Modules.Sales.Services
         }
         public async Task<InvoiceDto> GetByIdAsync(int id)
         {
-            var invoice = await _unitOfWork.Invoices.GetByIdAsync(id)
-                ?? throw new KeyNotFoundException($"Invoice with id {id} not found.");
+            var invoice = await _unitOfWork.Invoices
+                 .GetQueryable()
+                 .Include(i => i.InvoiceItems)
+                 .Include(i => i.Payments)
+                 .FirstOrDefaultAsync(i => i.Id == id);
+
+            if (invoice == null)
+                throw new KeyNotFoundException($"Invoice with id {id} not found.");
+
             return _mapper.Map<InvoiceDto>(invoice);
         }
         public async Task<InvoiceDto> CreateAsync(CreateInvoiceDto dto)
         {
+            var validationResult = await _createInvoiceValidator.ValidateAsync(dto);
+
+            if (!validationResult.IsValid)
+                throw new ValidationException(validationResult.Errors);
+
+            var customer = await _unitOfWork.Customers.GetByIdAsync(dto.CustomerId)
+                ?? throw new KeyNotFoundException($"Customer with id {dto.CustomerId} not found.");
+
+            if (!customer.IsActive)
+                throw new InvalidOperationException("Cannot create invoice for inactive customer.");
+
+            var warehouse = await _unitOfWork.Warehouses.GetByIdAsync(dto.WarehouseId)
+                ?? throw new KeyNotFoundException($"Warehouse with id {dto.WarehouseId} not found.");
+
+            if (!warehouse.IsActive)
+                throw new InvalidOperationException("Cannot create invoice for inactive warehouse.");
+
+            if (string.IsNullOrWhiteSpace(_currentUser.UserId))
+                throw new UnauthorizedAccessException("Current user is not authenticated.");
+
+            Salesync.Domain.Modules.SalesRep.Entities.SalesRep salesRep;
+
+            var isSalesRepUser = string.Equals(_currentUser.Role, "SalesRep", StringComparison.OrdinalIgnoreCase);
+
+            if (isSalesRepUser)
+            {
+                 salesRep = (await _unitOfWork.SalesReps
+                    .FindAsync(s => s.UserId == _currentUser.UserId && s.IsActive))
+                    .FirstOrDefault()
+                    ?? throw new UnauthorizedAccessException("SalesRep not found for current user.");
+            }
+            else
+            {
+                if (!dto.SalesRepId.HasValue)
+                    throw new InvalidOperationException("SalesRepId is required for admin or supervisor invoice creation.");
+
+                salesRep = await _unitOfWork.SalesReps.GetByIdAsync(dto.SalesRepId.Value)
+                    ?? throw new KeyNotFoundException($"SalesRep with id {dto.SalesRepId.Value} not found.");
+
+                if (!salesRep.IsActive)
+                    throw new InvalidOperationException("Cannot create invoice for inactive sales rep.");
+            }
+
+            if (!dto.SalesRepSessionId.HasValue)
+                throw new InvalidOperationException("SalesRepSessionId is required.");
+
+            var session = await _unitOfWork.SalesRepSessions.GetByIdAsync(dto.SalesRepSessionId.Value)
+                ?? throw new KeyNotFoundException($"SalesRepSession with id {dto.SalesRepSessionId.Value} not found.");
+
+            if (!session.IsActive)
+                throw new InvalidOperationException("Cannot create invoice for inactive session.");
+
+            if (session.Status == DayStatus.Closed)
+                throw new InvalidOperationException("Cannot create invoice for a closed session.");
+
+            if (session.SalesRepId != salesRep.Id)
+                throw new UnauthorizedAccessException("You cannot create invoice using another sales rep's session.");
+
+
+
             var invoice = _mapper.Map<Invoice>(dto);
             invoice.InvoiceNumber = GenerateInvoiceNumber();
             invoice.Status = InvoiceStatus.Draft;
             invoice.PaymentStatus = PaymentStatus.Pending;
             invoice.CreatedAt = DateTime.UtcNow;
             invoice.IsActive = true;
-
+            invoice.SalesRepId = salesRep.Id;
+            invoice.SalesRepSessionId = session.Id;
 
             invoice.InvoiceItems.Clear();
 
@@ -44,6 +121,12 @@ namespace Salesync.Application.Modules.Sales.Services
             {
                 var product = await _unitOfWork.Products.GetByIdAsync(itemDto.ProductId)
                     ?? throw new KeyNotFoundException($"Product with id {itemDto.ProductId} not found.");
+                if (!product.IsActive)
+                    throw new InvalidOperationException($"Product with id {itemDto.ProductId} is inactive.");
+
+                var grossAmount = product.UnitPrice * itemDto.Quantity;
+                var discountAmount = grossAmount * (itemDto.DiscountPercentage / 100m);
+                var netAmount = grossAmount - discountAmount;
 
                 var invoiceItem = new InvoiceItem
                 {
@@ -54,22 +137,27 @@ namespace Salesync.Application.Modules.Sales.Services
                     BonusQuantity = itemDto.BonusQuantity,
                     UnitPrice = product.UnitPrice,
                     DiscountPercentage = itemDto.DiscountPercentage,
-                    DiscountAmount = (product.UnitPrice * itemDto.Quantity) * (itemDto.DiscountPercentage / 100),
-                    NetAmount = (product.UnitPrice * itemDto.Quantity) - ((product.UnitPrice * itemDto.Quantity) * (itemDto.DiscountPercentage / 100))
+                    DiscountAmount = discountAmount,
+                    NetAmount = netAmount,
+                    CreatedAt = DateTime.UtcNow,
+                    IsActive = true
                 };
 
                 invoice.InvoiceItems.Add(invoiceItem);
             }
 
             invoice.SubTotal = invoice.InvoiceItems.Sum(i => i.NetAmount);
-            invoice.TotalAmount = invoice.SubTotal - invoice.DiscountAmount + invoice.TaxAmount;
 
+            if (invoice.DiscountAmount > invoice.SubTotal)
+                throw new InvalidOperationException("Invoice discount cannot be greater than invoice subtotal.");
+
+            invoice.TotalAmount = invoice.SubTotal - invoice.DiscountAmount + invoice.TaxAmount;
 
             await _unitOfWork.Invoices.AddAsync(invoice);
             await _unitOfWork.CompleteAsync();
+
             return _mapper.Map<InvoiceDto>(invoice);
         }
-
         public async Task<InvoiceDto> UpdateAsync(int id, UpdateInvoiceDto dto)
         {
             var invoice = await _unitOfWork.Invoices.GetByIdAsync(id)
@@ -82,6 +170,41 @@ namespace Salesync.Application.Modules.Sales.Services
             await _unitOfWork.CompleteAsync();
             return _mapper.Map<InvoiceDto>(invoice);
         }
+
+        public async Task<InvoiceDto> ConfirmAsync(int id)
+        {
+            var invoice = await _unitOfWork.Invoices
+                     .GetQueryable()
+                     .Include(i => i.InvoiceItems)
+                     .FirstOrDefaultAsync(i => i.Id == id);
+
+            if (invoice == null)
+                throw new KeyNotFoundException($"Invoice with id {id} not found.");
+
+            if (!invoice.IsActive)
+                throw new InvalidOperationException("Cannot confirm inactive invoice.");
+
+            if (invoice.Status == InvoiceStatus.Cancelled)
+                throw new InvalidOperationException("Cannot confirm a cancelled invoice.");
+
+            if (invoice.Status == InvoiceStatus.Confirmed)
+                throw new InvalidOperationException("Invoice is already confirmed.");
+
+            if (!invoice.InvoiceItems.Any())
+                throw new InvalidOperationException("Cannot confirm invoice without items.");
+
+            if (invoice.TotalAmount <= 0)
+                throw new InvalidOperationException("Cannot confirm invoice with invalid total amount.");
+
+            invoice.Status = InvoiceStatus.Confirmed;
+            invoice.UpdatedAt = DateTime.UtcNow;
+
+            _unitOfWork.Invoices.Update(invoice);
+            await _unitOfWork.CompleteAsync();
+
+            return _mapper.Map<InvoiceDto>(invoice);
+        }
+
         public async Task CancelAsync(int id)
         {
             var invoice = await _unitOfWork.Invoices.GetByIdAsync(id)

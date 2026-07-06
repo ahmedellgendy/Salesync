@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Salesync.Application.Common.Settings;
+using Salesync.Application.Interfaces.Repositories;
 using Salesync.Application.Modules.Identity.Dtos.Auth;
 using Salesync.Application.Modules.Identity.Interfaces;
 using Salesync.Infrastructure.Modules.Identity.Entities;
@@ -15,11 +16,13 @@ namespace Salesync.Infrastructure.Modules.Identity.Services
     {
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly JwtSettings _jwtSettings;
+        private readonly IUnitOfWork _unitOfWork;
 
-        public AuthService(UserManager<ApplicationUser> userManager, IOptions<JwtSettings> jwtSettings)
+        public AuthService(UserManager<ApplicationUser> userManager, IOptions<JwtSettings> jwtSettings, IUnitOfWork unitOfWork)
         {
             _userManager = userManager;
             _jwtSettings = jwtSettings.Value;
+            _unitOfWork = unitOfWork;
         }
 
         // Login
@@ -69,6 +72,10 @@ namespace Salesync.Infrastructure.Modules.Identity.Services
             var roles = await _userManager.GetRolesAsync(user);
             var rolesAsClaims = roles.Select(role => new Claim(ClaimTypes.Role, role)).ToList();
 
+            var salesRep = (await _unitOfWork.SalesReps
+                 .FindAsync(s => s.UserId == user.Id && s.IsActive))
+                 .FirstOrDefault();
+
             var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id),
@@ -76,10 +83,18 @@ namespace Salesync.Infrastructure.Modules.Identity.Services
                 new Claim(ClaimTypes.Name, user.UserName ?? string.Empty),
                 new Claim("FullName", user.FullName),
                 new Claim("BranchId", user.BranchId?.ToString() ?? string.Empty),
-                new Claim("BusinessUnitId", user.BusinessUnitId?.ToString() ?? string.Empty)
+                new Claim("BusinessUnitId", user.BusinessUnitId?.ToString() ?? string.Empty),
+            };
+
+            if (salesRep != null)
+            {
+                claims.Add(new Claim("SalesRepId", salesRep.Id.ToString()));
             }
-            .Union(userClaims)
-            .Union(rolesAsClaims);
+
+            claims = claims
+                .Union(userClaims)
+                .Union(rolesAsClaims)
+                .ToList();
 
             var symmetricSecuityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.Key));
             var signingCredentials = new SigningCredentials(symmetricSecuityKey, SecurityAlgorithms.HmacSha256);

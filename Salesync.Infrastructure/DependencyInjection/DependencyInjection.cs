@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Salesync.Application.Interfaces.Repositories;
+using Salesync.Application.Interfaces.Services;
 using Salesync.Application.Modules.Identity.Interfaces;
 using Salesync.Application.Modules.SalesRep.Interfaces.Services;
 using Salesync.Application.Modules.SalesRep.Services;
@@ -28,6 +29,9 @@ namespace Salesync.Infrastructure.DependencyInjection
             services.AddScoped<IAuthService, AuthService>();
             services.AddScoped<IUserService, UserService>();
 
+            // register services for current user context
+            services.AddHttpContextAccessor();
+            services.AddScoped<ICurrentUserService, CurrentUserService>();
 
             return services;
         }
