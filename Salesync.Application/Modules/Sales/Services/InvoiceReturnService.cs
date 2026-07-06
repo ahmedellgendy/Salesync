@@ -1,4 +1,5 @@
 ﻿using AutoMapper;
+using Microsoft.EntityFrameworkCore;
 using Salesync.Application.Interfaces.Repositories;
 using Salesync.Application.Modules.Sales.Dtos.InvoiceReturn;
 using Salesync.Application.Modules.Sales.Interfaces;
@@ -25,25 +26,61 @@ namespace Salesync.Application.Modules.Sales.Services
         }
         public async Task<InvoiceReturnDto> CreateAsync(CreateInvoiceReturnDto dto)
         {
-            var invoice = await _unitOfWork.Invoices.GetByIdAsync(dto.InvoiceId)
-                ?? throw new KeyNotFoundException($"Invoice with id {dto.InvoiceId} not found.");
+            var invoice = await _unitOfWork.Invoices
+                .GetQueryable()
+                .Include(i => i.InvoiceItems)
+                .FirstOrDefaultAsync(i => i.Id == dto.InvoiceId);
+
+            if (invoice == null)
+                throw new KeyNotFoundException($"Invoice with id {dto.InvoiceId} not found.");
+
+            if (invoice.Status != InvoiceStatus.Confirmed)
+                throw new InvalidOperationException("Returns are allowed only for confirmed invoices.");
+
+            if (!invoice.InvoiceItems.Any())
+                throw new InvalidOperationException("Cannot create return for invoice without items.");
 
             var invoiceReturn = _mapper.Map<InvoiceReturn>(dto);
+
             invoiceReturn.ReturnNumber = GenerateReturnNumber();
             invoiceReturn.CustomerId = invoice.CustomerId;
+            invoiceReturn.SalesRepId = invoice.SalesRepId;
+            invoiceReturn.SalesRepSessionId = invoice.SalesRepSessionId;
             invoiceReturn.Status = ReturnStatus.Pending;
             invoiceReturn.CreatedAt = DateTime.UtcNow;
             invoiceReturn.IsActive = true;
 
-            foreach (var item in invoiceReturn.Items)
-            {
-                var product = await _unitOfWork.Products.GetByIdAsync(item.ProductId)
-                    ?? throw new KeyNotFoundException($"Product with id {item.ProductId} not found.");
+            invoiceReturn.Items.Clear();
 
-                item.ProductName = product.Name;
-                item.ItemCode = product.ItemCode;
-                item.UnitPrice = product.UnitPrice;
-                item.TotalAmount = item.Quantity * product.UnitPrice;
+            foreach (var itemDto in dto.Items)
+            {
+                var invoiceItem = invoice.InvoiceItems
+                    .FirstOrDefault(i => i.Id == itemDto.InvoiceItemId);
+
+                if (invoiceItem == null)
+                    throw new InvalidOperationException($"Invoice item with id {itemDto.InvoiceItemId} does not belong to this invoice.");
+
+                if (itemDto.Quantity <= 0)
+                    throw new InvalidOperationException("Return quantity must be greater than zero.");
+
+                if (itemDto.Quantity > invoiceItem.Quantity)
+                    throw new InvalidOperationException("Return quantity cannot be greater than sold quantity.");
+
+                var returnItem = new InvoiceReturnItem
+                {
+                    InvoiceItemId = invoiceItem.Id,
+                    ProductId = invoiceItem.ProductId,
+                    ProductName = invoiceItem.ProductName,
+                    ItemCode = invoiceItem.ItemCode,
+                    Quantity = itemDto.Quantity,
+                    UnitPrice = invoiceItem.UnitPrice,
+                    TotalAmount = itemDto.Quantity * invoiceItem.UnitPrice,
+                    Notes = itemDto.Notes,
+                    CreatedAt = DateTime.UtcNow,
+                    IsActive = true
+                };
+
+                invoiceReturn.Items.Add(returnItem);
             }
 
             invoiceReturn.TotalAmount = invoiceReturn.Items.Sum(i => i.TotalAmount);
@@ -51,6 +88,7 @@ namespace Salesync.Application.Modules.Sales.Services
 
             await _unitOfWork.InvoiceReturns.AddAsync(invoiceReturn);
             await _unitOfWork.CompleteAsync();
+
             return _mapper.Map<InvoiceReturnDto>(invoiceReturn);
         }
 

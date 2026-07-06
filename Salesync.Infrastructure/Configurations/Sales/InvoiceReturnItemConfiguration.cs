@@ -29,6 +29,11 @@ namespace Salesync.Infrastructure.Configurations.Sales
                 .HasForeignKey(r => r.InvoiceReturnId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            builder.HasOne(x => x.InvoiceItem)
+                .WithMany()
+                .HasForeignKey(x => x.InvoiceItemId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             builder.HasOne(r => r.Product)
                 .WithMany()
                 .HasForeignKey(r => r.ProductId)
