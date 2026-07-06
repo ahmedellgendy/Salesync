@@ -94,18 +94,38 @@ namespace Salesync.Application.Modules.Sales.Services
 
         public async Task<InvoiceReturnDto> ApproveAsync(int id)
         {
-            var invoiceReturn = await _unitOfWork.InvoiceReturns.GetByIdAsync(id)
-                ?? throw new KeyNotFoundException($"Return with id {id} not found.");
+            var invoiceReturn = await _unitOfWork.InvoiceReturns
+                .GetQueryable()
+                .Include(r => r.Items)
+                .FirstOrDefaultAsync(r => r.Id == id);
+
+            if (invoiceReturn == null)
+                throw new KeyNotFoundException($"Return with id {id} not found.");
+
+            if (!invoiceReturn.IsActive)
+                throw new InvalidOperationException("Cannot approve inactive return.");
 
             if (invoiceReturn.Status != ReturnStatus.Pending)
                 throw new InvalidOperationException("Only pending returns can be approved.");
 
+            if (!invoiceReturn.Items.Any())
+                throw new InvalidOperationException("Cannot approve return without items.");
+
+            if (invoiceReturn.TotalAmount <= 0)
+                throw new InvalidOperationException("Cannot approve return with invalid total amount.");
+
+            var invoice = await _unitOfWork.Invoices.GetByIdAsync(invoiceReturn.InvoiceId)
+                ?? throw new KeyNotFoundException($"Invoice with id {invoiceReturn.InvoiceId} not found.");
+
+            if (invoice.Status != InvoiceStatus.Confirmed)
+                throw new InvalidOperationException("Cannot approve return for unconfirmed invoice.");
 
             invoiceReturn.Status = ReturnStatus.Approved;
             invoiceReturn.UpdatedAt = DateTime.UtcNow;
 
             _unitOfWork.InvoiceReturns.Update(invoiceReturn);
             await _unitOfWork.CompleteAsync();
+
             return _mapper.Map<InvoiceReturnDto>(invoiceReturn);
         }
         public async Task<InvoiceReturnDto> RejectAsync(int id)
