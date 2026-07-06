@@ -7,7 +7,6 @@
 ![Architecture](https://img.shields.io/badge/Architecture-Onion-orange)
 ![License](https://img.shields.io/badge/License-MIT-lightgrey)
 
-# Salesync
 
 Enterprise Sales Force Automation (SFA) Backend System built with ASP.NET Core using Onion Architecture.
 
