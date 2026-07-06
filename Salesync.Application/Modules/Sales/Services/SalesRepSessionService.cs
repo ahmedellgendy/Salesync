@@ -1,4 +1,5 @@
 ﻿using AutoMapper;
+using Microsoft.EntityFrameworkCore;
 using Salesync.Application.Interfaces.Repositories;
 using Salesync.Application.Modules.Sales.Dtos.SalesRepSession;
 using Salesync.Application.Modules.Sales.Interfaces;
@@ -78,13 +79,41 @@ namespace Salesync.Application.Modules.Sales.Services
             if (session.Status == DayStatus.Closed)
                 throw new InvalidOperationException($"Session with id {id} is already closed.");
 
+            var invoices = await _unitOfWork.Invoices
+                .GetQueryable()
+                .Where(i => i.SalesRepSessionId == id && i.Status == InvoiceStatus.Confirmed && i.IsActive)
+                .ToListAsync();
+
+            var payments = await _unitOfWork.Payments
+                .GetQueryable()
+                .Where(p => p.SalesRepSessionId == id && p.Status == PaymentStatus.Paid && p.IsActive)
+                .ToListAsync();
+
+            var returns = await _unitOfWork.InvoiceReturns
+                .GetQueryable()
+                .Where(r => r.SalesRepSessionId == id && r.Status == ReturnStatus.Approved && r.IsActive)
+                .ToListAsync();
+
+            var grossSales = invoices.Sum(i => i.SubTotal);
+            var totalInvoices = invoices.Count;
+            var totalCollection = payments.Sum(p => p.Amount);
+            var totalReturnAmount = returns.Sum(r => r.TotalAmount);
+            var netSales = invoices.Sum(i => i.TotalAmount) - totalReturnAmount;
+
+            session.GrossSales = grossSales;
+            session.NetSales = netSales;
+            session.TotalCollection = totalCollection;
+            session.TotalReturnAmount = totalReturnAmount;
+            session.TotalInvoices = totalInvoices;
+
             session.Status = DayStatus.Closed;
             session.EndTime = DateTime.UtcNow;
             session.UpdatedAt = DateTime.UtcNow;
-            session.IsActive = false;
+            session.IsActive = true;
 
             _unitOfWork.SalesRepSessions.Update(session);
             await _unitOfWork.CompleteAsync();
+
             return _mapper.Map<SalesRepSessionDto>(session);
         }
     }
