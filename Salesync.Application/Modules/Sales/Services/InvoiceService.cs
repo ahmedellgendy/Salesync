@@ -2,6 +2,7 @@
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Salesync.Application.Interfaces.Repositories;
+using Salesync.Application.Interfaces.Services;
 using Salesync.Application.Modules.Sales.Dtos.Invoice;
 using Salesync.Application.Modules.Sales.Interfaces;
 using Salesync.Domain.Common.Enums.Sales;
@@ -14,13 +15,16 @@ namespace Salesync.Application.Modules.Sales.Services
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
         private readonly IValidator<CreateInvoiceDto> _createInvoiceValidator;
+        private readonly ICurrentUserService _currentUser;
 
 
-        public InvoiceService(IUnitOfWork unitOfWork, IMapper mapper, IValidator<CreateInvoiceDto> createInvoiceValidator)
+
+        public InvoiceService(IUnitOfWork unitOfWork, IMapper mapper, IValidator<CreateInvoiceDto> createInvoiceValidator, ICurrentUserService currentUser)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
             _createInvoiceValidator = createInvoiceValidator;
+            _currentUser = currentUser;
         }
         public async Task<IEnumerable<InvoiceDto>> GetAllAsync()
         {
@@ -59,24 +63,47 @@ namespace Salesync.Application.Modules.Sales.Services
             if (!warehouse.IsActive)
                 throw new InvalidOperationException("Cannot create invoice for inactive warehouse.");
 
-            if (dto.SalesRepId.HasValue)
+            if (string.IsNullOrWhiteSpace(_currentUser.UserId))
+                throw new UnauthorizedAccessException("Current user is not authenticated.");
+
+            Salesync.Domain.Modules.SalesRep.Entities.SalesRep salesRep;
+
+            var isSalesRepUser = string.Equals(_currentUser.Role, "SalesRep", StringComparison.OrdinalIgnoreCase);
+
+            if (isSalesRepUser)
             {
-                var salesRep = await _unitOfWork.SalesReps.GetByIdAsync(dto.SalesRepId.Value)
+                 salesRep = (await _unitOfWork.SalesReps
+                    .FindAsync(s => s.UserId == _currentUser.UserId && s.IsActive))
+                    .FirstOrDefault()
+                    ?? throw new UnauthorizedAccessException("SalesRep not found for current user.");
+            }
+            else
+            {
+                if (!dto.SalesRepId.HasValue)
+                    throw new InvalidOperationException("SalesRepId is required for admin or supervisor invoice creation.");
+
+                salesRep = await _unitOfWork.SalesReps.GetByIdAsync(dto.SalesRepId.Value)
                     ?? throw new KeyNotFoundException($"SalesRep with id {dto.SalesRepId.Value} not found.");
 
                 if (!salesRep.IsActive)
                     throw new InvalidOperationException("Cannot create invoice for inactive sales rep.");
             }
 
-            if (dto.SalesRepSessionId.HasValue)
-            {
-                var session = await _unitOfWork.SalesRepSessions.GetByIdAsync(dto.SalesRepSessionId.Value)
-                    ?? throw new KeyNotFoundException($"SalesRepSession with id {dto.SalesRepSessionId.Value} not found.");
+            if (!dto.SalesRepSessionId.HasValue)
+                throw new InvalidOperationException("SalesRepSessionId is required.");
 
-                if (session.Status == DayStatus.Closed)
-                    throw new InvalidOperationException("Cannot create invoice for a closed session.");
+            var session = await _unitOfWork.SalesRepSessions.GetByIdAsync(dto.SalesRepSessionId.Value)
+                ?? throw new KeyNotFoundException($"SalesRepSession with id {dto.SalesRepSessionId.Value} not found.");
 
-            }
+            if (!session.IsActive)
+                throw new InvalidOperationException("Cannot create invoice for inactive session.");
+
+            if (session.Status == DayStatus.Closed)
+                throw new InvalidOperationException("Cannot create invoice for a closed session.");
+
+            if (session.SalesRepId != salesRep.Id)
+                throw new UnauthorizedAccessException("You cannot create invoice using another sales rep's session.");
+
 
 
             var invoice = _mapper.Map<Invoice>(dto);
@@ -85,7 +112,8 @@ namespace Salesync.Application.Modules.Sales.Services
             invoice.PaymentStatus = PaymentStatus.Pending;
             invoice.CreatedAt = DateTime.UtcNow;
             invoice.IsActive = true;
-
+            invoice.SalesRepId = salesRep.Id;
+            invoice.SalesRepSessionId = session.Id;
 
             invoice.InvoiceItems.Clear();
 
@@ -125,9 +153,9 @@ namespace Salesync.Application.Modules.Sales.Services
 
             invoice.TotalAmount = invoice.SubTotal - invoice.DiscountAmount + invoice.TaxAmount;
 
-
             await _unitOfWork.Invoices.AddAsync(invoice);
             await _unitOfWork.CompleteAsync();
+
             return _mapper.Map<InvoiceDto>(invoice);
         }
         public async Task<InvoiceDto> UpdateAsync(int id, UpdateInvoiceDto dto)
