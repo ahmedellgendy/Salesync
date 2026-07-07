@@ -1,4 +1,5 @@
-﻿using Salesync.Domain.Modules.MasterData.Entities;
+﻿using Salesync.Domain.Modules.Inventory.Entities;
+using Salesync.Domain.Modules.MasterData.Entities;
 using Salesync.Domain.Modules.Sales.Entities;
 using Salesync.Domain.Modules.SalesRep.Entities;
 
@@ -6,24 +7,45 @@ namespace Salesync.Application.Interfaces.Repositories
 {
     public interface IUnitOfWork
     {
-        // MasterData
+         
+        #region MasterData 
+
         IGenericRepository<Branch> Branches { get; }
         IGenericRepository<Warehouse> Warehouses { get; }
         IGenericRepository<Product> Products { get; }
         IGenericRepository<Customer> Customers { get; }
 
-        // SalesRep
+        #endregion
+
+        #region SalesRep
+
         IGenericRepository<SalesRep> SalesReps { get; }
         IGenericRepository<Route> Routes { get; }
         IGenericRepository<RouteCustomer> RouteCustomers { get; }
 
-        // Sales Module
+        #endregion
+
+        #region Sales
+
         IGenericRepository<SalesRepSession> SalesRepSessions { get; }
         IGenericRepository<Invoice> Invoices { get; }
         IGenericRepository<InvoiceItem> InvoiceItems { get; }
         IGenericRepository<InvoiceReturn> InvoiceReturns { get; }
         IGenericRepository<InvoiceReturnItem> InvoiceReturnItems { get; }
         IGenericRepository<Payment> Payments { get; }
+
+        #endregion
+
+        #region Inventory
+
+        IGenericRepository<StockBalance> StockBalances { get; }
+        IGenericRepository<StockMovement> StockMovements { get; }
+
+        #endregion
+
+        Task BeginTransactionAsync();
+        Task CommitTransactionAsync();
+        Task RollbackTransactionAsync();
 
         Task<int> CompleteAsync();
     }

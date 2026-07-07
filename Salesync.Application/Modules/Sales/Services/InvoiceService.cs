@@ -3,8 +3,10 @@ using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Salesync.Application.Interfaces.Repositories;
 using Salesync.Application.Interfaces.Services;
+using Salesync.Application.Modules.Inventory.Interfaces;
 using Salesync.Application.Modules.Sales.Dtos.Invoice;
 using Salesync.Application.Modules.Sales.Interfaces;
+using Salesync.Domain.Common.Enums.Inventory;
 using Salesync.Domain.Common.Enums.Sales;
 using Salesync.Domain.Modules.Sales.Entities;
 
@@ -16,15 +18,17 @@ namespace Salesync.Application.Modules.Sales.Services
         private readonly IMapper _mapper;
         private readonly IValidator<CreateInvoiceDto> _createInvoiceValidator;
         private readonly ICurrentUserService _currentUser;
+        private readonly IInventoryService _inventoryService;
 
 
 
-        public InvoiceService(IUnitOfWork unitOfWork, IMapper mapper, IValidator<CreateInvoiceDto> createInvoiceValidator, ICurrentUserService currentUser)
+        public InvoiceService(IUnitOfWork unitOfWork, IMapper mapper, IValidator<CreateInvoiceDto> createInvoiceValidator, ICurrentUserService currentUser, IInventoryService inventoryService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
             _createInvoiceValidator = createInvoiceValidator;
             _currentUser = currentUser;
+            _inventoryService = inventoryService;
         }
         public async Task<IEnumerable<InvoiceDto>> GetAllAsync()
         {
@@ -72,10 +76,10 @@ namespace Salesync.Application.Modules.Sales.Services
 
             if (isSalesRepUser)
             {
-                 salesRep = (await _unitOfWork.SalesReps
-                    .FindAsync(s => s.UserId == _currentUser.UserId && s.IsActive))
-                    .FirstOrDefault()
-                    ?? throw new UnauthorizedAccessException("SalesRep not found for current user.");
+                salesRep = (await _unitOfWork.SalesReps
+                   .FindAsync(s => s.UserId == _currentUser.UserId && s.IsActive))
+                   .FirstOrDefault()
+                   ?? throw new UnauthorizedAccessException("SalesRep not found for current user.");
             }
             else
             {
@@ -196,13 +200,69 @@ namespace Salesync.Application.Modules.Sales.Services
             if (invoice.TotalAmount <= 0)
                 throw new InvalidOperationException("Cannot confirm invoice with invalid total amount.");
 
-            invoice.Status = InvoiceStatus.Confirmed;
-            invoice.UpdatedAt = DateTime.UtcNow;
+            if (invoice.WarehouseId <= 0)
+                throw new InvalidOperationException("Invoice warehouse is required.");
 
-            _unitOfWork.Invoices.Update(invoice);
-            await _unitOfWork.CompleteAsync();
+            var requiredStock = invoice.InvoiceItems
+                 .GroupBy(i => i.ProductId)
+                 .Select(g => new
+                 {
+                     ProductId = g.Key,
+                     ProductName = g.First().ProductName,
+                     Quantity = g.Sum(i => i.Quantity + i.BonusQuantity)
+                 })
+                 .ToList();
 
-            return _mapper.Map<InvoiceDto>(invoice);
+            await _unitOfWork.BeginTransactionAsync();
+
+            try
+            {
+                foreach (var item in requiredStock)
+                {
+                    if (item.Quantity <= 0)
+                        throw new InvalidOperationException($"Invalid stock quantity for product {item.ProductName}.");
+
+                    var balance = await _unitOfWork.StockBalances
+                        .GetQueryable()
+                        .FirstOrDefaultAsync(x =>
+                            x.ProductId == item.ProductId &&
+                            x.WarehouseId == invoice.WarehouseId &&
+                            x.IsActive);
+
+                    if (balance == null)
+                        throw new InvalidOperationException($"No stock balance found for product {item.ProductName}.");
+
+                    if (balance.Quantity < item.Quantity)
+                        throw new InvalidOperationException($"Insufficient stock for product {item.ProductName}. Available: {balance.Quantity}, Required: {item.Quantity}.");
+                }
+
+                foreach (var item in requiredStock)
+                {
+                    await _inventoryService.StockOutAsync(
+                        item.ProductId,
+                        invoice.WarehouseId,
+                        item.Quantity,
+                        StockMovementSource.Invoice,
+                        invoice.Id,
+                        invoice.InvoiceNumber,
+                        $"Stock out for invoice {invoice.InvoiceNumber}");
+                }
+
+                invoice.Status = InvoiceStatus.Confirmed;
+                invoice.UpdatedAt = DateTime.UtcNow;
+
+                _unitOfWork.Invoices.Update(invoice);
+                await _unitOfWork.CompleteAsync();
+
+                await _unitOfWork.CommitTransactionAsync();
+
+                return _mapper.Map<InvoiceDto>(invoice);
+            }
+            catch
+            {
+                await _unitOfWork.RollbackTransactionAsync();
+                throw;
+            }
         }
 
         public async Task CancelAsync(int id)

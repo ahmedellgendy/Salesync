@@ -1,8 +1,10 @@
 ﻿using AutoMapper;
 using Microsoft.EntityFrameworkCore;
 using Salesync.Application.Interfaces.Repositories;
+using Salesync.Application.Modules.Inventory.Interfaces;
 using Salesync.Application.Modules.Sales.Dtos.InvoiceReturn;
 using Salesync.Application.Modules.Sales.Interfaces;
+using Salesync.Domain.Common.Enums.Inventory;
 using Salesync.Domain.Common.Enums.Sales;
 using Salesync.Domain.Modules.Sales.Entities;
 
@@ -12,11 +14,13 @@ namespace Salesync.Application.Modules.Sales.Services
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
+        private readonly IInventoryService _inventoryService;
 
-        public InvoiceReturnService(IUnitOfWork unitOfWork, IMapper mapper)
+        public InvoiceReturnService(IUnitOfWork unitOfWork, IMapper mapper, IInventoryService inventoryService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
+            _inventoryService = inventoryService;
         }
 
         public async Task<IEnumerable<InvoiceReturnDto>> GetByInvoiceIdAsync(int invoiceId)
@@ -120,13 +124,44 @@ namespace Salesync.Application.Modules.Sales.Services
             if (invoice.Status != InvoiceStatus.Confirmed)
                 throw new InvalidOperationException("Cannot approve return for unconfirmed invoice.");
 
-            invoiceReturn.Status = ReturnStatus.Approved;
-            invoiceReturn.UpdatedAt = DateTime.UtcNow;
+            if (invoice.WarehouseId <= 0)
+                throw new InvalidOperationException("Invoice warehouse is required.");
 
-            _unitOfWork.InvoiceReturns.Update(invoiceReturn);
-            await _unitOfWork.CompleteAsync();
+            await _unitOfWork.BeginTransactionAsync();
 
-            return _mapper.Map<InvoiceReturnDto>(invoiceReturn);
+            try
+            {
+                foreach (var item in invoiceReturn.Items)
+                {
+                    if (item.Quantity <= 0)
+                        throw new InvalidOperationException($"Invalid return quantity for product {item.ProductName}.");
+
+                    await _inventoryService.StockInAsync(
+                        item.ProductId,
+                        invoice.WarehouseId,
+                        item.Quantity,
+                        StockMovementSource.InvoiceReturn,
+                        invoiceReturn.Id,
+                        invoiceReturn.ReturnNumber,
+                        $"Stock in for return {invoiceReturn.ReturnNumber}");
+                }
+
+                invoiceReturn.Status = ReturnStatus.Approved;
+                invoiceReturn.UpdatedAt = DateTime.UtcNow;
+
+                _unitOfWork.InvoiceReturns.Update(invoiceReturn);
+                await _unitOfWork.CompleteAsync();
+
+                await _unitOfWork.CommitTransactionAsync();
+
+                return _mapper.Map<InvoiceReturnDto>(invoiceReturn);
+            }
+            catch
+            {
+                await _unitOfWork.RollbackTransactionAsync();
+                throw;
+            }
+
         }
         public async Task<InvoiceReturnDto> RejectAsync(int id)
         {
