@@ -213,47 +213,56 @@ namespace Salesync.Application.Modules.Sales.Services
                  })
                  .ToList();
 
-            foreach (var item in requiredStock)
+            await _unitOfWork.BeginTransactionAsync();
+
+            try
             {
-                if (item.Quantity <= 0)
-                    throw new InvalidOperationException($"Invalid stock quantity for product {item.ProductName}.");
+                foreach (var item in requiredStock)
+                {
+                    if (item.Quantity <= 0)
+                        throw new InvalidOperationException($"Invalid stock quantity for product {item.ProductName}.");
 
-                var balance = await _unitOfWork.StockBalances
-                    .GetQueryable()
-                    .FirstOrDefaultAsync(x =>
-                        x.ProductId == item.ProductId &&
-                        x.WarehouseId == invoice.WarehouseId &&
-                        x.IsActive);
+                    var balance = await _unitOfWork.StockBalances
+                        .GetQueryable()
+                        .FirstOrDefaultAsync(x =>
+                            x.ProductId == item.ProductId &&
+                            x.WarehouseId == invoice.WarehouseId &&
+                            x.IsActive);
 
-                if (balance == null)
-                    throw new InvalidOperationException($"No stock balance found for product {item.ProductName}.");
+                    if (balance == null)
+                        throw new InvalidOperationException($"No stock balance found for product {item.ProductName}.");
 
-                if (balance.Quantity < item.Quantity)
-                    throw new InvalidOperationException(
-                        $"Insufficient stock for product {item.ProductName}. Available: {balance.Quantity}, Required: {item.Quantity}.");
+                    if (balance.Quantity < item.Quantity)
+                        throw new InvalidOperationException($"Insufficient stock for product {item.ProductName}. Available: {balance.Quantity}, Required: {item.Quantity}.");
+                }
+
+                foreach (var item in requiredStock)
+                {
+                    await _inventoryService.StockOutAsync(
+                        item.ProductId,
+                        invoice.WarehouseId,
+                        item.Quantity,
+                        StockMovementSource.Invoice,
+                        invoice.Id,
+                        invoice.InvoiceNumber,
+                        $"Stock out for invoice {invoice.InvoiceNumber}");
+                }
+
+                invoice.Status = InvoiceStatus.Confirmed;
+                invoice.UpdatedAt = DateTime.UtcNow;
+
+                _unitOfWork.Invoices.Update(invoice);
+                await _unitOfWork.CompleteAsync();
+
+                await _unitOfWork.CommitTransactionAsync();
+
+                return _mapper.Map<InvoiceDto>(invoice);
             }
-
-
-            foreach (var item in requiredStock)
+            catch
             {
-                await _inventoryService.StockOutAsync(
-                    item.ProductId,
-                    invoice.WarehouseId,
-                    item.Quantity,
-                    StockMovementSource.Invoice,
-                    invoice.Id,
-                    invoice.InvoiceNumber,
-                    $"Stock out for invoice {invoice.InvoiceNumber}");
+                await _unitOfWork.RollbackTransactionAsync();
+                throw;
             }
-
-            invoice.Status = InvoiceStatus.Confirmed;
-            invoice.UpdatedAt = DateTime.UtcNow;
-
-            _unitOfWork.Invoices.Update(invoice);
-            await _unitOfWork.CompleteAsync();
-
-            return _mapper.Map<InvoiceDto>(invoice);
-
         }
 
         public async Task CancelAsync(int id)

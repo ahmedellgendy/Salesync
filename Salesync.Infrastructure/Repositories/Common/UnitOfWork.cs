@@ -1,4 +1,5 @@
-﻿using Salesync.Application.Interfaces.Repositories;
+﻿using Microsoft.EntityFrameworkCore.Storage;
+using Salesync.Application.Interfaces.Repositories;
 using Salesync.Domain.Modules.Inventory.Entities;
 using Salesync.Domain.Modules.MasterData.Entities;
 using Salesync.Domain.Modules.Sales.Entities;
@@ -10,6 +11,7 @@ namespace Salesync.Infrastructure.Repositories.Common
     public class UnitOfWork : IUnitOfWork
     {
         private readonly SalesyncDbContext _context;
+        private IDbContextTransaction? _transaction;
 
         public IGenericRepository<Branch> Branches { get; }
         public IGenericRepository<Warehouse> Warehouses { get; }
@@ -52,6 +54,32 @@ namespace Salesync.Infrastructure.Repositories.Common
 
             StockBalances = new GenericRepository<StockBalance>(_context);
             StockMovements = new GenericRepository<StockMovement>(_context);
+        }
+
+        public async Task BeginTransactionAsync()
+        {
+            if (_transaction != null)
+                return;
+
+            _transaction = await _context.Database.BeginTransactionAsync();
+        }
+        public async Task CommitTransactionAsync()
+        {
+            if (_transaction == null)
+                return;
+
+            await _transaction.CommitAsync();
+            await _transaction.DisposeAsync();
+            _transaction = null;
+        }
+        public async Task RollbackTransactionAsync()
+        {
+            if (_transaction == null)
+                return;
+
+            await _transaction.RollbackAsync();
+            await _transaction.DisposeAsync();
+            _transaction = null;
         }
 
         public async Task<int> CompleteAsync() => await _context.SaveChangesAsync();

@@ -39,9 +39,13 @@ namespace Salesync.Application.Interfaces.Repositories
         #region Inventory
 
         IGenericRepository<StockBalance> StockBalances { get; }
-        IGenericRepository<StockMovement> StockMovements { get; } 
+        IGenericRepository<StockMovement> StockMovements { get; }
 
         #endregion
+
+        Task BeginTransactionAsync();
+        Task CommitTransactionAsync();
+        Task RollbackTransactionAsync();
 
         Task<int> CompleteAsync();
     }

@@ -127,28 +127,41 @@ namespace Salesync.Application.Modules.Sales.Services
             if (invoice.WarehouseId <= 0)
                 throw new InvalidOperationException("Invoice warehouse is required.");
 
-            foreach (var item in invoiceReturn.Items)
-            {
-                if (item.Quantity <= 0)
-                    throw new InvalidOperationException($"Invalid return quantity for product {item.ProductName}.");
+            await _unitOfWork.BeginTransactionAsync();
 
-                await _inventoryService.StockInAsync(
-                    item.ProductId,
-                    invoice.WarehouseId,
-                    item.Quantity,
-                    StockMovementSource.InvoiceReturn,
-                    invoiceReturn.Id,
-                    invoiceReturn.ReturnNumber,
-                    $"Stock in for return {invoiceReturn.ReturnNumber}");
+            try
+            {
+                foreach (var item in invoiceReturn.Items)
+                {
+                    if (item.Quantity <= 0)
+                        throw new InvalidOperationException($"Invalid return quantity for product {item.ProductName}.");
+
+                    await _inventoryService.StockInAsync(
+                        item.ProductId,
+                        invoice.WarehouseId,
+                        item.Quantity,
+                        StockMovementSource.InvoiceReturn,
+                        invoiceReturn.Id,
+                        invoiceReturn.ReturnNumber,
+                        $"Stock in for return {invoiceReturn.ReturnNumber}");
+                }
+
+                invoiceReturn.Status = ReturnStatus.Approved;
+                invoiceReturn.UpdatedAt = DateTime.UtcNow;
+
+                _unitOfWork.InvoiceReturns.Update(invoiceReturn);
+                await _unitOfWork.CompleteAsync();
+
+                await _unitOfWork.CommitTransactionAsync();
+
+                return _mapper.Map<InvoiceReturnDto>(invoiceReturn);
+            }
+            catch
+            {
+                await _unitOfWork.RollbackTransactionAsync();
+                throw;
             }
 
-            invoiceReturn.Status = ReturnStatus.Approved;
-            invoiceReturn.UpdatedAt = DateTime.UtcNow;
-
-            _unitOfWork.InvoiceReturns.Update(invoiceReturn);
-            await _unitOfWork.CompleteAsync();
-
-            return _mapper.Map<InvoiceReturnDto>(invoiceReturn);
         }
         public async Task<InvoiceReturnDto> RejectAsync(int id)
         {
