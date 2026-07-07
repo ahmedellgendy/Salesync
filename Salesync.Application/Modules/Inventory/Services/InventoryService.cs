@@ -1,4 +1,5 @@
 ﻿using AutoMapper;
+using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Salesync.Application.Interfaces.Repositories;
 using Salesync.Application.Modules.Inventory.Dtos;
@@ -12,25 +13,23 @@ namespace Salesync.Application.Modules.Inventory.Services
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
+        private readonly IValidator<CreateOpeningBalanceDto> _createOpeningBalanceValidator;
 
-        public InventoryService(IUnitOfWork unitOfWork, IMapper mapper)
+        public InventoryService(IUnitOfWork unitOfWork, IMapper mapper, IValidator<CreateOpeningBalanceDto> createOpeningBalanceValidator)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
+            _createOpeningBalanceValidator = createOpeningBalanceValidator;
         }
 
         public async Task<StockBalanceDto> CreateOpeningBalanceAsync(CreateOpeningBalanceDto dto)
         {
+            var validationResult = await _createOpeningBalanceValidator.ValidateAsync(dto);
+
+            if (!validationResult.IsValid)
+                throw new ValidationException(validationResult.Errors);
+
             #region Validations
-
-            if (dto.ProductId <= 0)
-                throw new InvalidOperationException("ProductId is required.");
-
-            if (dto.WarehouseId <= 0)
-                throw new InvalidOperationException("WarehouseId is required.");
-
-            if (dto.Quantity < 0)
-                throw new InvalidOperationException("Quantity cannot be negative.");
 
             var product = await _unitOfWork.Products.GetByIdAsync(dto.ProductId)
                 ?? throw new KeyNotFoundException($"Product with id {dto.ProductId} not found.");
