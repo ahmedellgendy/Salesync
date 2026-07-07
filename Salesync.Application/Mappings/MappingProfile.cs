@@ -1,4 +1,5 @@
 ﻿using AutoMapper;
+using Salesync.Application.Modules.Inventory.Dtos;
 using Salesync.Application.Modules.MasterData.Dtos.BranchDto;
 using Salesync.Application.Modules.MasterData.Dtos.CustomerDto;
 using Salesync.Application.Modules.MasterData.Dtos.ProductDto;
@@ -11,6 +12,7 @@ using Salesync.Application.Modules.Sales.Dtos.SalesRepSession;
 using Salesync.Application.Modules.SalesRep.Dtos.RouteCustomerDto;
 using Salesync.Application.Modules.SalesRep.Dtos.RouteDto;
 using Salesync.Application.Modules.SalesRep.Dtos.SalesRepDto;
+using Salesync.Domain.Modules.Inventory.Entities;
 using Salesync.Domain.Modules.MasterData.Entities;
 using Salesync.Domain.Modules.Sales.Entities;
 using Salesync.Domain.Modules.SalesRep.Entities;
@@ -78,6 +80,18 @@ namespace Salesync.Application.Mappings
             CreateMap<CreateInvoiceReturnDto, InvoiceReturn>();
 
             CreateMap<CreateInvoiceReturnItemDto, InvoiceReturnItem>();
+
+            #endregion
+
+            #region Inventory
+
+            CreateMap<StockBalance, StockBalanceDto>()
+                .ForMember(dest => dest.ProductName, opt => opt.MapFrom(src => src.Product.Name))
+                .ForMember(dest => dest.WarehouseName, opt => opt.MapFrom(src => src.Warehouse.Name));
+
+            CreateMap<StockMovement, StockMovementDto>()
+                .ForMember(dest => dest.ProductName, opt => opt.MapFrom(src => src.Product.Name))
+                .ForMember(dest => dest.WarehouseName, opt => opt.MapFrom(src => src.Warehouse.Name));
 
             #endregion
         }

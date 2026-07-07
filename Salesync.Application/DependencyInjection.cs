@@ -1,5 +1,7 @@
 ﻿using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
+using Salesync.Application.Modules.Inventory.Interfaces;
+using Salesync.Application.Modules.Inventory.Services;
 using Salesync.Application.Modules.MasterData.Validators.Customer;
 using Salesync.Application.Modules.Sales.Interfaces;
 using Salesync.Application.Modules.Sales.Services;
@@ -26,6 +28,9 @@ namespace Salesync.Application
             services.AddScoped<IInvoiceService, InvoiceService>();
             services.AddScoped<IPaymentService, PaymentService>();
             services.AddScoped<IInvoiceReturnService, InvoiceReturnService>();
+
+            // Register Inventory Service
+            services.AddScoped<IInventoryService, InventoryService>();
 
             return services;
         }

@@ -1,4 +1,5 @@
 ﻿using Salesync.Application.Interfaces.Repositories;
+using Salesync.Domain.Modules.Inventory.Entities;
 using Salesync.Domain.Modules.MasterData.Entities;
 using Salesync.Domain.Modules.Sales.Entities;
 using Salesync.Domain.Modules.SalesRep.Entities;
@@ -26,6 +27,9 @@ namespace Salesync.Infrastructure.Repositories.Common
         public IGenericRepository<InvoiceReturnItem> InvoiceReturnItems { get; private set; }
         public IGenericRepository<Payment> Payments { get; private set; }
 
+        public IGenericRepository<StockBalance> StockBalances { get; }
+        public IGenericRepository<StockMovement> StockMovements { get; }
+
         public UnitOfWork(SalesyncDbContext context)
         {
             _context = context;
@@ -46,8 +50,9 @@ namespace Salesync.Infrastructure.Repositories.Common
             InvoiceReturnItems = new GenericRepository<InvoiceReturnItem>(_context);
             Payments = new GenericRepository<Payment>(_context);
 
+            StockBalances = new GenericRepository<StockBalance>(_context);
+            StockMovements = new GenericRepository<StockMovement>(_context);
         }
-
 
         public async Task<int> CompleteAsync() => await _context.SaveChangesAsync();
     }
