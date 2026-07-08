@@ -261,6 +261,8 @@ namespace Salesync.Application.Modules.LoadRequest.Services
             if (dto.Items.Sum(x => x.ConfirmedQuantity) <= 0)
                 throw new InvalidOperationException("At least one item must have confirmed quantity greater than zero.");
 
+            await EnsureWarehouseStockAvailableAsync(request.WarehouseId, request.Items, dto.Items);
+
             await _unitOfWork.BeginTransactionAsync();
 
             try
@@ -551,6 +553,51 @@ namespace Salesync.Application.Modules.LoadRequest.Services
 
             if (currentSalesRep.Id != salesRepId)
                 throw new UnauthorizedAccessException("You cannot access another sales rep inventory.");
+        }
+
+        private async Task EnsureWarehouseStockAvailableAsync(
+             int warehouseId,
+             IEnumerable<LoadRequestItem> requestItems,
+             IEnumerable<ConfirmLoadRequestItemDto> confirmedItems)
+        {
+            var requiredStock = confirmedItems
+                .Where(x => x.ConfirmedQuantity > 0)
+                .Select(x =>
+                {
+                    var requestItem = requestItems.First(i => i.Id == x.LoadRequestItemId);
+
+                    return new
+                    {
+                        ProductId = requestItem.ProductId,
+                        ProductName = requestItem.ProductName,
+                        Quantity = x.ConfirmedQuantity
+                    };
+                })
+                .GroupBy(x => x.ProductId)
+                .Select(g => new
+                {
+                    ProductId = g.Key,
+                    ProductName = g.First().ProductName,
+                    Quantity = g.Sum(x => x.Quantity)
+                })
+                .ToList();
+
+            foreach (var item in requiredStock)
+            {
+                var balance = await _unitOfWork.StockBalances
+                    .GetQueryable()
+                    .FirstOrDefaultAsync(x =>
+                        x.ProductId == item.ProductId &&
+                        x.WarehouseId == warehouseId &&
+                        x.IsActive);
+
+                if (balance == null)
+                    throw new InvalidOperationException($"No stock balance found for product {item.ProductName}.");
+
+                if (balance.Quantity < item.Quantity)
+                    throw new InvalidOperationException(
+                        $"Insufficient stock for product {item.ProductName}. Available: {balance.Quantity}, Required: {item.Quantity}.");
+            }
         }
 
         #endregion
