@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Salesync.Infrastructure.Data;
 
@@ -11,9 +12,11 @@ using Salesync.Infrastructure.Data;
 namespace Salesync.Infrastructure.Migrations
 {
     [DbContext(typeof(SalesyncDbContext))]
-    partial class SalesyncDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260707120754_AddLoadRequestModule")]
+    partial class AddLoadRequestModule
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -386,116 +389,6 @@ namespace Salesync.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("LoadRequestItems", (string)null);
-                });
-
-            modelBuilder.Entity("Salesync.Domain.Modules.LoadRequest.Entities.SalesRepInventory", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("CreatedBy")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.Property<DateTime>("LastUpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("ProductId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("Quantity")
-                        .HasColumnType("int");
-
-                    b.Property<int>("SalesRepId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("UpdatedBy")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ProductId");
-
-                    b.HasIndex("SalesRepId", "ProductId")
-                        .IsUnique();
-
-                    b.ToTable("SalesRepInventories", (string)null);
-                });
-
-            modelBuilder.Entity("Salesync.Domain.Modules.LoadRequest.Entities.SalesRepInventoryMovement", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("CreatedBy")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.Property<DateTime>("MovementDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("MovementType")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<int>("ProductId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("Quantity")
-                        .HasColumnType("int");
-
-                    b.Property<int>("SalesRepId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("Source")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("SourceId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("SourceNumber")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("UpdatedBy")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("MovementDate");
-
-                    b.HasIndex("ProductId");
-
-                    b.HasIndex("SalesRepId");
-
-                    b.HasIndex("SourceId");
-
-                    b.ToTable("SalesRepInventoryMovements", (string)null);
                 });
 
             modelBuilder.Entity("Salesync.Domain.Modules.MasterData.Entities.Branch", b =>
@@ -1900,44 +1793,6 @@ namespace Salesync.Infrastructure.Migrations
                     b.Navigation("LoadRequest");
 
                     b.Navigation("Product");
-                });
-
-            modelBuilder.Entity("Salesync.Domain.Modules.LoadRequest.Entities.SalesRepInventory", b =>
-                {
-                    b.HasOne("Salesync.Domain.Modules.MasterData.Entities.Product", "Product")
-                        .WithMany()
-                        .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Salesync.Domain.Modules.SalesRep.Entities.SalesRep", "SalesRep")
-                        .WithMany()
-                        .HasForeignKey("SalesRepId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Product");
-
-                    b.Navigation("SalesRep");
-                });
-
-            modelBuilder.Entity("Salesync.Domain.Modules.LoadRequest.Entities.SalesRepInventoryMovement", b =>
-                {
-                    b.HasOne("Salesync.Domain.Modules.MasterData.Entities.Product", "Product")
-                        .WithMany()
-                        .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Salesync.Domain.Modules.SalesRep.Entities.SalesRep", "SalesRep")
-                        .WithMany()
-                        .HasForeignKey("SalesRepId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Product");
-
-                    b.Navigation("SalesRep");
                 });
 
             modelBuilder.Entity("Salesync.Domain.Modules.MasterData.Entities.Customer", b =>

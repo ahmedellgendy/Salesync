@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore.Storage;
 using Salesync.Application.Interfaces.Repositories;
 using Salesync.Domain.Modules.Inventory.Entities;
+using Salesync.Domain.Modules.LoadRequest.Entities;
 using Salesync.Domain.Modules.MasterData.Entities;
 using Salesync.Domain.Modules.Sales.Entities;
 using Salesync.Domain.Modules.SalesRep.Entities;
@@ -32,6 +33,13 @@ namespace Salesync.Infrastructure.Repositories.Common
         public IGenericRepository<StockBalance> StockBalances { get; }
         public IGenericRepository<StockMovement> StockMovements { get; }
 
+        public IGenericRepository<LoadRequest> LoadRequests { get; private set; }
+        public IGenericRepository<LoadRequestItem> LoadRequestItems { get; private set; }
+        public IGenericRepository<SalesRepInventory> SalesRepInventories { get; private set; }
+        public IGenericRepository<SalesRepInventoryMovement> SalesRepInventoryMovements { get; private set; }
+
+
+
         public UnitOfWork(SalesyncDbContext context)
         {
             _context = context;
@@ -54,6 +62,11 @@ namespace Salesync.Infrastructure.Repositories.Common
 
             StockBalances = new GenericRepository<StockBalance>(_context);
             StockMovements = new GenericRepository<StockMovement>(_context);
+
+            LoadRequests = new GenericRepository<LoadRequest>(_context);
+            LoadRequestItems = new GenericRepository<LoadRequestItem>(_context);
+            SalesRepInventories = new GenericRepository<SalesRepInventory>(_context);
+            SalesRepInventoryMovements = new GenericRepository<SalesRepInventoryMovement>(_context);
         }
 
         public async Task BeginTransactionAsync()

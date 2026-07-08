@@ -1,5 +1,6 @@
 ﻿using AutoMapper;
 using Salesync.Application.Modules.Inventory.Dtos;
+using Salesync.Application.Modules.LoadRequest.Dtos;
 using Salesync.Application.Modules.MasterData.Dtos.BranchDto;
 using Salesync.Application.Modules.MasterData.Dtos.CustomerDto;
 using Salesync.Application.Modules.MasterData.Dtos.ProductDto;
@@ -13,6 +14,7 @@ using Salesync.Application.Modules.SalesRep.Dtos.RouteCustomerDto;
 using Salesync.Application.Modules.SalesRep.Dtos.RouteDto;
 using Salesync.Application.Modules.SalesRep.Dtos.SalesRepDto;
 using Salesync.Domain.Modules.Inventory.Entities;
+using Salesync.Domain.Modules.LoadRequest.Entities;
 using Salesync.Domain.Modules.MasterData.Entities;
 using Salesync.Domain.Modules.Sales.Entities;
 using Salesync.Domain.Modules.SalesRep.Entities;
@@ -92,6 +94,27 @@ namespace Salesync.Application.Mappings
             CreateMap<StockMovement, StockMovementDto>()
                 .ForMember(dest => dest.ProductName, opt => opt.MapFrom(src => src.Product.Name))
                 .ForMember(dest => dest.WarehouseName, opt => opt.MapFrom(src => src.Warehouse.Name));
+
+            #endregion
+
+            #region LoadRequest
+
+            CreateMap<LoadRequest, LoadRequestDto>()
+                .ForMember(dest => dest.SalesRepName, opt => opt.MapFrom(src => src.SalesRep.Name))
+                .ForMember(dest => dest.WarehouseName, opt => opt.MapFrom(src => src.Warehouse.Name))
+                .ForMember(dest => dest.Items, opt => opt.MapFrom(src => src.Items));
+
+            CreateMap<LoadRequestItem, LoadRequestItemDto>();
+
+            CreateMap<SalesRepInventory, SalesRepInventoryDto>()
+                .ForMember(dest => dest.SalesRepName, opt => opt.MapFrom(src => src.SalesRep.Name))
+                .ForMember(dest => dest.ProductName, opt => opt.MapFrom(src => src.Product.Name))
+                .ForMember(dest => dest.ItemCode, opt => opt.MapFrom(src => src.Product.ItemCode));
+
+            CreateMap<SalesRepInventoryMovement, SalesRepInventoryMovementDto>()
+                .ForMember(dest => dest.SalesRepName, opt => opt.MapFrom(src => src.SalesRep.Name))
+                .ForMember(dest => dest.ProductName, opt => opt.MapFrom(src => src.Product.Name))
+                .ForMember(dest => dest.ItemCode, opt => opt.MapFrom(src => src.Product.ItemCode));
 
             #endregion
         }

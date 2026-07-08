@@ -7,7 +7,9 @@ using Salesync.Application.Modules.Inventory.Interfaces;
 using Salesync.Application.Modules.Sales.Dtos.Invoice;
 using Salesync.Application.Modules.Sales.Interfaces;
 using Salesync.Domain.Common.Enums.Inventory;
+using Salesync.Domain.Common.Enums.LoadRequest;
 using Salesync.Domain.Common.Enums.Sales;
+using Salesync.Domain.Modules.LoadRequest.Entities;
 using Salesync.Domain.Modules.Sales.Entities;
 
 namespace Salesync.Application.Modules.Sales.Services
@@ -178,9 +180,9 @@ namespace Salesync.Application.Modules.Sales.Services
         public async Task<InvoiceDto> ConfirmAsync(int id)
         {
             var invoice = await _unitOfWork.Invoices
-                     .GetQueryable()
-                     .Include(i => i.InvoiceItems)
-                     .FirstOrDefaultAsync(i => i.Id == id);
+                .GetQueryable()
+                .Include(i => i.InvoiceItems)
+                .FirstOrDefaultAsync(i => i.Id == id);
 
             if (invoice == null)
                 throw new KeyNotFoundException($"Invoice with id {id} not found.");
@@ -200,52 +202,53 @@ namespace Salesync.Application.Modules.Sales.Services
             if (invoice.TotalAmount <= 0)
                 throw new InvalidOperationException("Cannot confirm invoice with invalid total amount.");
 
-            if (invoice.WarehouseId <= 0)
-                throw new InvalidOperationException("Invoice warehouse is required.");
+            if (!invoice.SalesRepId.HasValue)
+                throw new InvalidOperationException("Invoice is not assigned to a sales rep.");
 
-            var requiredStock = invoice.InvoiceItems
-                 .GroupBy(i => i.ProductId)
-                 .Select(g => new
-                 {
-                     ProductId = g.Key,
-                     ProductName = g.First().ProductName,
-                     Quantity = g.Sum(i => i.Quantity + i.BonusQuantity)
-                 })
-                 .ToList();
+            var requiredInventory = invoice.InvoiceItems
+                .GroupBy(i => i.ProductId)
+                .Select(g => new
+                {
+                    ProductId = g.Key,
+                    ProductName = g.First().ProductName,
+                    Quantity = g.Sum(i => i.Quantity + i.BonusQuantity)
+                })
+                .ToList();
+
+            foreach (var item in requiredInventory)
+            {
+                if (item.Quantity <= 0)
+                    throw new InvalidOperationException($"Invalid inventory quantity for product {item.ProductName}.");
+
+                var salesRepInventory = await _unitOfWork.SalesRepInventories
+                    .GetQueryable()
+                    .FirstOrDefaultAsync(x =>
+                        x.SalesRepId == invoice.SalesRepId.Value &&
+                        x.ProductId == item.ProductId &&
+                        x.IsActive);
+
+                if (salesRepInventory == null)
+                    throw new InvalidOperationException($"No sales rep inventory found for product {item.ProductName}.");
+
+                if (salesRepInventory.Quantity < item.Quantity)
+                    throw new InvalidOperationException(
+                        $"Insufficient sales rep inventory for product {item.ProductName}. Available: {salesRepInventory.Quantity}, Required: {item.Quantity}.");
+            }
 
             await _unitOfWork.BeginTransactionAsync();
 
             try
             {
-                foreach (var item in requiredStock)
+                foreach (var item in requiredInventory)
                 {
-                    if (item.Quantity <= 0)
-                        throw new InvalidOperationException($"Invalid stock quantity for product {item.ProductName}.");
-
-                    var balance = await _unitOfWork.StockBalances
-                        .GetQueryable()
-                        .FirstOrDefaultAsync(x =>
-                            x.ProductId == item.ProductId &&
-                            x.WarehouseId == invoice.WarehouseId &&
-                            x.IsActive);
-
-                    if (balance == null)
-                        throw new InvalidOperationException($"No stock balance found for product {item.ProductName}.");
-
-                    if (balance.Quantity < item.Quantity)
-                        throw new InvalidOperationException($"Insufficient stock for product {item.ProductName}. Available: {balance.Quantity}, Required: {item.Quantity}.");
-                }
-
-                foreach (var item in requiredStock)
-                {
-                    await _inventoryService.StockOutAsync(
+                    await DecreaseSalesRepInventoryAsync(
+                        invoice.SalesRepId.Value,
                         item.ProductId,
-                        invoice.WarehouseId,
                         item.Quantity,
-                        StockMovementSource.Invoice,
+                        SalesRepInventoryMovementSource.Invoice,
                         invoice.Id,
                         invoice.InvoiceNumber,
-                        $"Stock out for invoice {invoice.InvoiceNumber}");
+                        $"Stock out from sales rep inventory for invoice {invoice.InvoiceNumber}");
                 }
 
                 invoice.Status = InvoiceStatus.Confirmed;
@@ -264,7 +267,6 @@ namespace Salesync.Application.Modules.Sales.Services
                 throw;
             }
         }
-
         public async Task CancelAsync(int id)
         {
             var invoice = await _unitOfWork.Invoices.GetByIdAsync(id)
@@ -283,6 +285,53 @@ namespace Salesync.Application.Modules.Sales.Services
         #region Helper Method
 
         private static string GenerateInvoiceNumber() => $"INV-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..4].ToUpper()}";
+        private async Task DecreaseSalesRepInventoryAsync(
+             int salesRepId,
+             int productId,
+             int quantity,
+             SalesRepInventoryMovementSource source,
+             int? sourceId = null,
+             string? sourceNumber = null,
+             string? notes = null)
+        {
+            if (quantity <= 0)
+                throw new InvalidOperationException("Quantity must be greater than zero.");
+
+            var inventory = await _unitOfWork.SalesRepInventories
+                .GetQueryable()
+                .FirstOrDefaultAsync(x =>
+                    x.SalesRepId == salesRepId &&
+                    x.ProductId == productId &&
+                    x.IsActive);
+
+            if (inventory == null)
+                throw new InvalidOperationException("Sales rep inventory not found.");
+
+            if (inventory.Quantity < quantity)
+                throw new InvalidOperationException("Insufficient sales rep inventory.");
+
+            inventory.Quantity -= quantity;
+            inventory.LastUpdatedAt = DateTime.UtcNow;
+            inventory.UpdatedAt = DateTime.UtcNow;
+
+            var movement = new SalesRepInventoryMovement
+            {
+                SalesRepId = salesRepId,
+                ProductId = productId,
+                Quantity = quantity,
+                MovementType = SalesRepInventoryMovementType.Out,
+                Source = source,
+                SourceId = sourceId,
+                SourceNumber = sourceNumber,
+                MovementDate = DateTime.UtcNow,
+                Notes = notes,
+                CreatedAt = DateTime.UtcNow,
+                IsActive = true
+            };
+
+            _unitOfWork.SalesRepInventories.Update(inventory);
+            await _unitOfWork.SalesRepInventoryMovements.AddAsync(movement);
+        }
 
         #endregion
 

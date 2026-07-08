@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Salesync.Domain.Modules.Inventory.Entities;
+using Salesync.Domain.Modules.LoadRequest.Entities;
 using Salesync.Domain.Modules.MasterData.Entities;
 using Salesync.Domain.Modules.Sales.Entities;
 using Salesync.Domain.Modules.SalesRep.Entities;
@@ -51,6 +52,15 @@ namespace Salesync.Infrastructure.Data
 
         public DbSet<StockBalance> StockBalances { get; set; }
         public DbSet<StockMovement> StockMovements { get; set; }
+
+        #endregion
+
+        #region LoadRequest Dbsets
+
+        public DbSet<LoadRequest> LoadRequests { get; set; }
+        public DbSet<LoadRequestItem> LoadRequestItems { get; set; }
+        public DbSet<SalesRepInventory> SalesRepInventories { get; set; }
+        public DbSet<SalesRepInventoryMovement> SalesRepInventoryMovements { get; set; }
 
         #endregion
     }
