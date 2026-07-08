@@ -3,6 +3,7 @@ using Salesync.Domain.Modules.LoadRequest.Entities;
 using Salesync.Domain.Modules.MasterData.Entities;
 using Salesync.Domain.Modules.Sales.Entities;
 using Salesync.Domain.Modules.SalesRep.Entities;
+using CustomerVisitEntity = Salesync.Domain.Modules.CustomerVisit.Entities.CustomerVisit;
 
 namespace Salesync.Application.Interfaces.Repositories
 {
@@ -50,6 +51,12 @@ namespace Salesync.Application.Interfaces.Repositories
         IGenericRepository<LoadRequestItem> LoadRequestItems { get; }
         IGenericRepository<SalesRepInventory> SalesRepInventories { get; }
         IGenericRepository<SalesRepInventoryMovement> SalesRepInventoryMovements { get; }
+
+        #endregion
+
+        #region CustomerVisit
+
+        IGenericRepository<CustomerVisitEntity> CustomerVisits { get; }
 
         #endregion
 

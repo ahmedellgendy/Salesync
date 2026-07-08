@@ -6,6 +6,7 @@ using Salesync.Domain.Modules.MasterData.Entities;
 using Salesync.Domain.Modules.Sales.Entities;
 using Salesync.Domain.Modules.SalesRep.Entities;
 using Salesync.Infrastructure.Data;
+using CustomerVisitEntity = Salesync.Domain.Modules.CustomerVisit.Entities.CustomerVisit;
 
 namespace Salesync.Infrastructure.Repositories.Common
 {
@@ -38,7 +39,7 @@ namespace Salesync.Infrastructure.Repositories.Common
         public IGenericRepository<SalesRepInventory> SalesRepInventories { get; private set; }
         public IGenericRepository<SalesRepInventoryMovement> SalesRepInventoryMovements { get; private set; }
 
-
+        public IGenericRepository<CustomerVisitEntity> CustomerVisits { get; private set; }
 
         public UnitOfWork(SalesyncDbContext context)
         {
@@ -67,6 +68,8 @@ namespace Salesync.Infrastructure.Repositories.Common
             LoadRequestItems = new GenericRepository<LoadRequestItem>(_context);
             SalesRepInventories = new GenericRepository<SalesRepInventory>(_context);
             SalesRepInventoryMovements = new GenericRepository<SalesRepInventoryMovement>(_context);
+
+            CustomerVisits = new GenericRepository<CustomerVisitEntity>(_context);
         }
 
         public async Task BeginTransactionAsync()
