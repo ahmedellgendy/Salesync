@@ -18,7 +18,7 @@ namespace Salesync.API.Controllers.LoadRequest
             _loadRequestService = loadRequestService;
         }
 
-            
+
         [HttpGet] // GET: api/loadrequest
         [Authorize(Roles = "Admin,Supervisor,Warehouse")]
         public async Task<IActionResult> GetAllAsync()
@@ -99,6 +99,22 @@ namespace Salesync.API.Controllers.LoadRequest
         {
             await _loadRequestService.CancelAsync(id);
             return Ok(ApiResponse<object>.SuccessResponse(null, "Load request cancelled successfully"));
+        }
+
+        [HttpGet("salesrep-inventory/{salesRepId:int}")] // GET: api/loadrequest/salesrep-inventory/1
+        [Authorize(Roles = "Admin,Supervisor,Warehouse,SalesRep")]
+        public async Task<IActionResult> GetSalesRepInventoryAsync(int salesRepId)
+        {
+            var result = await _loadRequestService.GetSalesRepInventoryAsync(salesRepId);
+            return Ok(ApiResponse<IEnumerable<SalesRepInventoryDto>>.SuccessResponse(result));
+        }
+
+        [HttpGet("salesrep-inventory/{salesRepId:int}/movements")] // GET: api/loadrequest/salesrep-inventory/1/movements
+        [Authorize(Roles = "Admin,Supervisor,Warehouse,SalesRep")]
+        public async Task<IActionResult> GetSalesRepInventoryMovementsAsync(int salesRepId, [FromQuery] int? productId)
+        {
+            var result = await _loadRequestService.GetSalesRepInventoryMovementsAsync(salesRepId, productId);
+            return Ok(ApiResponse<IEnumerable<SalesRepInventoryMovementDto>>.SuccessResponse(result));
         }
     }
 }

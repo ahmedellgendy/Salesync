@@ -24,6 +24,10 @@ namespace Salesync.Application.Modules.LoadRequest.Interfaces
 
         Task CancelAsync(int id);
 
+        Task<IEnumerable<SalesRepInventoryDto>> GetSalesRepInventoryAsync(int salesRepId);
+
+        Task<IEnumerable<SalesRepInventoryMovementDto>> GetSalesRepInventoryMovementsAsync(int salesRepId, int? productId = null);
+
 
     }
 }

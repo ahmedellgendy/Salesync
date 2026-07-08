@@ -336,6 +336,63 @@ namespace Salesync.Application.Modules.LoadRequest.Services
             await _unitOfWork.CompleteAsync();
         }
 
+        public async Task<IEnumerable<SalesRepInventoryDto>> GetSalesRepInventoryAsync(int salesRepId)
+        {
+            if (salesRepId <= 0)
+                throw new InvalidOperationException("SalesRepId is required.");
+
+            await EnsureSalesRepInventoryAccessAsync(salesRepId);
+
+            var salesRep = await _unitOfWork.SalesReps.GetByIdAsync(salesRepId)
+                ?? throw new KeyNotFoundException($"SalesRep with id {salesRepId} not found.");
+
+            if (!salesRep.IsActive)
+                throw new InvalidOperationException("Cannot get inventory for inactive sales rep.");
+
+            var inventory = await _unitOfWork.SalesRepInventories
+                .GetQueryable()
+                .Include(x => x.SalesRep)
+                .Include(x => x.Product)
+                .Where(x => x.SalesRepId == salesRepId && x.IsActive)
+                .OrderBy(x => x.Product.Name)
+                .ToListAsync();
+
+            return _mapper.Map<IEnumerable<SalesRepInventoryDto>>(inventory);
+        }
+
+        public async Task<IEnumerable<SalesRepInventoryMovementDto>> GetSalesRepInventoryMovementsAsync(int salesRepId, int? productId = null)
+        {
+            if (salesRepId <= 0)
+                throw new InvalidOperationException("SalesRepId is required.");
+
+            if (productId.HasValue && productId.Value <= 0)
+                throw new InvalidOperationException("ProductId must be greater than zero.");
+
+            await EnsureSalesRepInventoryAccessAsync(salesRepId);
+
+            var salesRep = await _unitOfWork.SalesReps.GetByIdAsync(salesRepId)
+                ?? throw new KeyNotFoundException($"SalesRep with id {salesRepId} not found.");
+
+            if (!salesRep.IsActive)
+                throw new InvalidOperationException("Cannot get inventory movements for inactive sales rep.");
+
+            var query = _unitOfWork.SalesRepInventoryMovements
+                .GetQueryable()
+                .Include(x => x.SalesRep)
+                .Include(x => x.Product)
+                .Where(x => x.SalesRepId == salesRepId && x.IsActive)
+                .AsQueryable();
+
+            if (productId.HasValue)
+                query = query.Where(x => x.ProductId == productId.Value);
+
+            var movements = await query
+                .OrderByDescending(x => x.MovementDate)
+                .ToListAsync();
+
+            return _mapper.Map<IEnumerable<SalesRepInventoryMovementDto>>(movements);
+        }
+
         #region Helper Methods
 
         private async Task<LoadRequestEntity> GetRequestWithDetailsAsync(int id)
@@ -477,7 +534,24 @@ namespace Salesync.Application.Modules.LoadRequest.Services
             await _unitOfWork.SalesRepInventoryMovements.AddAsync(movement);
         }
 
+        private async Task EnsureSalesRepInventoryAccessAsync(int salesRepId)
+        {
+            var isSalesRepUser = string.Equals(
+                _currentUser.Role,
+                "SalesRep",
+                StringComparison.OrdinalIgnoreCase);
 
+            if (!isSalesRepUser)
+                return;
+
+            var currentSalesRep = (await _unitOfWork.SalesReps
+                .FindAsync(x => x.UserId == _currentUser.UserId && x.IsActive))
+                .FirstOrDefault()
+                ?? throw new UnauthorizedAccessException("SalesRep not found for current user.");
+
+            if (currentSalesRep.Id != salesRepId)
+                throw new UnauthorizedAccessException("You cannot access another sales rep inventory.");
+        }
 
         #endregion
 

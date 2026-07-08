@@ -106,6 +106,16 @@ namespace Salesync.Application.Mappings
 
             CreateMap<LoadRequestItem, LoadRequestItemDto>();
 
+            CreateMap<SalesRepInventory, SalesRepInventoryDto>()
+                .ForMember(dest => dest.SalesRepName, opt => opt.MapFrom(src => src.SalesRep.Name))
+                .ForMember(dest => dest.ProductName, opt => opt.MapFrom(src => src.Product.Name))
+                .ForMember(dest => dest.ItemCode, opt => opt.MapFrom(src => src.Product.ItemCode));
+
+            CreateMap<SalesRepInventoryMovement, SalesRepInventoryMovementDto>()
+                .ForMember(dest => dest.SalesRepName, opt => opt.MapFrom(src => src.SalesRep.Name))
+                .ForMember(dest => dest.ProductName, opt => opt.MapFrom(src => src.Product.Name))
+                .ForMember(dest => dest.ItemCode, opt => opt.MapFrom(src => src.Product.ItemCode));
+
             #endregion
         }
     }
