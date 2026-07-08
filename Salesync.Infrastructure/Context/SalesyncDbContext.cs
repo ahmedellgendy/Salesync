@@ -6,6 +6,7 @@ using Salesync.Domain.Modules.MasterData.Entities;
 using Salesync.Domain.Modules.Sales.Entities;
 using Salesync.Domain.Modules.SalesRep.Entities;
 using Salesync.Infrastructure.Modules.Identity.Entities;
+using CustomerVisitEntity = Salesync.Domain.Modules.CustomerVisit.Entities.CustomerVisit;
 
 namespace Salesync.Infrastructure.Data
 {
@@ -61,6 +62,13 @@ namespace Salesync.Infrastructure.Data
         public DbSet<LoadRequestItem> LoadRequestItems { get; set; }
         public DbSet<SalesRepInventory> SalesRepInventories { get; set; }
         public DbSet<SalesRepInventoryMovement> SalesRepInventoryMovements { get; set; }
+
+        #endregion
+
+        #region CustomerVisit Dbsets
+
+        public DbSet<CustomerVisitEntity> CustomerVisits { get; set; }
+
 
         #endregion
     }

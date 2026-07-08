@@ -1,5 +1,7 @@
 ﻿using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
+using Salesync.Application.Modules.CustomerVisit.Interfaces;
+using Salesync.Application.Modules.CustomerVisit.Services;
 using Salesync.Application.Modules.Inventory.Interfaces;
 using Salesync.Application.Modules.Inventory.Services;
 using Salesync.Application.Modules.LoadRequest.Interfaces;
@@ -36,6 +38,9 @@ namespace Salesync.Application
 
             // Register LoadRequest Service
             services.AddScoped<ILoadRequestService, LoadRequestService>();
+
+            // Register CustomerVisit Service
+            services.AddScoped<ICustomerVisitService, CustomerVisitService>();
 
             return services;
         }
