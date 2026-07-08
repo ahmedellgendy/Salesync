@@ -2,6 +2,8 @@
 using Microsoft.Extensions.DependencyInjection;
 using Salesync.Application.Modules.Inventory.Interfaces;
 using Salesync.Application.Modules.Inventory.Services;
+using Salesync.Application.Modules.LoadRequest.Interfaces;
+using Salesync.Application.Modules.LoadRequest.Services;
 using Salesync.Application.Modules.MasterData.Validators.Customer;
 using Salesync.Application.Modules.Sales.Interfaces;
 using Salesync.Application.Modules.Sales.Services;
@@ -31,6 +33,9 @@ namespace Salesync.Application
 
             // Register Inventory Service
             services.AddScoped<IInventoryService, InventoryService>();
+
+            // Register LoadRequest Service
+            services.AddScoped<ILoadRequestService, LoadRequestService>();
 
             return services;
         }

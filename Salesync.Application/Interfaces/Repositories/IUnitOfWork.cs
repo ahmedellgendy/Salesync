@@ -1,4 +1,5 @@
 ﻿using Salesync.Domain.Modules.Inventory.Entities;
+using Salesync.Domain.Modules.LoadRequest.Entities;
 using Salesync.Domain.Modules.MasterData.Entities;
 using Salesync.Domain.Modules.Sales.Entities;
 using Salesync.Domain.Modules.SalesRep.Entities;
@@ -40,6 +41,13 @@ namespace Salesync.Application.Interfaces.Repositories
 
         IGenericRepository<StockBalance> StockBalances { get; }
         IGenericRepository<StockMovement> StockMovements { get; }
+
+        #endregion
+
+        #region LoadRequest
+
+        IGenericRepository<LoadRequest> LoadRequests { get; }
+        IGenericRepository<LoadRequestItem> LoadRequestItems { get; }
 
         #endregion
 
