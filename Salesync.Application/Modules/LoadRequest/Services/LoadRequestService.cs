@@ -56,11 +56,26 @@ namespace Salesync.Application.Modules.LoadRequest.Services
             return _mapper.Map<IEnumerable<LoadRequestDto>>(requests);
         }
 
+        public async Task<IEnumerable<LoadRequestDto>> GetPendingAsync()
+        {
+            var requests = await _unitOfWork.LoadRequests
+                .GetQueryable()
+                .Include(x => x.SalesRep)
+                .Include(x => x.Warehouse)
+                .Include(x => x.Items)
+                .Where(x => x.IsActive && x.Status == LoadRequestStatus.Pending)
+                .OrderByDescending(x => x.RequestDate)
+                .ToListAsync();
+
+            return _mapper.Map<IEnumerable<LoadRequestDto>>(requests);
+        }
+
         public async Task<LoadRequestDto> GetByIdAsync(int id)
         {
             var request = await GetRequestWithDetailsAsync(id);
             return _mapper.Map<LoadRequestDto>(request);
         }
+
         public async Task<IEnumerable<LoadRequestDto>> GetBySalesRepAsync(int salesRepId)
         {
             var requests = await _unitOfWork.LoadRequests
@@ -74,6 +89,7 @@ namespace Salesync.Application.Modules.LoadRequest.Services
 
             return _mapper.Map<IEnumerable<LoadRequestDto>>(requests);
         }
+
         public async Task<LoadRequestDto> CreateAsync(CreateLoadRequestDto dto)
         {
             var validationResult = await _createValidator.ValidateAsync(dto);
@@ -134,7 +150,6 @@ namespace Salesync.Application.Modules.LoadRequest.Services
             return await GetByIdAsync(request.Id);
         }
 
-
         public async Task<LoadRequestDto> ApproveAsync(int id, ApproveLoadRequestDto dto)
         {
             var validationResult = await _approveValidator.ValidateAsync(dto);
@@ -178,6 +193,7 @@ namespace Salesync.Application.Modules.LoadRequest.Services
 
             return await GetByIdAsync(request.Id);
         }
+
         public async Task<LoadRequestDto> RejectAsync(int id, RejectLoadRequestDto dto)
         {
             var validationResult = await _rejectValidator.ValidateAsync(dto);
@@ -201,6 +217,7 @@ namespace Salesync.Application.Modules.LoadRequest.Services
 
             return await GetByIdAsync(request.Id);
         }
+
         public async Task<LoadRequestDto> ConfirmWarehouseAsync(int id, ConfirmLoadRequestDto dto)
         {
             var validationResult = await _confirmValidator.ValidateAsync(dto);
@@ -251,6 +268,15 @@ namespace Salesync.Application.Modules.LoadRequest.Services
                             request.Id,
                             request.LoadRequestNumber,
                             $"Stock out for load request {request.LoadRequestNumber}");
+
+                        await IncreaseSalesRepInventoryAsync(
+                              request.SalesRepId,
+                              item.ProductId,
+                              itemDto.ConfirmedQuantity,
+                              SalesRepInventoryMovementSource.LoadRequest,
+                              request.Id,
+                              request.LoadRequestNumber,
+                              $"Stock in for load request {request.LoadRequestNumber}");
                     }
                 }
 
@@ -374,10 +400,72 @@ namespace Salesync.Application.Modules.LoadRequest.Services
             return $"LR-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..4].ToUpper()}";
         }
 
+        private async Task IncreaseSalesRepInventoryAsync(
+          int salesRepId,
+          int productId,
+          int quantity,
+          SalesRepInventoryMovementSource source,
+          int? sourceId = null,
+          string? sourceNumber = null,
+          string? notes = null)
+        {
+            if (quantity <= 0)
+                throw new InvalidOperationException("Quantity must be greater than zero.");
+
+            var inventory = await _unitOfWork.SalesRepInventories
+                .GetQueryable()
+                .FirstOrDefaultAsync(x =>
+                    x.SalesRepId == salesRepId &&
+                    x.ProductId == productId &&
+                    x.IsActive);
+
+            var isNewInventory = false;
+
+            if (inventory == null)
+            {
+                inventory = new SalesRepInventory
+                {
+                    SalesRepId = salesRepId,
+                    ProductId = productId,
+                    Quantity = 0,
+                    LastUpdatedAt = DateTime.UtcNow,
+                    CreatedAt = DateTime.UtcNow,
+                    IsActive = true
+                };
+
+                isNewInventory = true;
+
+                await _unitOfWork.SalesRepInventories.AddAsync(inventory);
+            }
+
+            inventory.Quantity += quantity;
+            inventory.LastUpdatedAt = DateTime.UtcNow;
+            inventory.UpdatedAt = DateTime.UtcNow;
+
+            var movement = new SalesRepInventoryMovement
+            {
+                SalesRepId = salesRepId,
+                ProductId = productId,
+                Quantity = quantity,
+                MovementType = SalesRepInventoryMovementType.In,
+                Source = source,
+                SourceId = sourceId,
+                SourceNumber = sourceNumber,
+                MovementDate = DateTime.UtcNow,
+                Notes = notes,
+                CreatedAt = DateTime.UtcNow,
+                IsActive = true
+            };
+
+            if (!isNewInventory)
+                _unitOfWork.SalesRepInventories.Update(inventory);
+
+            await _unitOfWork.SalesRepInventoryMovements.AddAsync(movement);
+        }
+
+
+
         #endregion
-
-
-
 
 
     }

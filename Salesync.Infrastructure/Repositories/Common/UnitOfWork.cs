@@ -35,8 +35,10 @@ namespace Salesync.Infrastructure.Repositories.Common
 
         public IGenericRepository<LoadRequest> LoadRequests { get; private set; }
         public IGenericRepository<LoadRequestItem> LoadRequestItems { get; private set; }
+        public IGenericRepository<SalesRepInventory> SalesRepInventories { get; private set; }
+        public IGenericRepository<SalesRepInventoryMovement> SalesRepInventoryMovements { get; private set; }
 
-        
+
 
         public UnitOfWork(SalesyncDbContext context)
         {
@@ -63,6 +65,8 @@ namespace Salesync.Infrastructure.Repositories.Common
 
             LoadRequests = new GenericRepository<LoadRequest>(_context);
             LoadRequestItems = new GenericRepository<LoadRequestItem>(_context);
+            SalesRepInventories = new GenericRepository<SalesRepInventory>(_context);
+            SalesRepInventoryMovements = new GenericRepository<SalesRepInventoryMovement>(_context);
         }
 
         public async Task BeginTransactionAsync()

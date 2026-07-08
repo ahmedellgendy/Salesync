@@ -59,6 +59,8 @@ namespace Salesync.Infrastructure.Data
 
         public DbSet<LoadRequest> LoadRequests { get; set; }
         public DbSet<LoadRequestItem> LoadRequestItems { get; set; }
+        public DbSet<SalesRepInventory> SalesRepInventories { get; set; }
+        public DbSet<SalesRepInventoryMovement> SalesRepInventoryMovements { get; set; }
 
         #endregion
     }

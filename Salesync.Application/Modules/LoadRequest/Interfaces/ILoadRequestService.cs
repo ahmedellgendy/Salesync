@@ -10,6 +10,8 @@ namespace Salesync.Application.Modules.LoadRequest.Interfaces
 
         Task<IEnumerable<LoadRequestDto>> GetBySalesRepAsync(int salesRepId);
 
+        Task<IEnumerable<LoadRequestDto>> GetPendingAsync();
+
         Task<LoadRequestDto> CreateAsync(CreateLoadRequestDto dto);
 
         Task<LoadRequestDto> ApproveAsync(int id, ApproveLoadRequestDto dto);
@@ -19,5 +21,7 @@ namespace Salesync.Application.Modules.LoadRequest.Interfaces
         Task<LoadRequestDto> ConfirmWarehouseAsync(int id, ConfirmLoadRequestDto dto);
 
         Task CancelAsync(int id);
+
+
     }
 }

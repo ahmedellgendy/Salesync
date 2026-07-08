@@ -43,6 +43,14 @@ namespace Salesync.API.Controllers.LoadRequest
             return Ok(ApiResponse<IEnumerable<LoadRequestDto>>.SuccessResponse(result));
         }
 
+        [HttpGet("pending")] // GET: api/loadrequest/pending
+        [Authorize(Roles = "Admin,Supervisor")]
+        public async Task<IActionResult> GetPendingAsync()
+        {
+            var result = await _loadRequestService.GetPendingAsync();
+            return Ok(ApiResponse<IEnumerable<LoadRequestDto>>.SuccessResponse(result));
+        }
+
         [HttpPost] // POST: api/loadrequest
         [Authorize(Roles = "Admin,Supervisor,SalesRep")]
         public async Task<IActionResult> CreateAsync([FromBody] CreateLoadRequestDto dto)

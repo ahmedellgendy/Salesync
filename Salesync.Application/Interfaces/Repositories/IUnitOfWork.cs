@@ -48,6 +48,8 @@ namespace Salesync.Application.Interfaces.Repositories
 
         IGenericRepository<LoadRequest> LoadRequests { get; }
         IGenericRepository<LoadRequestItem> LoadRequestItems { get; }
+        IGenericRepository<SalesRepInventory> SalesRepInventories { get; }
+        IGenericRepository<SalesRepInventoryMovement> SalesRepInventoryMovements { get; }
 
         #endregion
 
