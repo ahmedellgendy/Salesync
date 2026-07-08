@@ -2,6 +2,6 @@
 {
     public class CreateSalesRepSessionDto
     {
-        public int SalesRepId { get; set; }
+        public int? SalesRepId { get; set; }
     }
 }
