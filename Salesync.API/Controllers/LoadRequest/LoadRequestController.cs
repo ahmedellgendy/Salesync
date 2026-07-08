@@ -51,6 +51,14 @@ namespace Salesync.API.Controllers.LoadRequest
             return Ok(ApiResponse<IEnumerable<LoadRequestDto>>.SuccessResponse(result));
         }
 
+        [HttpGet("approved")] // GET: api/loadrequest/approved
+        [Authorize(Roles = "Admin,Supervisor,Warehouse")]
+        public async Task<IActionResult> GetApprovedAsync()
+        {
+            var result = await _loadRequestService.GetApprovedAsync();
+            return Ok(ApiResponse<IEnumerable<LoadRequestDto>>.SuccessResponse(result));
+        }
+
         [HttpPost] // POST: api/loadrequest
         [Authorize(Roles = "Admin,Supervisor,SalesRep")]
         public async Task<IActionResult> CreateAsync([FromBody] CreateLoadRequestDto dto)

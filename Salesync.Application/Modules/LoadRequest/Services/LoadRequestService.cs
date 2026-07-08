@@ -70,6 +70,20 @@ namespace Salesync.Application.Modules.LoadRequest.Services
             return _mapper.Map<IEnumerable<LoadRequestDto>>(requests);
         }
 
+        public async Task<IEnumerable<LoadRequestDto>> GetApprovedAsync()
+        {
+            var requests = await _unitOfWork.LoadRequests
+                .GetQueryable()
+                .Include(x => x.SalesRep)
+                .Include(x => x.Warehouse)
+                .Include(x => x.Items)
+                .Where(x => x.IsActive && x.Status == LoadRequestStatus.Approved)
+                .OrderByDescending(x => x.RequestDate)
+                .ToListAsync();
+
+            return _mapper.Map<IEnumerable<LoadRequestDto>>(requests);
+        }
+
         public async Task<LoadRequestDto> GetByIdAsync(int id)
         {
             var request = await GetRequestWithDetailsAsync(id);

@@ -12,6 +12,8 @@ namespace Salesync.Application.Modules.LoadRequest.Interfaces
 
         Task<IEnumerable<LoadRequestDto>> GetPendingAsync();
 
+        Task<IEnumerable<LoadRequestDto>> GetApprovedAsync();
+
         Task<LoadRequestDto> CreateAsync(CreateLoadRequestDto dto);
 
         Task<LoadRequestDto> ApproveAsync(int id, ApproveLoadRequestDto dto);
