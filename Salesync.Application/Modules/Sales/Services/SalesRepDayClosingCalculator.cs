@@ -31,7 +31,7 @@ namespace Salesync.Application.Modules.Sales.Services
 
             var actualTotalReturnedQuantity = items.Sum(x => x.ActualReturnedQuantity);
 
-            var expectedCashAmount = totalCollectionAmount - totalReturnAmount;
+            var expectedCashAmount = totalCollectionAmount;
 
             return new SalesRepDayClosingCalculationResult
             {
