@@ -17,9 +17,7 @@ namespace Salesync.Application.Modules.Sales.Services
             _unitOfWork = unitOfWork;
         }
 
-        public async Task<SalesRepDayClosingCalculationResult> CalculateAsync(
-            CreateSalesRepDayClosingDto dto,
-            SalesRepSession session)
+        public async Task<SalesRepDayClosingCalculationResult> CalculateAsync(CreateSalesRepDayClosingDto dto, SalesRepSession session)
         {
             var totalSalesAmount = await CalculateTotalSalesAmountAsync(session.Id);
 
@@ -33,15 +31,17 @@ namespace Salesync.Application.Modules.Sales.Services
 
             var actualTotalReturnedQuantity = items.Sum(x => x.ActualReturnedQuantity);
 
+            var expectedCashAmount = totalCollectionAmount - totalReturnAmount;
+
             return new SalesRepDayClosingCalculationResult
             {
                 TotalSalesAmount = totalSalesAmount,
                 TotalCollectionAmount = totalCollectionAmount,
                 TotalReturnAmount = totalReturnAmount,
 
-                ExpectedCashAmount = totalCollectionAmount,
+                ExpectedCashAmount = expectedCashAmount,
                 ActualCashAmount = dto.ActualCashAmount,
-                CashVariance = dto.ActualCashAmount - totalCollectionAmount,
+                CashVariance = dto.ActualCashAmount - expectedCashAmount,
 
                 ExpectedTotalRemainingQuantity = expectedTotalRemainingQuantity,
                 ActualTotalReturnedQuantity = actualTotalReturnedQuantity,
