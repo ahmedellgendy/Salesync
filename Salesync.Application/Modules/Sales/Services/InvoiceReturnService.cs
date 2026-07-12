@@ -5,7 +5,9 @@ using Salesync.Application.Modules.Inventory.Interfaces;
 using Salesync.Application.Modules.Sales.Dtos.InvoiceReturn;
 using Salesync.Application.Modules.Sales.Interfaces;
 using Salesync.Domain.Common.Enums.Inventory;
+using Salesync.Domain.Common.Enums.LoadRequest;
 using Salesync.Domain.Common.Enums.Sales;
+using Salesync.Domain.Modules.LoadRequest.Entities;
 using Salesync.Domain.Modules.Sales.Entities;
 
 namespace Salesync.Application.Modules.Sales.Services
@@ -14,13 +16,11 @@ namespace Salesync.Application.Modules.Sales.Services
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
-        private readonly IInventoryService _inventoryService;
 
         public InvoiceReturnService(IUnitOfWork unitOfWork, IMapper mapper, IInventoryService inventoryService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
-            _inventoryService = inventoryService;
         }
 
         public async Task<IEnumerable<InvoiceReturnDto>> GetByInvoiceIdAsync(int invoiceId)
@@ -95,7 +95,6 @@ namespace Salesync.Application.Modules.Sales.Services
 
             return _mapper.Map<InvoiceReturnDto>(invoiceReturn);
         }
-
         public async Task<InvoiceReturnDto> ApproveAsync(int id)
         {
             var invoiceReturn = await _unitOfWork.InvoiceReturns
@@ -124,8 +123,9 @@ namespace Salesync.Application.Modules.Sales.Services
             if (invoice.Status != InvoiceStatus.Confirmed)
                 throw new InvalidOperationException("Cannot approve return for unconfirmed invoice.");
 
-            if (invoice.WarehouseId <= 0)
-                throw new InvalidOperationException("Invoice warehouse is required.");
+            var salesRepId = invoiceReturn.SalesRepId
+                ?? invoice.SalesRepId
+                ?? throw new InvalidOperationException("Sales rep is required for invoice return.");
 
             await _unitOfWork.BeginTransactionAsync();
 
@@ -136,14 +136,12 @@ namespace Salesync.Application.Modules.Sales.Services
                     if (item.Quantity <= 0)
                         throw new InvalidOperationException($"Invalid return quantity for product {item.ProductName}.");
 
-                    await _inventoryService.StockInAsync(
+                    await IncreaseSalesRepInventoryForReturnAsync(
+                        salesRepId,
                         item.ProductId,
-                        invoice.WarehouseId,
                         item.Quantity,
-                        StockMovementSource.InvoiceReturn,
                         invoiceReturn.Id,
-                        invoiceReturn.ReturnNumber,
-                        $"Stock in for return {invoiceReturn.ReturnNumber}");
+                        invoiceReturn.ReturnNumber);
                 }
 
                 invoiceReturn.Status = ReturnStatus.Approved;
@@ -161,8 +159,8 @@ namespace Salesync.Application.Modules.Sales.Services
                 await _unitOfWork.RollbackTransactionAsync();
                 throw;
             }
-
         }
+
         public async Task<InvoiceReturnDto> RejectAsync(int id)
         {
             var invoiceReturn = await _unitOfWork.InvoiceReturns.GetByIdAsync(id)
@@ -183,6 +181,57 @@ namespace Salesync.Application.Modules.Sales.Services
         #region Helper Method
 
         private static string GenerateReturnNumber() => $"RET-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..4].ToUpper()}";
+
+        private async Task IncreaseSalesRepInventoryForReturnAsync(int salesRepId, int productId, int quantity, int invoiceReturnId, string returnNumber)
+        {
+            if (quantity <= 0)
+                throw new InvalidOperationException("Return quantity must be greater than zero.");
+
+            var inventory = await _unitOfWork.SalesRepInventories
+                .GetQueryable()
+                .FirstOrDefaultAsync(x =>
+                    x.SalesRepId == salesRepId &&
+                    x.ProductId == productId &&
+                    x.IsActive);
+
+            if (inventory == null)
+            {
+                inventory = new SalesRepInventory
+                {
+                    SalesRepId = salesRepId,
+                    ProductId = productId,
+                    Quantity = quantity,
+                    LastUpdatedAt = DateTime.UtcNow,
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                await _unitOfWork.SalesRepInventories.AddAsync(inventory);
+            }
+            else
+            {
+                inventory.Quantity += quantity;
+                inventory.LastUpdatedAt = DateTime.UtcNow;
+                inventory.UpdatedAt = DateTime.UtcNow;
+
+                _unitOfWork.SalesRepInventories.Update(inventory);
+            }
+
+            var movement = new SalesRepInventoryMovement
+            {
+                SalesRepId = salesRepId,
+                ProductId = productId,
+                Quantity = quantity,
+                MovementType = SalesRepInventoryMovementType.In,
+                Source = SalesRepInventoryMovementSource.InvoiceReturn,
+                SourceId = invoiceReturnId,
+                SourceNumber = returnNumber,
+                MovementDate = DateTime.UtcNow,
+                Notes = "Product returned from customer to sales rep."
+            };
+
+            await _unitOfWork.SalesRepInventoryMovements.AddAsync(movement);
+        }
 
         #endregion
 
