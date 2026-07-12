@@ -3,8 +3,10 @@ using Microsoft.EntityFrameworkCore;
 using Salesync.Application.Interfaces.Repositories;
 using Salesync.Application.Modules.Sales.Dtos.SalesRepSession;
 using Salesync.Application.Modules.Sales.Interfaces;
+using Salesync.Domain.Common.Enums.CustomerVisit;
 using Salesync.Domain.Common.Enums.Sales;
 using Salesync.Domain.Modules.Sales.Entities;
+using Salesync.Domain.Modules.SalesRep.Entities;
 using System;
 
 namespace Salesync.Application.Modules.Sales.Services
@@ -50,11 +52,12 @@ namespace Salesync.Application.Modules.Sales.Services
         public async Task<SalesRepSessionDto> StartSessionAsync(CreateSalesRepSessionDto dto)
         {
             // chech if there is already an open session for the sales rep on the same working date
-            var existingSession = await _unitOfWork.SalesRepSessions
-                .FindAsync(s => s.SalesRepId == dto.SalesRepId && s.WorkingDate == DateTime.UtcNow.Date && s.Status != DayStatus.Closed);
+            var hasSessionToday = await _unitOfWork.SalesRepSessions
+                .GetQueryable()
+                .AnyAsync(x => x.SalesRepId == dto.SalesRepId && x.WorkingDate == DateTime.UtcNow.Date && x.IsActive);
 
-            if (existingSession.Any())
-                throw new InvalidOperationException($"You already have a session today.");
+            if (hasSessionToday)
+                throw new InvalidOperationException("Sales rep already has a session today.");
 
             var session = new SalesRepSession
             {
@@ -100,16 +103,23 @@ namespace Salesync.Application.Modules.Sales.Services
             var totalReturnAmount = returns.Sum(r => r.TotalAmount);
             var netSales = invoices.Sum(i => i.TotalAmount) - totalReturnAmount;
 
+            var totalVisits = await _unitOfWork.CustomerVisits
+                 .GetQueryable()
+                 .CountAsync(x => x.SalesRepSessionId == id && x.Status == VisitStatus.Completed && x.IsActive);
+
             session.GrossSales = grossSales;
             session.NetSales = netSales;
             session.TotalCollection = totalCollection;
             session.TotalReturnAmount = totalReturnAmount;
             session.TotalInvoices = totalInvoices;
+            session.TotalVisits = totalVisits;
 
             session.Status = DayStatus.Closed;
             session.EndTime = DateTime.UtcNow;
             session.UpdatedAt = DateTime.UtcNow;
             session.IsActive = true;
+
+
 
             _unitOfWork.SalesRepSessions.Update(session);
             await _unitOfWork.CompleteAsync();

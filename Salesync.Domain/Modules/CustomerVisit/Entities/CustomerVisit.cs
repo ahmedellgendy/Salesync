@@ -14,7 +14,8 @@ namespace Salesync.Domain.Modules.CustomerVisit.Entities
         public int? RouteId { get; set; }
         public int? SalesRepSessionId { get; set; }
         public DateTime VisitDate { get; set; } = DateTime.UtcNow;
-        public VisitType VisitType { get; set; }
+        public DateTime? EndTime { get; set; }
+        public VisitType? VisitType { get; set; }
         public VisitStatus Status { get; set; } = VisitStatus.Completed;
         public NegativeVisitReason? NegativeReason { get; set; }
         public int? InvoiceId { get; set; }

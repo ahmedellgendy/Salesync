@@ -283,7 +283,7 @@ namespace Salesync.Application.Modules.LoadRequest.Services
                             StockMovementSource.LoadRequest,
                             request.Id,
                             request.LoadRequestNumber,
-                            $"Stock out for load request {request.LoadRequestNumber}");
+                            $"Stouk out for load request {request.LoadRequestNumber}");
 
                         await IncreaseSalesRepInventoryAsync(
                               request.SalesRepId,
@@ -353,9 +353,10 @@ namespace Salesync.Application.Modules.LoadRequest.Services
 
             var inventory = await _unitOfWork.SalesRepInventories
                 .GetQueryable()
+                .AsNoTracking()
                 .Include(x => x.SalesRep)
                 .Include(x => x.Product)
-                .Where(x => x.SalesRepId == salesRepId && x.IsActive)
+                .Where(x => x.SalesRepId == salesRepId && x.Quantity > 0 && x.IsActive)
                 .OrderBy(x => x.Product.Name)
                 .ToListAsync();
 

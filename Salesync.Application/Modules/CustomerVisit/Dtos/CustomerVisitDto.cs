@@ -13,7 +13,8 @@ namespace Salesync.Application.Modules.CustomerVisit.Dtos
         public string? RouteName { get; set; }
         public int? SalesRepSessionId { get; set; }
         public DateTime VisitDate { get; set; }
-        public VisitType VisitType { get; set; }
+        public DateTime? EndTime { get; set; }
+        public VisitType? VisitType { get; set; }
         public VisitStatus Status { get; set; }
         public NegativeVisitReason? NegativeReason { get; set; }
         public int? InvoiceId { get; set; }

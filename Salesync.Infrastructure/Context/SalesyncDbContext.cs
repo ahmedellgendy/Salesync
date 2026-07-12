@@ -47,6 +47,9 @@ namespace Salesync.Infrastructure.Data
         public DbSet<InvoiceReturnItem> InvoiceReturnItems { get; set; }
         public DbSet<Payment> Payments { get; set; }
 
+        public DbSet<SalesRepDayClosing> SalesRepDayClosings { get; set; }
+        public DbSet<SalesRepDayClosingItem> SalesRepDayClosingItems { get; set; }
+
         #endregion
 
         #region Inventory Dbsets

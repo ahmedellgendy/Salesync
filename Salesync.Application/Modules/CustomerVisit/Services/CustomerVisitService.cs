@@ -6,6 +6,7 @@ using Salesync.Application.Interfaces.Services;
 using Salesync.Application.Modules.CustomerVisit.Dtos;
 using Salesync.Application.Modules.CustomerVisit.Interfaces;
 using Salesync.Domain.Common.Enums.CustomerVisit;
+using Salesync.Domain.Common.Enums.Sales;
 using CustomerVisitEntity = Salesync.Domain.Modules.CustomerVisit.Entities.CustomerVisit;
 using SalesRepEntity = Salesync.Domain.Modules.SalesRep.Entities.SalesRep;
 
@@ -16,18 +17,21 @@ namespace Salesync.Application.Modules.CustomerVisit.Services
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
-        private readonly IValidator<CreateCustomerVisitDto> _createValidator;
+        private readonly IValidator<StartCustomerVisitDto> _startValidator;
+        private readonly IValidator<CompleteCustomerVisitDto> _completeValidator;
         private readonly ICurrentUserService _currentUser;
 
         public CustomerVisitService(
             IUnitOfWork unitOfWork,
             IMapper mapper,
-            IValidator<CreateCustomerVisitDto> createValidator,
+            IValidator<StartCustomerVisitDto> startValidator,
+            IValidator<CompleteCustomerVisitDto> completeValidator,
             ICurrentUserService currentUser)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
-            _createValidator = createValidator;
+            _startValidator = startValidator;
+            _completeValidator = completeValidator;
             _currentUser = currentUser;
         }
 
@@ -118,9 +122,9 @@ namespace Salesync.Application.Modules.CustomerVisit.Services
             return _mapper.Map<IEnumerable<CustomerVisitDto>>(visits);
         }
 
-        public async Task<CustomerVisitDto> CreateAsync(CreateCustomerVisitDto dto)
+        public async Task<CustomerVisitDto> StartAsync(StartCustomerVisitDto dto)
         {
-            var validationResult = await _createValidator.ValidateAsync(dto);
+            var validationResult = await _startValidator.ValidateAsync(dto);
 
             if (!validationResult.IsValid)
                 throw new ValidationException(validationResult.Errors);
@@ -132,18 +136,69 @@ namespace Salesync.Application.Modules.CustomerVisit.Services
             if (dto.RouteId.HasValue)
                 await EnsureRouteExistsAsync(dto.RouteId.Value);
 
-            if (dto.SalesRepSessionId.HasValue)
-                await EnsureSalesRepSessionExistsAsync(dto.SalesRepSessionId.Value, salesRep.Id);
+            await EnsureSalesRepSessionIsStartedAsync(dto.SalesRepSessionId, salesRep.Id);
 
-            await EnsurePositiveVisitLinksExistAsync(dto);
+            await EnsureNoActiveVisitAsync(salesRep.Id);
 
             var visit = _mapper.Map<CustomerVisitEntity>(dto);
 
             visit.SalesRepId = salesRep.Id;
             visit.VisitDate = DateTime.UtcNow;
-            visit.Status = VisitStatus.Completed;
+            visit.EndTime = null;
+
+            visit.Status = VisitStatus.InProgress;
+            visit.VisitType = null;
+            visit.NegativeReason = null;
+
+            visit.InvoiceId = null;
+            visit.PaymentId = null;
+            visit.InvoiceReturnId = null;
 
             await _unitOfWork.CustomerVisits.AddAsync(visit);
+            await _unitOfWork.CompleteAsync();
+
+            return await GetByIdAsync(visit.Id);
+        }
+
+        public async Task<CustomerVisitDto> CompleteAsync(int id, CompleteCustomerVisitDto dto)
+        {
+            if (id <= 0)
+                throw new ArgumentException("Invalid customer visit id.");
+
+            var validationResult = await _completeValidator.ValidateAsync(dto);
+
+            if (!validationResult.IsValid)
+                throw new ValidationException(validationResult.Errors);
+
+            var visit = await _unitOfWork.CustomerVisits
+                .GetQueryable()
+                .FirstOrDefaultAsync(x => x.Id == id && x.IsActive);
+
+            if (visit == null)
+                throw new KeyNotFoundException("Customer visit not found.");
+
+            await EnsureSalesRepCanAccessVisitAsync(visit.SalesRepId);
+
+            if (visit.Status != VisitStatus.InProgress)
+                throw new InvalidOperationException("Only in-progress visits can be completed.");
+
+            await EnsureLinkedDocumentsMatchVisitAsync(visit, dto);
+
+            visit.VisitType = dto.VisitType;
+            visit.NegativeReason = dto.NegativeReason;
+
+            visit.InvoiceId = dto.InvoiceId;
+            visit.PaymentId = dto.PaymentId;
+            visit.InvoiceReturnId = dto.InvoiceReturnId;
+
+            visit.Status = VisitStatus.Completed;
+            visit.EndTime = DateTime.UtcNow;
+            visit.UpdatedAt = DateTime.UtcNow;
+
+            if (!string.IsNullOrWhiteSpace(dto.Notes))
+                visit.Notes = dto.Notes;
+
+            _unitOfWork.CustomerVisits.Update(visit);
             await _unitOfWork.CompleteAsync();
 
             return await GetByIdAsync(visit.Id);
@@ -154,17 +209,20 @@ namespace Salesync.Application.Modules.CustomerVisit.Services
             if (id <= 0)
                 throw new ArgumentException("Invalid customer visit id.");
 
-            var visit = await _unitOfWork.CustomerVisits.GetByIdAsync(id);
+            var visit = await _unitOfWork.CustomerVisits
+                .GetQueryable()
+                .FirstOrDefaultAsync(x => x.Id == id && x.IsActive);
 
-            if (visit == null || !visit.IsActive)
+            if (visit == null)
                 throw new KeyNotFoundException("Customer visit not found.");
 
             await EnsureSalesRepCanAccessVisitAsync(visit.SalesRepId);
 
-            if (visit.Status == VisitStatus.Cancelled)
-                throw new InvalidOperationException("Customer visit is already cancelled.");
+            if (visit.Status != VisitStatus.InProgress)
+                throw new InvalidOperationException("Only in-progress visits can be cancelled.");
 
             visit.Status = VisitStatus.Cancelled;
+            visit.EndTime = DateTime.UtcNow;
             visit.UpdatedAt = DateTime.UtcNow;
 
             _unitOfWork.CustomerVisits.Update(visit);
@@ -218,38 +276,54 @@ namespace Salesync.Application.Modules.CustomerVisit.Services
 
         private async Task EnsureCustomerExistsAsync(int customerId)
         {
-            var customerExists = await _unitOfWork.Customers
+            var exists = await _unitOfWork.Customers
                 .GetQueryable()
                 .AnyAsync(x => x.Id == customerId && x.IsActive);
 
-            if (!customerExists)
+            if (!exists)
                 throw new KeyNotFoundException("Customer not found.");
         }
 
         private async Task EnsureRouteExistsAsync(int routeId)
         {
-            var routeExists = await _unitOfWork.Routes
+            var exists = await _unitOfWork.Routes
                 .GetQueryable()
                 .AnyAsync(x => x.Id == routeId && x.IsActive);
 
-            if (!routeExists)
+            if (!exists)
                 throw new KeyNotFoundException("Route not found.");
         }
 
-        private async Task EnsureSalesRepSessionExistsAsync(int salesRepSessionId, int salesRepId)
+        private async Task EnsureSalesRepSessionIsStartedAsync(int salesRepSessionId, int salesRepId)
         {
             var sessionExists = await _unitOfWork.SalesRepSessions
                 .GetQueryable()
                 .AnyAsync(x =>
                     x.Id == salesRepSessionId &&
                     x.SalesRepId == salesRepId &&
+                    x.Status == DayStatus.Started &&
                     x.IsActive);
 
             if (!sessionExists)
-                throw new KeyNotFoundException("Sales rep session not found.");
+                throw new InvalidOperationException("Sales rep session must be started and belong to the same sales rep.");
         }
 
-        private async Task EnsurePositiveVisitLinksExistAsync(CreateCustomerVisitDto dto)
+        private async Task EnsureNoActiveVisitAsync(int salesRepId)
+        {
+            var hasActiveVisit = await _unitOfWork.CustomerVisits
+                .GetQueryable()
+                .AnyAsync(x =>
+                    x.SalesRepId == salesRepId &&
+                    x.Status == VisitStatus.InProgress &&
+                    x.IsActive);
+
+            if (hasActiveVisit)
+                throw new InvalidOperationException("Sales rep already has an active visit.");
+        }
+
+        private async Task EnsureLinkedDocumentsMatchVisitAsync(
+            CustomerVisitEntity visit,
+            CompleteCustomerVisitDto dto)
         {
             if (dto.VisitType == VisitType.Negative)
                 return;
@@ -260,10 +334,13 @@ namespace Salesync.Application.Modules.CustomerVisit.Services
                     .GetQueryable()
                     .AnyAsync(x =>
                         x.Id == dto.InvoiceId.Value &&
+                        x.CustomerId == visit.CustomerId &&
+                        x.SalesRepId == visit.SalesRepId &&
+                        x.SalesRepSessionId == visit.SalesRepSessionId &&
                         x.IsActive);
 
                 if (!invoiceExists)
-                    throw new KeyNotFoundException("Invoice not found.");
+                    throw new KeyNotFoundException("Invoice not found or does not match this visit.");
             }
 
             if (dto.PaymentId.HasValue)
@@ -272,22 +349,28 @@ namespace Salesync.Application.Modules.CustomerVisit.Services
                     .GetQueryable()
                     .AnyAsync(x =>
                         x.Id == dto.PaymentId.Value &&
+                        x.CustomerId == visit.CustomerId &&
+                        x.SalesRepId == visit.SalesRepId &&
+                        x.SalesRepSessionId == visit.SalesRepSessionId &&
                         x.IsActive);
 
                 if (!paymentExists)
-                    throw new KeyNotFoundException("Payment not found.");
+                    throw new KeyNotFoundException("Payment not found or does not match this visit.");
             }
 
             if (dto.InvoiceReturnId.HasValue)
             {
-                var invoiceReturnExists = await _unitOfWork.InvoiceReturns
+                var returnExists = await _unitOfWork.InvoiceReturns
                     .GetQueryable()
                     .AnyAsync(x =>
                         x.Id == dto.InvoiceReturnId.Value &&
+                        x.CustomerId == visit.CustomerId &&
+                        x.SalesRepId == visit.SalesRepId &&
+                        x.SalesRepSessionId == visit.SalesRepSessionId &&
                         x.IsActive);
 
-                if (!invoiceReturnExists)
-                    throw new KeyNotFoundException("Invoice return not found.");
+                if (!returnExists)
+                    throw new KeyNotFoundException("Invoice return not found or does not match this visit.");
             }
         }
 
@@ -326,7 +409,6 @@ namespace Salesync.Application.Modules.CustomerVisit.Services
 
             return query.Where(x => x.SalesRepId == currentSalesRepId);
         } 
-
 
         #endregion
     }
