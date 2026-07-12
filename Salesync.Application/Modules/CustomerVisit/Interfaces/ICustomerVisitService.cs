@@ -17,7 +17,9 @@ namespace Salesync.Application.Modules.CustomerVisit.Interfaces
 
         Task<IEnumerable<CustomerVisitDto>> GetByCustomerAsync(int customerId);
 
-        Task<CustomerVisitDto> CreateAsync(CreateCustomerVisitDto dto);
+        Task<CustomerVisitDto> StartAsync(StartCustomerVisitDto dto);
+
+        Task<CustomerVisitDto> CompleteAsync(int id, CompleteCustomerVisitDto dto);
 
         Task CancelAsync(int id);
     }

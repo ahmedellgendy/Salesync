@@ -36,6 +36,9 @@ namespace Salesync.Application.Interfaces.Repositories
         IGenericRepository<InvoiceReturnItem> InvoiceReturnItems { get; }
         IGenericRepository<Payment> Payments { get; }
 
+        IGenericRepository<SalesRepDayClosing> SalesRepDayClosings { get; }
+        IGenericRepository<SalesRepDayClosingItem> SalesRepDayClosingItems { get; }
+
         #endregion
 
         #region Inventory

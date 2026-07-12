@@ -50,12 +50,20 @@ namespace Salesync.API.Controllers.CustomerVisit
             return Ok(ApiResponse<IEnumerable<CustomerVisitDto>>.SuccessResponse(result, "Customer visit history retrieved successfully."));
         }
 
-        [HttpPost] // POST: api/CustomerVisit
+        [HttpPost("start")] // POST: api/CustomerVisit/start
         [Authorize(Roles = "Admin,Supervisor,SalesRep")]
-        public async Task<IActionResult> Create([FromBody] CreateCustomerVisitDto dto)
+        public async Task<IActionResult> Start([FromBody] StartCustomerVisitDto dto)
         {
-            var result = await _customerVisitService.CreateAsync(dto);
-            return Ok(ApiResponse<CustomerVisitDto>.SuccessResponse(result, "Customer visit created successfully."));
+            var result = await _customerVisitService.StartAsync(dto);
+            return Ok(ApiResponse<CustomerVisitDto>.SuccessResponse(result, "Customer visit started successfully."));
+        }
+
+        [HttpPut("{id}/complete")]  // PUT: api/CustomerVisit/5/complete
+        [Authorize(Roles = "Admin,Supervisor,SalesRep")]
+        public async Task<IActionResult> Complete(int id, [FromBody] CompleteCustomerVisitDto dto)
+        {
+            var result = await _customerVisitService.CompleteAsync(id, dto);
+            return Ok(ApiResponse<CustomerVisitDto>.SuccessResponse(result, "Customer visit completed successfully."));
         }
 
         [HttpPut("{id}/cancel")] // PUT: api/CustomerVisit/5/cancel

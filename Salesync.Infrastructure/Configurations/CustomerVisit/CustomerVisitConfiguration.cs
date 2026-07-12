@@ -16,8 +16,11 @@ namespace Salesync.Infrastructure.Configurations.CustomerVisit
             builder.Property(x => x.VisitDate)
                 .IsRequired();
 
+            builder.Property(x => x.EndTime)
+                .IsRequired(false);
+
             builder.Property(x => x.VisitType)
-                .IsRequired();
+                .IsRequired(false);
 
             builder.Property(x => x.Status)
                 .IsRequired();

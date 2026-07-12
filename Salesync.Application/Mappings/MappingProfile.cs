@@ -14,12 +14,15 @@ using Salesync.Application.Modules.Sales.Dtos.SalesRepSession;
 using Salesync.Application.Modules.SalesRep.Dtos.RouteCustomerDto;
 using Salesync.Application.Modules.SalesRep.Dtos.RouteDto;
 using Salesync.Application.Modules.SalesRep.Dtos.SalesRepDto;
+using Salesync.Domain.Common.Enums.Sales.SalesRepDayClosing;
 using Salesync.Domain.Modules.CustomerVisit.Entities;
 using Salesync.Domain.Modules.Inventory.Entities;
 using Salesync.Domain.Modules.LoadRequest.Entities;
 using Salesync.Domain.Modules.MasterData.Entities;
 using Salesync.Domain.Modules.Sales.Entities;
 using Salesync.Domain.Modules.SalesRep.Entities;
+using ClosingEntity = Salesync.Domain.Modules.Sales.Entities.SalesRepDayClosing;
+using ClosingItemEntity = Salesync.Domain.Modules.Sales.Entities.SalesRepDayClosingItem;
 
 
 namespace Salesync.Application.Mappings
@@ -85,6 +88,15 @@ namespace Salesync.Application.Mappings
 
             CreateMap<CreateInvoiceReturnItemDto, InvoiceReturnItem>();
 
+            CreateMap<ClosingEntity, SalesRepDayClosingDto>()
+                .ForMember(dest => dest.SalesRepName, opt => opt.MapFrom(src => src.SalesRep.Name))
+                .ForMember(dest => dest.WarehouseName, opt => opt.MapFrom(src => src.Warehouse.Name))
+                .ForMember(dest => dest.Items, opt => opt.MapFrom(src => src.Items));
+
+            CreateMap<ClosingItemEntity, SalesRepDayClosingItemDto>()
+                .ForMember(dest => dest.ProductName, opt => opt.MapFrom(src => src.Product.Name))
+                .ForMember(dest => dest.ItemCode, opt => opt.MapFrom(src => src.Product.ItemCode));
+
             #endregion
 
             #region Inventory
@@ -122,7 +134,12 @@ namespace Salesync.Application.Mappings
 
             #region CustomerVisit
 
-            CreateMap<CreateCustomerVisitDto, CustomerVisit>();
+            CreateMap<CustomerVisit, CustomerVisitDto>()
+                .ForMember(dest => dest.SalesRepName, opt => opt.MapFrom(src => src.SalesRep.Name))
+                .ForMember(dest => dest.CustomerName, opt => opt.MapFrom(src => src.Customer.Name))
+                .ForMember(dest => dest.RouteName, opt => opt.MapFrom(src => src.Route != null ? src.Route.Name : null));
+
+            CreateMap<StartCustomerVisitDto, CustomerVisit>();
 
             CreateMap<CustomerVisit, CustomerVisitDto>()
                 .ForMember(dest => dest.SalesRepName, opt => opt.MapFrom(src => src.SalesRep.Name))

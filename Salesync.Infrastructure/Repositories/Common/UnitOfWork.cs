@@ -30,6 +30,9 @@ namespace Salesync.Infrastructure.Repositories.Common
         public IGenericRepository<InvoiceReturn> InvoiceReturns { get; private set; }
         public IGenericRepository<InvoiceReturnItem> InvoiceReturnItems { get; private set; }
         public IGenericRepository<Payment> Payments { get; private set; }
+        public IGenericRepository<SalesRepDayClosing> SalesRepDayClosings { get; private set; }
+        public IGenericRepository<SalesRepDayClosingItem> SalesRepDayClosingItems { get; private set; }
+
 
         public IGenericRepository<StockBalance> StockBalances { get; }
         public IGenericRepository<StockMovement> StockMovements { get; }
@@ -60,6 +63,8 @@ namespace Salesync.Infrastructure.Repositories.Common
             InvoiceReturns = new GenericRepository<InvoiceReturn>(_context);
             InvoiceReturnItems = new GenericRepository<InvoiceReturnItem>(_context);
             Payments = new GenericRepository<Payment>(_context);
+            SalesRepDayClosings = new GenericRepository<SalesRepDayClosing>(_context);
+            SalesRepDayClosingItems = new GenericRepository<SalesRepDayClosingItem>(_context);
 
             StockBalances = new GenericRepository<StockBalance>(_context);
             StockMovements = new GenericRepository<StockMovement>(_context);

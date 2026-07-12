@@ -32,6 +32,9 @@ namespace Salesync.Application
             services.AddScoped<IInvoiceService, InvoiceService>();
             services.AddScoped<IPaymentService, PaymentService>();
             services.AddScoped<IInvoiceReturnService, InvoiceReturnService>();
+            services.AddScoped<ISalesRepDayClosingCalculator, SalesRepDayClosingCalculator>();
+            services.AddScoped<ISalesRepDayClosingSettlementService, SalesRepDayClosingSettlementService>();
+            services.AddScoped<ISalesRepDayClosingService, SalesRepDayClosingService>();
 
             // Register Inventory Service
             services.AddScoped<IInventoryService, InventoryService>();
