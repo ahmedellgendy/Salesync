@@ -13,7 +13,7 @@ namespace Salesync.Domain.Modules.Sales.Entities
         public int SalesRepSessionId { get; set; }
         public int WarehouseId { get; set; }
         public DateTime ClosingDate { get; set; } = DateTime.UtcNow;
-        public SalesRepDayClosingStatus Status { get; set; } = SalesRepDayClosingStatus.PendingApproval;
+        public SalesRepDayClosingStatus Status { get; set; } = SalesRepDayClosingStatus.Submitted;
 
         // Sales Summary
         public decimal TotalSalesAmount { get; set; }
@@ -30,10 +30,16 @@ namespace Salesync.Domain.Modules.Sales.Entities
         public DateTime? CashReceivedAt { get; set; }
         public string? CashNotes { get; set; }
 
+        
         // Stock Summary
         public int ExpectedTotalRemainingQuantity { get; set; }
         public int ActualTotalReturnedQuantity { get; set; }
         public int TotalVarianceQuantity { get; set; }
+
+        public bool IsStockReceived { get; set; }
+        public string? StockReceivedByUserId { get; set; }
+        public DateTime? StockReceivedAt { get; set; }
+        public string? StockNotes { get; set; }
 
         // Workflow
         public string? SubmittedByUserId { get; set; }

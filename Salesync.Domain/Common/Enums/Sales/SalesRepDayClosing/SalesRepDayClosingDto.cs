@@ -36,6 +36,22 @@
 
         public int TotalVarianceQuantity { get; set; }
 
+        public bool IsCashReceived { get; set; }
+
+        public string? CashReceivedByUserId { get; set; }
+
+        public DateTime? CashReceivedAt { get; set; }
+
+        public string? CashNotes { get; set; }
+
+        public bool IsStockReceived { get; set; }
+
+        public string? StockReceivedByUserId { get; set; }
+
+        public DateTime? StockReceivedAt { get; set; }
+
+        public string? StockNotes { get; set; }
+
         public string? SubmittedByUserId { get; set; }
         public DateTime? SubmittedAt { get; set; }
 

@@ -126,9 +126,8 @@ namespace Salesync.Application.Modules.Treasury.Services
             if (closing == null)
                 throw new KeyNotFoundException($"Day closing with id {dayClosingId} not found.");
 
-            if (closing.Status != SalesRepDayClosingStatus.PendingApproval)
-                throw new InvalidOperationException("Cash can only be received for pending day closing.");
-
+            if (closing.Status != SalesRepDayClosingStatus.Submitted)
+                throw new InvalidOperationException("Cash can only be received for submitted day closing.");
             if (closing.IsCashReceived)
                 throw new InvalidOperationException("Cash has already been received for this day closing.");
 
@@ -207,6 +206,12 @@ namespace Salesync.Application.Modules.Treasury.Services
                 closing.CashReceivedByUserId = userId;
                 closing.CashReceivedAt = DateTime.UtcNow;
                 closing.CashNotes = dto.Notes;
+
+                if (closing.IsStockReceived)
+                {
+                    closing.Status = SalesRepDayClosingStatus.Completed;
+                }
+
                 closing.UpdatedAt = DateTime.UtcNow;
 
                 _unitOfWork.SalesRepDayClosings.Update(closing);
