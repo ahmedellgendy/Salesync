@@ -5,6 +5,7 @@ using Salesync.Domain.Modules.LoadRequest.Entities;
 using Salesync.Domain.Modules.MasterData.Entities;
 using Salesync.Domain.Modules.Sales.Entities;
 using Salesync.Domain.Modules.SalesRep.Entities;
+using Salesync.Domain.Modules.Treasury.Entities;
 using Salesync.Infrastructure.Modules.Identity.Entities;
 using CustomerVisitEntity = Salesync.Domain.Modules.CustomerVisit.Entities.CustomerVisit;
 
@@ -71,6 +72,15 @@ namespace Salesync.Infrastructure.Data
         #region CustomerVisit Dbsets
 
         public DbSet<CustomerVisitEntity> CustomerVisits { get; set; }
+
+
+        #endregion
+
+        #region Treasury Dbsets
+
+        public DbSet<CashBox> CashBoxes { get; set; }
+        public DbSet<CashReceipt> CashReceipts { get; set; }
+        public DbSet<SalesRepCashLedger> SalesRepCashLedgers { get; set; }
 
 
         #endregion

@@ -3,6 +3,7 @@ using Salesync.Domain.Modules.LoadRequest.Entities;
 using Salesync.Domain.Modules.MasterData.Entities;
 using Salesync.Domain.Modules.Sales.Entities;
 using Salesync.Domain.Modules.SalesRep.Entities;
+using Salesync.Domain.Modules.Treasury.Entities;
 using CustomerVisitEntity = Salesync.Domain.Modules.CustomerVisit.Entities.CustomerVisit;
 
 namespace Salesync.Application.Interfaces.Repositories
@@ -60,6 +61,14 @@ namespace Salesync.Application.Interfaces.Repositories
         #region CustomerVisit
 
         IGenericRepository<CustomerVisitEntity> CustomerVisits { get; }
+
+        #endregion
+
+        #region Treasury
+
+        IGenericRepository<CashBox> CashBoxes { get; }
+        IGenericRepository<CashReceipt> CashReceipts { get; }
+        IGenericRepository<SalesRepCashLedger> SalesRepCashLedgers { get; }
 
         #endregion
 

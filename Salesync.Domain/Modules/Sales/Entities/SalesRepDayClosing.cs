@@ -25,6 +25,11 @@ namespace Salesync.Domain.Modules.Sales.Entities
         public decimal ActualCashAmount { get; set; }
         public decimal CashVariance { get; set; }
 
+        public bool IsCashReceived { get; set; }
+        public string? CashReceivedByUserId { get; set; }
+        public DateTime? CashReceivedAt { get; set; }
+        public string? CashNotes { get; set; }
+
         // Stock Summary
         public int ExpectedTotalRemainingQuantity { get; set; }
         public int ActualTotalReturnedQuantity { get; set; }
