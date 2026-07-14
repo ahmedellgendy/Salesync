@@ -133,8 +133,25 @@ namespace Salesync.Application.Modules.CustomerVisit.Services
 
             await EnsureCustomerExistsAsync(dto.CustomerId);
 
-            if (dto.RouteId.HasValue)
-                await EnsureRouteExistsAsync(dto.RouteId.Value);
+            if (!dto.RouteId.HasValue)
+                throw new InvalidOperationException("Route is required for customer visit.");
+
+            var route = await _unitOfWork.Routes
+                .GetQueryable()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == dto.RouteId.Value && x.IsActive);
+
+            if (route == null)
+                throw new KeyNotFoundException($"Route with id {dto.RouteId.Value} not found.");
+
+            if (route.AssignedSalesRepId.HasValue &&
+                route.AssignedSalesRepId.Value != salesRep.Id)
+            {
+                throw new UnauthorizedAccessException(
+                    "Sales rep cannot start a visit on a route assigned to another sales rep.");
+            }
+
+            await EnsureCustomerBelongsToRouteAsync(dto.RouteId.Value, dto.CustomerId);
 
             await EnsureSalesRepSessionIsStartedAsync(dto.SalesRepSessionId, salesRep.Id);
 
@@ -143,6 +160,7 @@ namespace Salesync.Application.Modules.CustomerVisit.Services
             var visit = _mapper.Map<CustomerVisitEntity>(dto);
 
             visit.SalesRepId = salesRep.Id;
+            visit.RouteId = dto.RouteId.Value;
             visit.VisitDate = DateTime.UtcNow;
             visit.EndTime = null;
 
@@ -284,16 +302,6 @@ namespace Salesync.Application.Modules.CustomerVisit.Services
                 throw new KeyNotFoundException("Customer not found.");
         }
 
-        private async Task EnsureRouteExistsAsync(int routeId)
-        {
-            var exists = await _unitOfWork.Routes
-                .GetQueryable()
-                .AnyAsync(x => x.Id == routeId && x.IsActive);
-
-            if (!exists)
-                throw new KeyNotFoundException("Route not found.");
-        }
-
         private async Task EnsureSalesRepSessionIsStartedAsync(int salesRepSessionId, int salesRepId)
         {
             var sessionExists = await _unitOfWork.SalesRepSessions
@@ -408,7 +416,21 @@ namespace Salesync.Application.Modules.CustomerVisit.Services
                 throw new UnauthorizedAccessException("Current user is not linked to an active sales rep.");
 
             return query.Where(x => x.SalesRepId == currentSalesRepId);
-        } 
+        }
+
+        private async Task EnsureCustomerBelongsToRouteAsync(int routeId, int customerId)
+        {
+            var customerExistsInRoute = await _unitOfWork.RouteCustomers
+                .GetQueryable()
+                .AsNoTracking()
+                .AnyAsync(x =>
+                    x.RouteId == routeId &&
+                    x.CustomerId == customerId &&
+                    x.IsActive);
+
+            if (!customerExistsInRoute)
+                throw new InvalidOperationException("Customer does not belong to the selected route.");
+        }
 
         #endregion
     }

@@ -17,9 +17,10 @@ namespace Salesync.Application.Modules.CustomerVisit.Validators
                 .WithMessage("SalesRepId must be greater than zero.");
 
             RuleFor(x => x.RouteId)
+                .NotNull()
+                .WithMessage("Route id is required for customer visit.")
                 .GreaterThan(0)
-                .When(x => x.RouteId.HasValue)
-                .WithMessage("RouteId must be greater than zero.");
+                .WithMessage("Route id must be greater than zero.");
 
             RuleFor(x => x.SalesRepSessionId)
                 .GreaterThan(0)
