@@ -182,6 +182,9 @@ namespace Salesync.Application.Modules.Sales.Services
             if (closing.Status != SalesRepDayClosingStatus.Submitted)
                 throw new InvalidOperationException("Returned stock can only be received for submitted day closing.");
 
+            if (closing.IsStockReceived)
+                throw new InvalidOperationException("Returned stock has already been received for this day closing.");
+
             await _unitOfWork.BeginTransactionAsync();
 
             try
