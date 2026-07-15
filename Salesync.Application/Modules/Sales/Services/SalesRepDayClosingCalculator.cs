@@ -40,8 +40,8 @@ namespace Salesync.Application.Modules.Sales.Services
                 TotalReturnAmount = totalReturnAmount,
 
                 ExpectedCashAmount = expectedCashAmount,
-                ActualCashAmount = dto.ActualCashAmount,
-                CashVariance = dto.ActualCashAmount - expectedCashAmount,
+                ActualCashAmount = 0,
+                CashVariance = 0,
 
                 ExpectedTotalRemainingQuantity = expectedTotalRemainingQuantity,
                 ActualTotalReturnedQuantity = actualTotalReturnedQuantity,

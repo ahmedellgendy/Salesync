@@ -18,6 +18,11 @@ namespace Salesync.Application.Modules.CustomerVisit.Validators
                 .WithMessage("NegativeReason is required for negative visits.");
 
             RuleFor(x => x.NegativeReason)
+                .IsInEnum()
+                .When(x => x.NegativeReason.HasValue)
+                .WithMessage("Invalid negative reason.");
+
+            RuleFor(x => x.NegativeReason)
                 .Null()
                 .When(x => x.VisitType == VisitType.Positive)
                 .WithMessage("NegativeReason must be empty for positive visits.");

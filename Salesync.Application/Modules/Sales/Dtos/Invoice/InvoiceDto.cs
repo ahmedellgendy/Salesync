@@ -19,6 +19,7 @@ namespace Salesync.Application.Modules.Sales.Dtos.Invoice
         public decimal TaxAmount { get; set; }
         public decimal TotalAmount { get; set; }
         public decimal PaidAmount { get; set; }
+        public decimal RemainingAmount { get; set; }
         public string? Notes { get; set; }
         public DateTime CreatedAt { get; set; }
 

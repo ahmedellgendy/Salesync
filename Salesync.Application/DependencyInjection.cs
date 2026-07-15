@@ -11,6 +11,8 @@ using Salesync.Application.Modules.Sales.Interfaces;
 using Salesync.Application.Modules.Sales.Services;
 using Salesync.Application.Modules.SalesRep.Interfaces.Services;
 using Salesync.Application.Modules.SalesRep.Services;
+using Salesync.Application.Modules.Treasury.Interfaces.Services;
+using Salesync.Application.Modules.Treasury.Services;
 
 namespace Salesync.Application
 {
@@ -44,6 +46,9 @@ namespace Salesync.Application
 
             // Register CustomerVisit Service
             services.AddScoped<ICustomerVisitService, CustomerVisitService>();
+
+            // Register Treasury Service
+            services.AddScoped<ITreasuryService, TreasuryService>();
 
             return services;
         }

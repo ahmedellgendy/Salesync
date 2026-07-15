@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Salesync.API.Responses;
 using Salesync.Application.Modules.Sales.Interfaces;
+using Salesync.Application.Modules.Sales.Services;
 using Salesync.Domain.Common.Enums.Sales.SalesRepDayClosing;
 
 namespace Salesync.API.Controllers.Sales
@@ -32,7 +33,7 @@ namespace Salesync.API.Controllers.Sales
         public async Task<IActionResult> GetById(int id)
         {
             var result = await _dayClosingService.GetByIdAsync(id);
-            return Ok(ApiResponse<SalesRepDayClosingDto> .SuccessResponse(result, "Sales rep day closing retrieved successfully."));
+            return Ok(ApiResponse<SalesRepDayClosingDto>.SuccessResponse(result, "Sales rep day closing retrieved successfully."));
         }
 
         [HttpGet("salesrep/{salesRepId}")] // GET: api/SalesRepDayClosing/salesrep/5
@@ -51,21 +52,14 @@ namespace Salesync.API.Controllers.Sales
             return Ok(ApiResponse<SalesRepDayClosingDto>.SuccessResponse(result, "Sales rep day closing submitted successfully."));
         }
 
-        [HttpPut("{id}/approve")] // PUT: api/SalesRepDayClosing/5/approve
+        [HttpPut("{id}/receive-returned-stock")] // PUT: api/SalesRepDayClosing/5/receive-returned-stock
         [Authorize(Roles = "Admin,Supervisor,Warehouse")]
-        public async Task<IActionResult> Approve(int id)
+        public async Task<IActionResult> ReceiveReturnedStock(int id)
         {
-            var result = await _dayClosingService.ApproveAsync(id);
-            return Ok(ApiResponse<SalesRepDayClosingDto>.SuccessResponse(result, "Sales rep day closing approved successfully."));
+            var result = await _dayClosingService.ReceiveReturnedStockAsync(id);
+            return Ok(ApiResponse<SalesRepDayClosingDto>.SuccessResponse(result, "Returned stock received successfully."));
         }
 
-        [HttpPut("{id}/reject")] // PUT: api/SalesRepDayClosing/5/reject
-        [Authorize(Roles = "Admin,Supervisor,Warehouse")]
-        public async Task<IActionResult> Reject(int id, [FromBody] RejectSalesRepDayClosingDto dto)
-        {
-            var result = await _dayClosingService.RejectAsync(id, dto);
-            return Ok(ApiResponse<SalesRepDayClosingDto>.SuccessResponse(result, "Sales rep day closing rejected successfully."));
-        }
 
         [HttpPut("{id}/cancel")]  // PUT: api/SalesRepDayClosing/5/cancel
         [Authorize(Roles = "Admin,Supervisor,SalesRep")]

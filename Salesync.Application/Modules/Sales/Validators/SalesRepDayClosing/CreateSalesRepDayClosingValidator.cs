@@ -15,10 +15,6 @@ namespace Salesync.Application.Modules.Sales.Validators.SalesRepDayClosing
                 .GreaterThan(0)
                 .WithMessage("WarehouseId is required.");
 
-            RuleFor(x => x.ActualCashAmount)
-                .GreaterThanOrEqualTo(0)
-                .WithMessage("Actual cash amount cannot be negative.");
-
             RuleFor(x => x.Notes)
                 .MaximumLength(500)
                 .WithMessage("Notes cannot exceed 500 characters.")

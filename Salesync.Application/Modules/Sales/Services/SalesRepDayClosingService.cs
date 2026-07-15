@@ -135,7 +135,7 @@ namespace Salesync.Application.Modules.Sales.Services
                 SalesRepSessionId = session.Id,
                 WarehouseId = dto.WarehouseId,
                 ClosingDate = DateTime.UtcNow,
-                Status = SalesRepDayClosingStatus.PendingApproval,
+                Status = SalesRepDayClosingStatus.Submitted,
 
                 TotalSalesAmount = calculation.TotalSalesAmount,
                 TotalCollectionAmount = calculation.TotalCollectionAmount,
@@ -169,7 +169,7 @@ namespace Salesync.Application.Modules.Sales.Services
             return await GetByIdAsync(closing.Id);
         }
 
-        public async Task<SalesRepDayClosingDto> ApproveAsync(int id)
+        public async Task<SalesRepDayClosingDto> ReceiveReturnedStockAsync(int id)
         {
             if (id <= 0)
                 throw new ArgumentException("Invalid closing id.");
@@ -179,8 +179,11 @@ namespace Salesync.Application.Modules.Sales.Services
 
             var closing = await GetClosingForUpdateAsync(id);
 
-            if (closing.Status != SalesRepDayClosingStatus.PendingApproval)
-                throw new InvalidOperationException("Only pending day closings can be approved.");
+            if (closing.Status != SalesRepDayClosingStatus.Submitted)
+                throw new InvalidOperationException("Returned stock can only be received for submitted day closing.");
+
+            if (closing.IsStockReceived)
+                throw new InvalidOperationException("Returned stock has already been received for this day closing.");
 
             await _unitOfWork.BeginTransactionAsync();
 
@@ -188,9 +191,17 @@ namespace Salesync.Application.Modules.Sales.Services
             {
                 await _settlementService.ApplyApprovalSettlementAsync(closing);
 
-                closing.Status = SalesRepDayClosingStatus.Approved;
-                closing.ApprovedByUserId = _currentUser.UserId;
-                closing.ApprovedAt = DateTime.UtcNow;
+                closing.IsStockReceived = true;
+                closing.StockReceivedByUserId = _currentUser.UserId;
+                closing.StockReceivedAt = DateTime.UtcNow;
+
+                var cashReceived = closing.ExpectedCashAmount <= 0 || closing.IsCashReceived;
+
+                if (cashReceived)
+                {
+                    closing.Status = SalesRepDayClosingStatus.Completed;
+                }
+
                 closing.UpdatedAt = DateTime.UtcNow;
 
                 _unitOfWork.SalesRepDayClosings.Update(closing);
@@ -207,34 +218,6 @@ namespace Salesync.Application.Modules.Sales.Services
             return await GetByIdAsync(id);
         }
 
-        public async Task<SalesRepDayClosingDto> RejectAsync(int id, RejectSalesRepDayClosingDto dto)
-        {
-            if (id <= 0)
-                throw new ArgumentException("Invalid closing id.");
-
-            if (_currentUser.Role == "SalesRep")
-                throw new UnauthorizedAccessException("Sales reps are not allowed to reject day closings.");
-
-            var validationResult = await _rejectValidator.ValidateAsync(dto);
-            if (!validationResult.IsValid)
-                throw new ValidationException(validationResult.Errors);
-
-            var closing = await GetClosingForUpdateAsync(id);
-
-            if (closing.Status != SalesRepDayClosingStatus.PendingApproval)
-                throw new InvalidOperationException("Only pending day closings can be rejected.");
-
-            closing.Status = SalesRepDayClosingStatus.Rejected;
-            closing.RejectedByUserId = _currentUser.UserId;
-            closing.RejectedAt = DateTime.UtcNow;
-            closing.RejectionReason = dto.RejectionReason;
-            closing.UpdatedAt = DateTime.UtcNow;
-
-            _unitOfWork.SalesRepDayClosings.Update(closing);
-            await _unitOfWork.CompleteAsync();
-
-            return await GetByIdAsync(id);
-        }
 
         public async Task CancelAsync(int id)
         {
@@ -245,8 +228,8 @@ namespace Salesync.Application.Modules.Sales.Services
 
             await EnsureSalesRepCanAccessClosingAsync(closing.SalesRepId);
 
-            if (closing.Status != SalesRepDayClosingStatus.PendingApproval)
-                throw new InvalidOperationException("Only pending day closings can be cancelled.");
+            if (closing.Status != SalesRepDayClosingStatus.Submitted)
+                 throw new InvalidOperationException("Only pending day closings can be cancelled.");
 
             closing.Status = SalesRepDayClosingStatus.Cancelled;
             closing.CancelledByUserId = _currentUser.UserId;
@@ -317,8 +300,8 @@ namespace Salesync.Application.Modules.Sales.Services
                     x.SalesRepSessionId == salesRepSessionId &&
                     x.IsActive &&
                     (
-                        x.Status == SalesRepDayClosingStatus.PendingApproval ||
-                        x.Status == SalesRepDayClosingStatus.Approved
+                        x.Status == SalesRepDayClosingStatus.Submitted ||
+                        x.Status == SalesRepDayClosingStatus.Completed
                     ));
 
             if (exists)

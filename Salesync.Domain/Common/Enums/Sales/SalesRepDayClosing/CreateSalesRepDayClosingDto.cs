@@ -6,8 +6,6 @@
 
         public int WarehouseId { get; set; }
 
-        public decimal ActualCashAmount { get; set; }
-
         public string? Notes { get; set; }
 
         public List<CreateSalesRepDayClosingItemDto> Items { get; set; } = new();

@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Salesync.Infrastructure.Data;
 
@@ -11,9 +12,11 @@ using Salesync.Infrastructure.Data;
 namespace Salesync.Infrastructure.Migrations
 {
     [DbContext(typeof(SalesyncDbContext))]
-    partial class SalesyncDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260712123227_AddTreasuryModule")]
+    partial class AddTreasuryModule
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1471,9 +1474,6 @@ namespace Salesync.Infrastructure.Migrations
                     b.Property<bool>("IsCashReceived")
                         .HasColumnType("bit");
 
-                    b.Property<bool>("IsStockReceived")
-                        .HasColumnType("bit");
-
                     b.Property<string>("Notes")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
@@ -1497,15 +1497,6 @@ namespace Salesync.Infrastructure.Migrations
 
                     b.Property<int>("Status")
                         .HasColumnType("int");
-
-                    b.Property<string>("StockNotes")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("StockReceivedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("StockReceivedByUserId")
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("SubmittedAt")
                         .HasColumnType("datetime2");
