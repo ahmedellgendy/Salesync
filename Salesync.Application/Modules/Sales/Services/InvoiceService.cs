@@ -131,8 +131,18 @@ namespace Salesync.Application.Modules.Sales.Services
                     throw new InvalidOperationException($"Product with id {itemDto.ProductId} is inactive.");
 
                 var grossAmount = product.UnitPrice * itemDto.Quantity;
-                var discountAmount = grossAmount * (itemDto.DiscountPercentage / 100m);
-                var netAmount = grossAmount - discountAmount;
+
+                var itemDiscountAmount = itemDto.DiscountAmount;
+
+                if (itemDto.DiscountPercentage > 0)
+                {
+                    itemDiscountAmount = grossAmount * (itemDto.DiscountPercentage / 100m);
+                }
+
+                if (itemDiscountAmount > grossAmount)
+                    throw new InvalidOperationException($"Discount cannot be greater than gross amount for product {product.Name}.");
+
+                var netAmount = grossAmount - itemDiscountAmount;
 
                 var invoiceItem = new InvoiceItem
                 {
@@ -143,7 +153,7 @@ namespace Salesync.Application.Modules.Sales.Services
                     BonusQuantity = itemDto.BonusQuantity,
                     UnitPrice = product.UnitPrice,
                     DiscountPercentage = itemDto.DiscountPercentage,
-                    DiscountAmount = discountAmount,
+                    DiscountAmount = itemDiscountAmount,
                     NetAmount = netAmount,
                     CreatedAt = DateTime.UtcNow,
                     IsActive = true
@@ -152,7 +162,13 @@ namespace Salesync.Application.Modules.Sales.Services
                 invoice.InvoiceItems.Add(invoiceItem);
             }
 
-            invoice.SubTotal = invoice.InvoiceItems.Sum(i => i.NetAmount);
+            var itemsGrossTotal = invoice.InvoiceItems.Sum(i => i.Quantity * i.UnitPrice);
+            var itemsDiscountTotal = invoice.InvoiceItems.Sum(i => i.DiscountAmount);
+            var extraInvoiceDiscount = dto.DiscountAmount;
+
+            invoice.SubTotal = itemsGrossTotal;
+
+            invoice.DiscountAmount = itemsDiscountTotal + extraInvoiceDiscount;
 
             if (invoice.DiscountAmount > invoice.SubTotal)
                 throw new InvalidOperationException("Invoice discount cannot be greater than invoice subtotal.");

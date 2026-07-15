@@ -229,7 +229,7 @@ namespace Salesync.Application.Modules.Sales.Services
             await EnsureSalesRepCanAccessClosingAsync(closing.SalesRepId);
 
             if (closing.Status != SalesRepDayClosingStatus.Submitted)
-                throw new InvalidOperationException("Only pending day closings can be cancelled.");
+                 throw new InvalidOperationException("Only pending day closings can be cancelled.");
 
             closing.Status = SalesRepDayClosingStatus.Cancelled;
             closing.CancelledByUserId = _currentUser.UserId;

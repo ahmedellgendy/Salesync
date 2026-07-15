@@ -4,6 +4,7 @@
     {
         public int ProductId { get; set; }
         public int Quantity { get; set; }
+        public decimal DiscountAmount { get; set; }
         public int BonusQuantity { get; set; }
         public decimal DiscountPercentage { get; set; }
     }

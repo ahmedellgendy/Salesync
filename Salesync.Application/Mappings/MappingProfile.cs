@@ -74,7 +74,8 @@ namespace Salesync.Application.Mappings
             CreateMap<SalesRepSession, SalesRepSessionDto>();
             CreateMap<CreateSalesRepSessionDto, SalesRepSession>();
 
-            CreateMap<Invoice, InvoiceDto>();
+            CreateMap<Invoice, InvoiceDto>()
+                .ForMember(dest => dest.RemainingAmount, opt => opt.MapFrom(src => src.TotalAmount - src.PaidAmount));
             CreateMap<CreateInvoiceDto, Invoice>();
             CreateMap<UpdateInvoiceDto, Invoice>()
                 .ForAllMembers(o => o.Condition((src, dest, srcMember) => srcMember != null));
