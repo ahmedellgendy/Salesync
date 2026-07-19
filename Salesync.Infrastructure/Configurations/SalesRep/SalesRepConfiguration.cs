@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Salesync.Infrastructure.Modules.Identity.Entities;
 
 namespace Salesync.Infrastructure.Configurations.SalesRep
 {
@@ -50,10 +51,20 @@ namespace Salesync.Infrastructure.Configurations.SalesRep
                 .HasForeignKey(sr => sr.SalesRepId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            builder.HasOne<ApplicationUser>()
+                  .WithOne()
+                  .HasForeignKey<Domain.Modules.SalesRep.Entities.SalesRep>(
+                      s => s.UserId)
+                  .OnDelete(DeleteBehavior.Restrict)
+                  .IsRequired(false);
+
             // Indexes
             builder.HasIndex(s => s.SalesRepCode)
                 .IsUnique();
 
+            builder.HasIndex(s => s.UserId)
+                 .IsUnique()
+                 .HasFilter("[UserId] IS NOT NULL");
 
         }
     }

@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Salesync.API.Responses;
+using Salesync.Application.Modules.SalesRep.Dtos.SalesRepAccount;
 using Salesync.Application.Modules.SalesRep.Dtos.SalesRepDto;
 using Salesync.Application.Modules.SalesRep.Interfaces.Services;
 
@@ -12,10 +13,12 @@ namespace Salesync.API.Controllers.SalesRep
     public class SalesRepController : ControllerBase
     {
         private readonly ISalesRepService _salesRepService;
+        private readonly ISalesRepAccountService _salesRepAccountService;
 
-        public SalesRepController(ISalesRepService salesRepService)
+        public SalesRepController(ISalesRepService salesRepService, ISalesRepAccountService salesRepAccountService)
         {
             _salesRepService = salesRepService;
+            _salesRepAccountService = salesRepAccountService;
         }
 
         [HttpGet] // GET: api/SalesRep
@@ -40,14 +43,12 @@ namespace Salesync.API.Controllers.SalesRep
             ));
         }
 
-        [HttpPost] // POST: api/SalesRep
-        public async Task<IActionResult> CreateAsync([FromBody] CreateSalesRepDto createSalesRepDto)
+        [HttpPost]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> CreateAsync([FromBody] CreateSalesRepWithAccountDto dto)
         {
-            var salesRep = await _salesRepService.CreateAsync(createSalesRepDto);
-            return Ok(ApiResponse<SalesRepDto>.SuccessResponse(
-                salesRep,
-                "SalesRep created successfully"
-            ));
+            var result =await _salesRepAccountService.CreateAsync(dto);
+            return Ok(ApiResponse<CreatedSalesRepWithAccountDto>.SuccessResponse(result, "Sales representative and login account created successfully."));
         }
 
         [HttpPut("{id:int}")] // PUT: api/SalesRep/{id}

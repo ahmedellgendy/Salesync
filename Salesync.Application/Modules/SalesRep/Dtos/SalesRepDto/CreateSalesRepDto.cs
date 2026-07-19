@@ -13,7 +13,6 @@ namespace Salesync.Application.Modules.SalesRep.Dtos.SalesRepDto
         public string? Address { get; set; }
         public SalesRepType? SalesRepType { get; set; }
         public int? SupervisorId { get; set; }
-        public string? UserId { get; set; }
         public decimal? CreditLimit { get; set; }
         public int? OutOfRouteLimit { get; set; }
         public int? OutOfOrderLimit { get; set; }
