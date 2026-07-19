@@ -85,6 +85,80 @@ namespace Salesync.Infrastructure.Modules.Identity.Services
             return MapToUserDto(user, createUserDto.Role);
         }
 
+        public async Task<UserDto> CreateSalesRepUserAsync(CreateSalesRepUserDto createSalesRepUserDto)
+        {
+            const string salesRepRole = "SalesRep";
+
+            var userName = createSalesRepUserDto.UserName.Trim();
+            var email = createSalesRepUserDto.Email?.Trim();
+
+            // Check if username already exists
+            var existingUser =
+                await _userManager.FindByNameAsync(userName);
+
+            if (existingUser is not null)
+            {
+                throw new InvalidOperationException(
+                    $"User with username '{userName}' already exists.");
+            }
+
+            // Check if email already exists when provided
+            if (!string.IsNullOrWhiteSpace(email))
+            {
+                var existingEmail =
+                    await _userManager.FindByEmailAsync(email);
+
+                if (existingEmail is not null)
+                {
+                    throw new InvalidOperationException(
+                        $"Email '{email}' already exists.");
+                }
+            }
+
+            // Ensure SalesRep role exists
+            if (!await _roleManager.RoleExistsAsync(salesRepRole))
+            {
+                throw new KeyNotFoundException(
+                    $"Role '{salesRepRole}' does not exist.");
+            }
+
+            var user = new ApplicationUser
+            {
+                UserName = userName,
+                Email = email,
+                PhoneNumber = createSalesRepUserDto.PhoneNumber.Trim(),
+                FullName = createSalesRepUserDto.FullName.Trim(),
+                BranchId = createSalesRepUserDto.BranchId,
+                BusinessUnitId = createSalesRepUserDto.BusinessUnitId,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            // Identity creates and hashes the password
+            var createResult =
+                await _userManager.CreateAsync(
+                    user,
+                    createSalesRepUserDto.Password);
+
+            createResult.EnsureSuccess();
+
+            // Role is forced by the backend
+            var roleResult =
+                await _userManager.AddToRoleAsync(
+                    user,
+                    salesRepRole);
+
+            if (!roleResult.Succeeded)
+            {
+                // Prevent leaving a user without the SalesRep role
+                await _userManager.DeleteAsync(user);
+
+                roleResult.EnsureSuccess();
+            }
+
+            return MapToUserDto(user, salesRepRole);
+        }
+
         // update user and role
         public async Task<UserDto> UpdateUserAsync(string id, UpdateUserDto updateUserDto)
         {

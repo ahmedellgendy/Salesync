@@ -28,6 +28,7 @@ namespace Salesync.Application
             services.AddScoped<ISalesRepService, SalesRepService>();
             services.AddScoped<IRouteService, RouteService>();
             services.AddScoped<IRouteCustomerService, RouteCustomerService>();
+            services.AddScoped<ISalesRepAccountService,SalesRepAccountService>();
 
             // Register Sales Service
             services.AddScoped<ISalesRepSessionService, SalesRepSessionService>();
