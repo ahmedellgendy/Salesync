@@ -67,6 +67,19 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("SalesyncPwaPolicy", policy =>
+    {
+        policy
+            .WithOrigins(
+                "https://localhost:7264",
+                "http://localhost:5009")
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
+
 var app = builder.Build();
 
 // Seed roles
@@ -83,8 +96,11 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Salesync API v1"));
 }
 
+
+
 app.UseExceptionHandler();
 app.UseHttpsRedirection();
+app.UseCors("SalesyncPwaPolicy");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
