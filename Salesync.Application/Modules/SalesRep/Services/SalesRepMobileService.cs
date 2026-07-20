@@ -2,6 +2,8 @@
 using Microsoft.EntityFrameworkCore;
 using Salesync.Application.Interfaces.Repositories;
 using Salesync.Application.Interfaces.Services;
+using Salesync.Application.Modules.CustomerVisit.Dtos;
+using Salesync.Application.Modules.CustomerVisit.Interfaces;
 using Salesync.Application.Modules.Sales.Dtos.SalesRepSession;
 using Salesync.Application.Modules.Sales.Interfaces;
 using Salesync.Application.Modules.SalesRep.Dtos.Mobile;
@@ -18,17 +20,20 @@ namespace Salesync.Application.Modules.SalesRep.Services
         private readonly IMapper _mapper;
         private readonly ICurrentUserService _currentUser;
         private readonly ISalesRepSessionService _salesRepSessionService;
+        private readonly ICustomerVisitService _customerVisitService;
 
         public SalesRepMobileService(
             IUnitOfWork unitOfWork,
             IMapper mapper,
             ICurrentUserService currentUser,
-            ISalesRepSessionService salesRepSessionService)
+            ISalesRepSessionService salesRepSessionService,
+            ICustomerVisitService customerVisitService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
             _currentUser = currentUser;
             _salesRepSessionService = salesRepSessionService;
+            _customerVisitService = customerVisitService;
         }
 
         public async Task<SalesRepMobileProfileDto> GetProfileAsync()
@@ -55,7 +60,6 @@ namespace Salesync.Application.Modules.SalesRep.Services
                 BusinessUnitId = salesRep.BusinessUnitId
             };
         }
-
         public async Task<SalesRepMobileTodayDto> GetTodayAsync()
         {
             var salesRep = await GetCurrentSalesRepAsync();
@@ -120,6 +124,39 @@ namespace Salesync.Application.Modules.SalesRep.Services
             await GetCurrentSalesRepAsync();
 
             return await _salesRepSessionService.CloseSessionAsync(sessionId);
+        }
+
+        public async Task<CustomerVisitDto> StartVisitAsync(StartSalesRepMobileVisitDto dto)
+        {
+            var startVisitDto = new StartCustomerVisitDto
+            {
+                SalesRepId = null,
+                CustomerId = dto.CustomerId,
+                RouteId = dto.RouteId,
+                SalesRepSessionId = dto.SalesRepSessionId,
+                Latitude = dto.Latitude,
+                Longitude = dto.Longitude,
+                Notes = dto.Notes
+            };
+
+            return await _customerVisitService.StartAsync(startVisitDto);
+        }
+        public async Task<CustomerVisitDto> CompleteVisitAsync(int visitId, CompleteSalesRepMobileVisitDto dto)
+        {
+            if (visitId <= 0)
+                throw new ArgumentException("Invalid visit id.");
+
+            var completeVisitDto = new CompleteCustomerVisitDto
+            {
+                VisitType = dto.VisitType,
+                NegativeReason = dto.NegativeReason,
+                InvoiceId = dto.InvoiceId,
+                PaymentId = dto.PaymentId,
+                InvoiceReturnId = dto.InvoiceReturnId,
+                Notes = dto.Notes
+            };
+
+            return await _customerVisitService.CompleteAsync(visitId, completeVisitDto);
         }
 
         #region Helper Method
@@ -197,7 +234,7 @@ namespace Salesync.Application.Modules.SalesRep.Services
                 .ToListAsync();
         }
 
-        private async Task<List<CustomerVisitMobileProjection>> GetSessionVisitsAsync(int sessionId,int salesRepId)
+        private async Task<List<CustomerVisitMobileProjection>> GetSessionVisitsAsync(int sessionId, int salesRepId)
         {
             return await _unitOfWork.CustomerVisits
                 .GetQueryable()
@@ -217,7 +254,7 @@ namespace Salesync.Application.Modules.SalesRep.Services
                 .ToListAsync();
         }
 
-        private static IEnumerable<SalesRepMobileCustomerDto> BuildMobileCustomers(List<RouteCustomerMobileProjection> routeCustomers,List<CustomerVisitMobileProjection> visits)
+        private static IEnumerable<SalesRepMobileCustomerDto> BuildMobileCustomers(List<RouteCustomerMobileProjection> routeCustomers, List<CustomerVisitMobileProjection> visits)
         {
             var latestVisitByCustomer = visits
                 .GroupBy(x => x.CustomerId)
@@ -293,7 +330,7 @@ namespace Salesync.Application.Modules.SalesRep.Services
             public int Status { get; set; }
             public int? VisitType { get; set; }
             public DateTime VisitDate { get; set; }
-        } 
+        }
 
 
         #endregion

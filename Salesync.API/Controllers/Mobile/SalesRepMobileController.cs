@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Salesync.API.Responses;
+using Salesync.Application.Modules.CustomerVisit.Dtos;
 using Salesync.Application.Modules.Sales.Dtos.SalesRepSession;
 using Salesync.Application.Modules.SalesRep.Dtos.Mobile;
 using Salesync.Application.Modules.SalesRep.Interfaces.Services;
@@ -27,8 +28,7 @@ namespace Salesync.API.Controllers.Mobile
                 result,
                 "Sales rep profile retrieved successfully."));
         }
-
-        [HttpGet("today")] // GET
+        [HttpGet("today")] // GET: api/mobile/today
         public async Task<IActionResult> GetToday()
         {
             var result = await _salesRepMobileService.GetTodayAsync();
@@ -37,7 +37,7 @@ namespace Salesync.API.Controllers.Mobile
                 "Today session status retrieved successfully."));
         }
 
-        [HttpPost("day/start")]
+        [HttpPost("day/start")] // POST: api/mobile/day/start
         public async Task<IActionResult> StartDay([FromBody] StartSalesRepMobileDayDto dto)
         {
             var result = await _salesRepMobileService.StartDayAsync(dto);
@@ -46,7 +46,7 @@ namespace Salesync.API.Controllers.Mobile
                 "Sales rep day started successfully."));
         }
 
-        [HttpPut("day/{sessionId}/close")]
+        [HttpPut("day/{sessionId}/close")] // PUT: api/mobile/day/{sessionid}/close
         public async Task<IActionResult> CloseDay(int sessionId)
         {
             var result = await _salesRepMobileService.CloseDayAsync(sessionId);
@@ -55,13 +55,31 @@ namespace Salesync.API.Controllers.Mobile
                 "Sales rep day closed successfully."));
         }
 
-        [HttpGet("customers")]
+        [HttpGet("customers")] // GET: api/mobile/customers
         public async Task<IActionResult> GetCustomers([FromQuery] int sessionId)
         {
             var result = await _salesRepMobileService.GetCustomersAsync(sessionId);
             return Ok(ApiResponse<IEnumerable<SalesRepMobileCustomerDto>>.SuccessResponse(
                 result,
                 "Sales rep customers retrieved successfully."));
+        }
+
+        [HttpPost("visits/start")] // POST: api/mobile/visits/start
+        public async Task<IActionResult> StartVisit([FromBody] StartSalesRepMobileVisitDto dto)
+        {
+            var result = await _salesRepMobileService.StartVisitAsync(dto);
+            return Ok(ApiResponse<CustomerVisitDto>.SuccessResponse(
+                result,
+                "Customer visit started successfully."));
+        }
+
+        [HttpPut("visits/{visitId}/complete")] // PUT: api/mobile/visits/{visitid}/compete
+        public async Task<IActionResult> CompleteVisit(int visitId,[FromBody] CompleteSalesRepMobileVisitDto dto)
+        {
+            var result = await _salesRepMobileService.CompleteVisitAsync(visitId, dto);
+            return Ok(ApiResponse<CustomerVisitDto>.SuccessResponse(
+                result,
+                "Customer visit completed successfully."));
         }
     }
 }
