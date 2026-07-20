@@ -30,6 +30,9 @@ namespace Salesync.Application
             services.AddScoped<IRouteCustomerService, RouteCustomerService>();
             services.AddScoped<ISalesRepAccountService,SalesRepAccountService>();
 
+            services.AddScoped<ISalesRepMobileService, SalesRepMobileService>();
+
+
             // Register Sales Service
             services.AddScoped<ISalesRepSessionService, SalesRepSessionService>();
             services.AddScoped<IInvoiceService, InvoiceService>();
@@ -50,6 +53,7 @@ namespace Salesync.Application
 
             // Register Treasury Service
             services.AddScoped<ITreasuryService, TreasuryService>();
+
 
             return services;
         }
