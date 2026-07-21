@@ -82,7 +82,7 @@ namespace Salesync.API.Controllers.Mobile
                 "Customer visit completed successfully."));
         }
 
-        [HttpGet("invoices")] // GET: api/mobile/invoices
+        [HttpGet("invoices")] // GET /api/mobile/salesrep/invoices?sessionId=31 
         public async Task<IActionResult> GetInvoicesAsync([FromQuery] int sessionId)
         {
             var result = await _salesRepMobileService.GetInvoicesAsync(sessionId);
