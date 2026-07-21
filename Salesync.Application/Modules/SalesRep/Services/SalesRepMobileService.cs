@@ -4,6 +4,7 @@ using Salesync.Application.Interfaces.Repositories;
 using Salesync.Application.Interfaces.Services;
 using Salesync.Application.Modules.CustomerVisit.Dtos;
 using Salesync.Application.Modules.CustomerVisit.Interfaces;
+using Salesync.Application.Modules.Sales.Dtos.Payment;
 using Salesync.Application.Modules.Sales.Dtos.SalesRepSession;
 using Salesync.Application.Modules.Sales.Interfaces;
 using Salesync.Application.Modules.SalesRep.Dtos.Mobile;
@@ -21,19 +22,22 @@ namespace Salesync.Application.Modules.SalesRep.Services
         private readonly ICurrentUserService _currentUser;
         private readonly ISalesRepSessionService _salesRepSessionService;
         private readonly ICustomerVisitService _customerVisitService;
+        private readonly IPaymentService _paymentService;
 
         public SalesRepMobileService(
             IUnitOfWork unitOfWork,
             IMapper mapper,
             ICurrentUserService currentUser,
             ISalesRepSessionService salesRepSessionService,
-            ICustomerVisitService customerVisitService)
+            ICustomerVisitService customerVisitService,
+            IPaymentService paymentService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
             _currentUser = currentUser;
             _salesRepSessionService = salesRepSessionService;
             _customerVisitService = customerVisitService;
+            _paymentService = paymentService;
         }
 
         public async Task<SalesRepMobileProfileDto> GetProfileAsync()
@@ -199,6 +203,46 @@ namespace Salesync.Application.Modules.SalesRep.Services
             };
 
             return await _customerVisitService.CompleteAsync(visitId, completeVisitDto);
+        }
+
+        public async Task<PaymentDto> CreatePaymentAsync(CreateSalesRepMobilePaymentDto dto)
+        {
+            if (dto.InvoiceId <= 0)
+                throw new ArgumentException("Invalid invoice id.");
+
+            if (dto.SalesRepSessionId <= 0)
+                throw new ArgumentException("Invalid session id.");
+
+            if (dto.Amount <= 0)
+                throw new ArgumentException("Payment amount must be greater than zero.");
+
+            var salesRep = await GetCurrentSalesRepAsync();
+
+            await EnsureSessionBelongsToSalesRepAsync(dto.SalesRepSessionId, salesRep.Id);
+
+            var invoice = await _unitOfWork.Invoices
+                .GetQueryable()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x =>
+                    x.Id == dto.InvoiceId &&
+                    x.IsActive &&
+                    x.SalesRepId == salesRep.Id &&
+                    x.SalesRepSessionId == dto.SalesRepSessionId);
+
+            if (invoice is null)
+                throw new KeyNotFoundException("Invoice not found for current sales rep session.");
+
+            var createPaymentDto = new CreatePaymentDto
+            {
+                InvoiceId = invoice.Id,
+                SalesRepId = salesRep.Id,
+                SalesRepSessionId = dto.SalesRepSessionId,
+                Amount = dto.Amount,
+                PaymentMethod = (PaymentMethod)dto.PaymentMethod,
+                Notes = dto.Notes
+            };
+
+            return await _paymentService.CreateAsync(createPaymentDto);
         }
 
         #region Helper Method

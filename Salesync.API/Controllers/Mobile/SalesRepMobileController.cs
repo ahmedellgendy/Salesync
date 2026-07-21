@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Salesync.API.Responses;
 using Salesync.Application.Modules.CustomerVisit.Dtos;
+using Salesync.Application.Modules.Sales.Dtos.Payment;
 using Salesync.Application.Modules.Sales.Dtos.SalesRepSession;
 using Salesync.Application.Modules.SalesRep.Dtos.Mobile;
 using Salesync.Application.Modules.SalesRep.Interfaces.Services;
@@ -87,6 +88,16 @@ namespace Salesync.API.Controllers.Mobile
         {
             var result = await _salesRepMobileService.GetInvoicesAsync(sessionId);
             return Ok(ApiResponse<IEnumerable<SalesRepMobileInvoiceDto>>.SuccessResponse(result));
+        }
+
+        [HttpPost("payments")] // POST: api/mobile/salesrep/payments
+        public async Task<IActionResult> CreatePaymentAsync([FromBody] CreateSalesRepMobilePaymentDto dto)
+        {
+            var result = await _salesRepMobileService.CreatePaymentAsync(dto);
+
+            return Ok(ApiResponse<PaymentDto>.SuccessResponse(
+                result,
+                "Payment created successfully."));
         }
     }
 }
