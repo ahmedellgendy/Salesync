@@ -11,6 +11,7 @@ using Salesync.Application.Modules.SalesRep.Dtos.Mobile;
 using Salesync.Application.Modules.SalesRep.Interfaces.Services;
 using Salesync.Domain.Common.Enums.CustomerVisit;
 using Salesync.Domain.Common.Enums.Sales;
+using Salesync.Domain.Modules.Sales.Entities;
 using SalesRepEntity = Salesync.Domain.Modules.SalesRep.Entities.SalesRep;
 
 namespace Salesync.Application.Modules.SalesRep.Services
@@ -101,21 +102,6 @@ namespace Salesync.Application.Modules.SalesRep.Services
                 Session = _mapper.Map<SalesRepSessionDto>(session)
             };
         }
-        public async Task<IEnumerable<SalesRepMobileCustomerDto>> GetCustomersAsync(int sessionId)
-        {
-            if (sessionId <= 0)
-                throw new ArgumentException("Invalid session id.");
-
-            var salesRep = await GetCurrentSalesRepAsync();
-
-            await EnsureSessionBelongsToSalesRepAsync(sessionId, salesRep.Id);
-
-            var routeCustomers = await GetAssignedRouteCustomersAsync(salesRep.Id);
-
-            var visits = await GetSessionVisitsAsync(sessionId, salesRep.Id);
-
-            return BuildMobileCustomers(routeCustomers, visits);
-        }
         public async Task<SalesRepSessionDto> StartDayAsync(StartSalesRepMobileDayDto dto)
         {
             var salesRep = await GetCurrentSalesRepAsync();
@@ -136,7 +122,7 @@ namespace Salesync.Application.Modules.SalesRep.Services
 
             return await _salesRepSessionService.CloseSessionAsync(sessionId);
         }
-        public async Task<IEnumerable<SalesRepMobileInvoiceDto>> GetInvoicesAsync(int sessionId)
+        public async Task<IEnumerable<SalesRepMobileCustomerDto>> GetCustomersAsync(int sessionId)
         {
             if (sessionId <= 0)
                 throw new ArgumentException("Invalid session id.");
@@ -144,6 +130,21 @@ namespace Salesync.Application.Modules.SalesRep.Services
             var salesRep = await GetCurrentSalesRepAsync();
 
             await EnsureSessionBelongsToSalesRepAsync(sessionId, salesRep.Id);
+
+            var routeCustomers = await GetAssignedRouteCustomersAsync(salesRep.Id);
+
+            var visits = await GetSessionVisitsAsync(sessionId, salesRep.Id);
+
+            return BuildMobileCustomers(routeCustomers, visits);
+        }
+        public async Task<IEnumerable<SalesRepMobileInvoiceDto>> GetInvoicesAsync(int sessionId)
+        {
+            if (sessionId <= 0)
+                throw new ArgumentException("Invalid session id.");
+
+            var salesRep = await GetCurrentSalesRepAsync();
+
+            await EnsureSessionBelongsToSalesRepAsync(sessionId, salesRep.Id, allowClosedSession: true);
 
             var invoices =
                 await
@@ -272,23 +273,6 @@ namespace Salesync.Application.Modules.SalesRep.Services
             return salesRep;
         }
 
-        private async Task EnsureSessionBelongsToSalesRepAsync(int sessionId, int salesRepId)
-        {
-            var session = await _unitOfWork.SalesRepSessions
-                .GetQueryable()
-                .AsNoTracking()
-                .FirstOrDefaultAsync(x =>
-                    x.Id == sessionId &&
-                    x.SalesRepId == salesRepId &&
-                    x.IsActive);
-
-            if (session == null)
-                throw new UnauthorizedAccessException("Session does not belong to the current sales rep.");
-
-            if (session.Status == DayStatus.Closed || session.EndTime.HasValue)
-                throw new InvalidOperationException("Cannot load customers for a closed session.");
-        }
-
         private async Task<List<RouteCustomerMobileProjection>> GetAssignedRouteCustomersAsync(int salesRepId)
         {
             return await (
@@ -325,6 +309,26 @@ namespace Salesync.Application.Modules.SalesRep.Services
                     VisitDays = routeCustomer.VisitDays
                 })
                 .ToListAsync();
+        }
+        private async Task<SalesRepSession> EnsureSessionBelongsToSalesRepAsync(int sessionId, int salesRepId, bool allowClosedSession = false)
+        {
+            var session = await _unitOfWork.SalesRepSessions
+                .GetQueryable()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x =>
+                    x.Id == sessionId &&
+                    x.SalesRepId == salesRepId &&
+                    x.IsActive);
+
+            if (session is null)
+                throw new KeyNotFoundException("Session not found for current sales rep.");
+
+            var isClosed = session.EndTime.HasValue;
+
+            if (isClosed && !allowClosedSession)
+                throw new InvalidOperationException("Cannot perform this action for a closed session.");
+
+            return session;
         }
 
         private async Task<List<CustomerVisitMobileProjection>> GetSessionVisitsAsync(int sessionId, int salesRepId)
