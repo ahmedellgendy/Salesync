@@ -13,5 +13,6 @@ namespace Salesync.Application.Modules.SalesRep.Interfaces.Services
         Task<SalesRepSessionDto> CloseDayAsync(int sessionId);
         Task<CustomerVisitDto> StartVisitAsync(StartSalesRepMobileVisitDto dto);
         Task<CustomerVisitDto> CompleteVisitAsync(int visitId, CompleteSalesRepMobileVisitDto dto);
+        Task<IEnumerable<SalesRepMobileInvoiceDto>> GetInvoicesAsync(int sessionId);
     }
 }

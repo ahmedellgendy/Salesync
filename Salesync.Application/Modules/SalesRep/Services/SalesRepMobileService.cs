@@ -125,7 +125,49 @@ namespace Salesync.Application.Modules.SalesRep.Services
 
             return await _salesRepSessionService.CloseSessionAsync(sessionId);
         }
+        public async Task<IEnumerable<SalesRepMobileInvoiceDto>> GetInvoicesAsync(int sessionId)
+        {
+            if (sessionId <= 0)
+                throw new ArgumentException("Invalid session id.");
 
+            var salesRep = await GetCurrentSalesRepAsync();
+
+            await EnsureSessionBelongsToSalesRepAsync(sessionId, salesRep.Id);
+
+            var invoices =
+                await
+                (
+                    from invoice in _unitOfWork.Invoices.GetQueryable().AsNoTracking()
+                    join customer in _unitOfWork.Customers.GetQueryable().AsNoTracking()
+                        on invoice.CustomerId equals customer.Id
+                    where invoice.IsActive
+                          && customer.IsActive
+                          && invoice.SalesRepId == salesRep.Id
+                          && invoice.SalesRepSessionId == sessionId
+                    orderby invoice.CreatedAt descending
+                    select new SalesRepMobileInvoiceDto
+                    {
+                        Id = invoice.Id,
+                        InvoiceNumber = invoice.InvoiceNumber,
+                        CustomerId = invoice.CustomerId,
+                        CustomerName = customer.Name,
+                        WarehouseId = invoice.WarehouseId,
+                        SalesRepSessionId = invoice.SalesRepSessionId,
+                        Status = (int)invoice.Status,
+                        PaymentStatus = (int)invoice.PaymentStatus,
+                        SubTotal = invoice.SubTotal,
+                        DiscountAmount = invoice.DiscountAmount,
+                        TaxAmount = invoice.TaxAmount,
+                        TotalAmount = invoice.TotalAmount,
+                        PaidAmount = invoice.PaidAmount,
+                        RemainingAmount = invoice.TotalAmount - invoice.PaidAmount,
+                        CreatedAt = invoice.CreatedAt,
+                        Notes = invoice.Notes
+                    }
+                ).ToListAsync();
+
+            return invoices;
+        }
         public async Task<CustomerVisitDto> StartVisitAsync(StartSalesRepMobileVisitDto dto)
         {
             var startVisitDto = new StartCustomerVisitDto
