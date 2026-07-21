@@ -68,30 +68,37 @@ namespace Salesync.Application.Modules.SalesRep.Services
         {
             var salesRep = await GetCurrentSalesRepAsync();
 
-            var openSession = await _unitOfWork.SalesRepSessions
+            var today = DateTime.UtcNow.Date;
+
+            var session = await _unitOfWork.SalesRepSessions
                 .GetQueryable()
                 .AsNoTracking()
                 .Where(x =>
                     x.SalesRepId == salesRep.Id &&
-                    x.IsActive &&
-                    x.Status != DayStatus.Closed &&
-                    !x.EndTime.HasValue)
-                .OrderByDescending(x => x.StartTime)
+                    x.WorkingDate == today &&
+                    x.IsActive)
+                .OrderByDescending(x => x.Id)
                 .FirstOrDefaultAsync();
 
-            if (openSession == null)
+            if (session is null)
             {
                 return new SalesRepMobileTodayDto
                 {
+                    HasTodaySession = false,
                     HasOpenSession = false,
+                    IsDayClosed = false,
                     Session = null
                 };
             }
 
+            var isDayClosed = session.EndTime.HasValue;
+
             return new SalesRepMobileTodayDto
             {
-                HasOpenSession = true,
-                Session = _mapper.Map<SalesRepSessionDto>(openSession)
+                HasTodaySession = true,
+                HasOpenSession = !isDayClosed,
+                IsDayClosed = isDayClosed,
+                Session = _mapper.Map<SalesRepSessionDto>(session)
             };
         }
         public async Task<IEnumerable<SalesRepMobileCustomerDto>> GetCustomersAsync(int sessionId)
