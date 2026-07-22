@@ -75,7 +75,7 @@ namespace Salesync.API.Controllers.Mobile
         }
 
         [HttpPut("visits/{visitId}/complete")] // PUT: api/mobile/visits/{visitid}/compete
-        public async Task<IActionResult> CompleteVisit(int visitId,[FromBody] CompleteSalesRepMobileVisitDto dto)
+        public async Task<IActionResult> CompleteVisit(int visitId, [FromBody] CompleteSalesRepMobileVisitDto dto)
         {
             var result = await _salesRepMobileService.CompleteVisitAsync(visitId, dto);
             return Ok(ApiResponse<CustomerVisitDto>.SuccessResponse(
@@ -98,6 +98,25 @@ namespace Salesync.API.Controllers.Mobile
             return Ok(ApiResponse<PaymentDto>.SuccessResponse(
                 result,
                 "Payment created successfully."));
+        }
+
+        [HttpGet("routes")] // GET: api/mobile/salesrep/routes?sessionId=32
+        public async Task<IActionResult> GetRoutes([FromQuery] int sessionId)
+        {
+            var result = await _salesRepMobileService.GetRoutesAsync(sessionId);
+            return Ok(ApiResponse<IEnumerable<SalesRepMobileRouteDto>>.SuccessResponse(
+                result,
+                "Sales rep routes retrieved successfully."));
+        }
+        
+        [HttpGet("routes/{routeId:int}/customers")]
+        // GET: api/mobile/salesrep/routes/1/customers?sessionId=32
+        public async Task<IActionResult> GetRouteCustomers(int routeId, [FromQuery] int sessionId)
+        {
+            var result = await _salesRepMobileService.GetRouteCustomersAsync(sessionId,routeId);
+            return Ok(ApiResponse<IEnumerable<SalesRepMobileCustomerDto>>.SuccessResponse(
+                result,
+                "Route customers retrieved successfully."));
         }
     }
 }
