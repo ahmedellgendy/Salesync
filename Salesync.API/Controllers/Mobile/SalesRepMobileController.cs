@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Salesync.API.Responses;
 using Salesync.Application.Modules.CustomerVisit.Dtos;
+using Salesync.Application.Modules.Sales.Dtos.Invoice;
 using Salesync.Application.Modules.Sales.Dtos.Payment;
 using Salesync.Application.Modules.Sales.Dtos.SalesRepSession;
 using Salesync.Application.Modules.SalesRep.Dtos.Mobile;
@@ -108,15 +109,24 @@ namespace Salesync.API.Controllers.Mobile
                 result,
                 "Sales rep routes retrieved successfully."));
         }
-        
-        [HttpGet("routes/{routeId:int}/customers")]
-        // GET: api/mobile/salesrep/routes/1/customers?sessionId=32
+
+        [HttpGet("routes/{routeId:int}/customers")] // GET: api/mobile/salesrep/routes/1/customers?sessionId=32
         public async Task<IActionResult> GetRouteCustomers(int routeId, [FromQuery] int sessionId)
         {
-            var result = await _salesRepMobileService.GetRouteCustomersAsync(sessionId,routeId);
+            var result = await _salesRepMobileService.GetRouteCustomersAsync(sessionId, routeId);
             return Ok(ApiResponse<IEnumerable<SalesRepMobileCustomerDto>>.SuccessResponse(
                 result,
                 "Route customers retrieved successfully."));
         }
+
+        [HttpPost("invoices")] // GET: api/mobile/salesrep/invoices
+        public async Task<IActionResult> CreateInvoiceAsync([FromBody] CreateSalesRepMobileInvoiceDto dto)
+        {
+            var result = await _salesRepMobileService.CreateInvoiceAsync(dto);
+            return Ok(ApiResponse<InvoiceDto>.SuccessResponse(
+                result,
+                "Invoice created and visit completed successfully."));
+        }
+
     }
 }
