@@ -4,6 +4,8 @@ using Salesync.Application.Interfaces.Repositories;
 using Salesync.Application.Interfaces.Services;
 using Salesync.Application.Modules.CustomerVisit.Dtos;
 using Salesync.Application.Modules.CustomerVisit.Interfaces;
+using Salesync.Application.Modules.Sales.Dtos.Invoice;
+using Salesync.Application.Modules.Sales.Dtos.InvoiceItem;
 using Salesync.Application.Modules.Sales.Dtos.Payment;
 using Salesync.Application.Modules.Sales.Dtos.SalesRepSession;
 using Salesync.Application.Modules.Sales.Interfaces;
@@ -24,6 +26,7 @@ namespace Salesync.Application.Modules.SalesRep.Services
         private readonly ISalesRepSessionService _salesRepSessionService;
         private readonly ICustomerVisitService _customerVisitService;
         private readonly IPaymentService _paymentService;
+        private readonly IInvoiceService _invoiceService;
 
         public SalesRepMobileService(
             IUnitOfWork unitOfWork,
@@ -31,7 +34,8 @@ namespace Salesync.Application.Modules.SalesRep.Services
             ICurrentUserService currentUser,
             ISalesRepSessionService salesRepSessionService,
             ICustomerVisitService customerVisitService,
-            IPaymentService paymentService)
+            IPaymentService paymentService,
+            IInvoiceService invoiceService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
@@ -39,6 +43,7 @@ namespace Salesync.Application.Modules.SalesRep.Services
             _salesRepSessionService = salesRepSessionService;
             _customerVisitService = customerVisitService;
             _paymentService = paymentService;
+            _invoiceService = invoiceService;
         }
 
         public async Task<SalesRepMobileProfileDto> GetProfileAsync()
@@ -251,7 +256,6 @@ namespace Salesync.Application.Modules.SalesRep.Services
 
             return await _paymentService.CreateAsync(createPaymentDto);
         }
-
         public async Task<IEnumerable<SalesRepMobileRouteDto>> GetRoutesAsync(int sessionId)
         {
             if (sessionId <= 0)
@@ -301,6 +305,92 @@ namespace Salesync.Application.Modules.SalesRep.Services
                 .ToList();
 
             return routes;
+        }
+        public async Task<InvoiceDto> CreateInvoiceAsync(CreateSalesRepMobileInvoiceDto dto)
+        {
+            if (dto.VisitId <= 0)
+                throw new ArgumentException("Invalid visit id.");
+
+            if (dto.CustomerId <= 0)
+                throw new ArgumentException("Invalid customer id.");
+
+            if (dto.SalesRepSessionId <= 0)
+                throw new ArgumentException("Invalid session id.");
+
+            if (dto.Items is null || dto.Items.Count == 0)
+                throw new ArgumentException("Invoice must contain at least one item.");
+
+            var salesRep = await GetCurrentSalesRepAsync();
+
+            await EnsureSessionBelongsToSalesRepAsync(
+                dto.SalesRepSessionId,
+                salesRep.Id);
+
+            var visit = await _unitOfWork.CustomerVisits
+                .GetQueryable()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x =>
+                    x.Id == dto.VisitId &&
+                    x.CustomerId == dto.CustomerId &&
+                    x.SalesRepId == salesRep.Id &&
+                    x.SalesRepSessionId == dto.SalesRepSessionId &&
+                    x.IsActive);
+
+            if (visit is null)
+                throw new KeyNotFoundException("Visit not found for current sales rep session.");
+
+            if (visit.Status != VisitStatus.InProgress)
+                throw new InvalidOperationException("Visit must be in progress to create invoice.");
+
+            await EnsureInvoiceItemsAvailableAsync(
+                salesRep.Id,
+                dto.Items);
+
+            var warehouse = await _unitOfWork.Warehouses
+                .GetQueryable()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x =>
+                    x.BranchId == salesRep.BranchId &&
+                    x.IsActive);
+
+            if (warehouse is null)
+                throw new KeyNotFoundException("No active warehouse found for current sales rep branch.");
+
+            var createInvoiceDto = new CreateInvoiceDto
+            {
+                CustomerId = dto.CustomerId,
+                WarehouseId = warehouse.Id,
+                SalesRepSessionId = dto.SalesRepSessionId,
+                SalesChannel = (SalesChannel)1,
+                DiscountAmount = dto.DiscountAmount,
+                Notes = dto.Notes,
+                Items = dto.Items.Select(x => new CreateInvoiceItemDto
+                {
+                    ProductId = x.ProductId,
+                    Quantity = x.Quantity,
+                    DiscountAmount = x.DiscountAmount,
+                    DiscountPercentage = x.DiscountPercentage,
+                    BonusQuantity = x.BonusQuantity
+                }).ToList()
+            };
+
+            var invoice = await _invoiceService.CreateAsync(createInvoiceDto);
+
+            var confirmedInvoice = await _invoiceService.ConfirmAsync(invoice.Id);
+
+            var completeVisitDto = new CompleteSalesRepMobileVisitDto
+            {
+                VisitType = (VisitType)1,
+                NegativeReason = null,
+                InvoiceId = confirmedInvoice.Id,
+                PaymentId = null,
+                InvoiceReturnId = null,
+                Notes = dto.Notes
+            };
+
+            await CompleteVisitAsync(dto.VisitId, completeVisitDto);
+
+            return confirmedInvoice;
         }
 
         #region Helper Method
@@ -446,7 +536,7 @@ namespace Salesync.Application.Modules.SalesRep.Services
                 };
             });
         }
-        public async Task<IEnumerable<SalesRepMobileCustomerDto>> GetRouteCustomersAsync(int sessionId,int routeId)
+        public async Task<IEnumerable<SalesRepMobileCustomerDto>> GetRouteCustomersAsync(int sessionId, int routeId)
         {
             if (sessionId <= 0)
                 throw new ArgumentException("Invalid session id.");
@@ -471,6 +561,55 @@ namespace Salesync.Application.Modules.SalesRep.Services
 
             return BuildMobileCustomers(selectedRouteCustomers, visits);
         }
+
+        private async Task EnsureInvoiceItemsAvailableAsync(int salesRepId, List<CreateSalesRepMobileInvoiceItemDto> items)
+        {
+            foreach (var item in items)
+            {
+                if (item.ProductId <= 0)
+                    throw new ArgumentException("Invalid product id.");
+
+                if (item.Quantity <= 0)
+                    throw new ArgumentException("Item quantity must be greater than zero.");
+
+                if (item.BonusQuantity < 0)
+                    throw new ArgumentException("Bonus quantity cannot be negative.");
+
+                if (item.DiscountAmount < 0 || item.DiscountPercentage < 0)
+                    throw new ArgumentException("Discount cannot be negative.");
+            }
+
+            var productIds = items
+                .Select(x => x.ProductId)
+                .Distinct()
+                .ToList();
+
+            var inventories = await _unitOfWork.SalesRepInventories
+                .GetQueryable()
+                .AsNoTracking()
+                .Where(x =>
+                    x.SalesRepId == salesRepId &&
+                    productIds.Contains(x.ProductId) &&
+                    x.IsActive)
+                .ToListAsync();
+
+            foreach (var group in items.GroupBy(x => x.ProductId))
+            {
+                var requestedQuantity = group.Sum(x => x.Quantity + x.BonusQuantity);
+
+                var inventory = inventories
+                    .FirstOrDefault(x => x.ProductId == group.Key);
+
+                if (inventory is null)
+                    throw new InvalidOperationException(
+                        $"No sales rep inventory found for product {group.Key}.");
+
+                if (requestedQuantity > inventory.Quantity)
+                    throw new InvalidOperationException(
+                        $"Requested quantity for product {group.Key} is greater than available quantity.");
+            }
+        }
+
         #endregion
 
         #region projection classes

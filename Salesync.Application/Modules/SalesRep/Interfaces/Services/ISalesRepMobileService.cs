@@ -1,4 +1,5 @@
 ﻿using Salesync.Application.Modules.CustomerVisit.Dtos;
+using Salesync.Application.Modules.Sales.Dtos.Invoice;
 using Salesync.Application.Modules.Sales.Dtos.Payment;
 using Salesync.Application.Modules.Sales.Dtos.SalesRepSession;
 using Salesync.Application.Modules.SalesRep.Dtos.Mobile;
@@ -18,5 +19,6 @@ namespace Salesync.Application.Modules.SalesRep.Interfaces.Services
         Task<PaymentDto> CreatePaymentAsync(CreateSalesRepMobilePaymentDto dto);
         Task<IEnumerable<SalesRepMobileRouteDto>> GetRoutesAsync(int sessionId);
         Task<IEnumerable<SalesRepMobileCustomerDto>> GetRouteCustomersAsync(int sessionId, int routeId);
+        Task<InvoiceDto> CreateInvoiceAsync(CreateSalesRepMobileInvoiceDto dto);
     }
 }
