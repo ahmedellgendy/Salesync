@@ -16,5 +16,7 @@ namespace Salesync.Application.Modules.SalesRep.Interfaces.Services
         Task<CustomerVisitDto> CompleteVisitAsync(int visitId, CompleteSalesRepMobileVisitDto dto);
         Task<IEnumerable<SalesRepMobileInvoiceDto>> GetInvoicesAsync(int sessionId);
         Task<PaymentDto> CreatePaymentAsync(CreateSalesRepMobilePaymentDto dto);
+        Task<IEnumerable<SalesRepMobileRouteDto>> GetRoutesAsync(int sessionId);
+        Task<IEnumerable<SalesRepMobileCustomerDto>> GetRouteCustomersAsync(int sessionId, int routeId);
     }
 }

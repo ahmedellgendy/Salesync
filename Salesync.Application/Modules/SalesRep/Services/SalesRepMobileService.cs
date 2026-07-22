@@ -212,7 +212,6 @@ namespace Salesync.Application.Modules.SalesRep.Services
 
             return await _customerVisitService.CompleteAsync(visitId, completeVisitDto);
         }
-
         public async Task<PaymentDto> CreatePaymentAsync(CreateSalesRepMobilePaymentDto dto)
         {
             if (dto.InvoiceId <= 0)
@@ -251,6 +250,57 @@ namespace Salesync.Application.Modules.SalesRep.Services
             };
 
             return await _paymentService.CreateAsync(createPaymentDto);
+        }
+
+        public async Task<IEnumerable<SalesRepMobileRouteDto>> GetRoutesAsync(int sessionId)
+        {
+            if (sessionId <= 0)
+                throw new ArgumentException("Invalid session id.");
+
+            var salesRep = await GetCurrentSalesRepAsync();
+
+            await EnsureSessionBelongsToSalesRepAsync(sessionId, salesRep.Id);
+
+            var routeCustomers = await GetAssignedRouteCustomersAsync(salesRep.Id);
+
+            var visits = await GetSessionVisitsAsync(sessionId, salesRep.Id);
+
+            var hasActiveVisit = visits.Any(x => x.Status == (int)VisitStatus.InProgress);
+
+            var visitedCustomerIds = visits
+                .Select(x => x.CustomerId)
+                .Distinct()
+                .ToHashSet();
+
+            var routes = routeCustomers
+                .GroupBy(x => new
+                {
+                    x.RouteId,
+                    x.RouteCode,
+                    x.RouteName
+                })
+                .Select(g =>
+                {
+                    var totalCustomers = g.Count();
+                    var visitedCustomers = g.Count(x => visitedCustomerIds.Contains(x.CustomerId));
+                    var remainingCustomers = totalCustomers - visitedCustomers;
+
+                    return new SalesRepMobileRouteDto
+                    {
+                        RouteId = g.Key.RouteId,
+                        RouteCode = g.Key.RouteCode,
+                        RouteName = g.Key.RouteName,
+                        TotalCustomers = totalCustomers,
+                        VisitedCustomers = visitedCustomers,
+                        RemainingCustomers = remainingCustomers,
+                        HasActiveVisit = hasActiveVisit,
+                        CanOpen = !hasActiveVisit
+                    };
+                })
+                .OrderBy(x => x.RouteName)
+                .ToList();
+
+            return routes;
         }
 
         #region Helper Method
@@ -396,7 +446,31 @@ namespace Salesync.Application.Modules.SalesRep.Services
                 };
             });
         }
+        public async Task<IEnumerable<SalesRepMobileCustomerDto>> GetRouteCustomersAsync(int sessionId,int routeId)
+        {
+            if (sessionId <= 0)
+                throw new ArgumentException("Invalid session id.");
 
+            if (routeId <= 0)
+                throw new ArgumentException("Invalid route id.");
+
+            var salesRep = await GetCurrentSalesRepAsync();
+
+            await EnsureSessionBelongsToSalesRepAsync(sessionId, salesRep.Id);
+
+            var routeCustomers = await GetAssignedRouteCustomersAsync(salesRep.Id);
+
+            var selectedRouteCustomers = routeCustomers
+                .Where(x => x.RouteId == routeId)
+                .ToList();
+
+            if (selectedRouteCustomers.Count == 0)
+                throw new KeyNotFoundException("Route not found for current sales rep.");
+
+            var visits = await GetSessionVisitsAsync(sessionId, salesRep.Id);
+
+            return BuildMobileCustomers(selectedRouteCustomers, visits);
+        }
         #endregion
 
         #region projection classes
