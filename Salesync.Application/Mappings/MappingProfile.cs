@@ -75,12 +75,24 @@ namespace Salesync.Application.Mappings
             CreateMap<CreateSalesRepSessionDto, SalesRepSession>();
 
             CreateMap<Invoice, InvoiceDto>()
-                .ForMember(dest => dest.RemainingAmount, opt => opt.MapFrom(src => src.TotalAmount - src.PaidAmount));
+              .ForMember(dest => dest.CustomerName, opt => opt.MapFrom(src => src.Customer != null ? src.Customer.Name : null))
+              .ForMember(dest => dest.CustomerCode, opt => opt.MapFrom(src => src.CustomerId.ToString()))
+              .ForMember(dest => dest.CustomerPhone, opt => opt.MapFrom(src => src.Customer != null ? src.Customer.Phone : null))
+              .ForMember(dest => dest.CustomerAddress, opt => opt.MapFrom(src => src.Customer != null ? src.Customer.Address : null))
+              .ForMember(dest => dest.SalesRepCode, opt => opt.MapFrom(src => src.SalesRep != null ? src.SalesRep.SalesRepCode : null))
+              .ForMember(dest => dest.SalesRepName, opt => opt.MapFrom(src => src.SalesRep != null ? src.SalesRep.Name : null))
+              .ForMember(dest => dest.SalesRepPhone, opt => opt.MapFrom(src => src.SalesRep != null ? src.SalesRep.Phone : null))
+              .ForMember(dest => dest.DueDate, opt => opt.MapFrom(src => src.CreatedAt))
+              .ForMember(dest => dest.ReturnsAmount, opt => opt.MapFrom(src => 0m))
+              .ForMember(dest => dest.RemainingAmount, opt => opt.MapFrom(src => src.TotalAmount - src.PaidAmount));
+
             CreateMap<CreateInvoiceDto, Invoice>();
             CreateMap<UpdateInvoiceDto, Invoice>()
                 .ForAllMembers(o => o.Condition((src, dest, srcMember) => srcMember != null));
-
-            CreateMap<InvoiceItem, InvoiceItemDto>();
+            CreateMap<InvoiceItem, InvoiceItemDto>()
+                .ForMember(dest => dest.SmallUnit, opt => opt.MapFrom(src => string.IsNullOrWhiteSpace(src.SmallUnit) ? "قطعة" : src.SmallUnit))
+                .ForMember(dest => dest.LargeUnit, opt => opt.MapFrom(src => string.IsNullOrWhiteSpace(src.LargeUnit) ? "كرتونة" : src.LargeUnit))
+                .ForMember(dest => dest.UnitsPerLargeUnit, opt => opt.MapFrom(src => src.UnitsPerLargeUnit <= 0 ? 1 : src.UnitsPerLargeUnit));
             CreateMap<CreateInvoiceItemDto, InvoiceItem>();
 
             CreateMap<Payment, PaymentDto>();

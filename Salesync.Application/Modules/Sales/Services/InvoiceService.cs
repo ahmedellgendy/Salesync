@@ -39,16 +39,46 @@ namespace Salesync.Application.Modules.Sales.Services
         }
         public async Task<InvoiceDto> GetByIdAsync(int id)
         {
+            if (id <= 0)
+                throw new ArgumentException("Invalid invoice id.");
+
             var invoice = await _unitOfWork.Invoices
                  .GetQueryable()
+                 .AsNoTracking()
+                 .Include(i => i.Customer)
+                 .Include(i => i.SalesRep)
                  .Include(i => i.InvoiceItems)
                  .Include(i => i.Payments)
-                 .FirstOrDefaultAsync(i => i.Id == id);
+                 .FirstOrDefaultAsync(i => i.Id == id && i.IsActive);
 
             if (invoice == null)
                 throw new KeyNotFoundException($"Invoice with id {id} not found.");
 
-            return _mapper.Map<InvoiceDto>(invoice);
+            var dto = _mapper.Map<InvoiceDto>(invoice);
+
+            dto.CustomerCode = invoice.CustomerId.ToString();
+
+            if (invoice.SalesRepId.HasValue)
+            {
+                var salesRep = invoice.SalesRep;
+
+                if (salesRep == null)
+                {
+                    salesRep = await _unitOfWork.SalesReps
+                        .GetQueryable()
+                        .AsNoTracking()
+                        .FirstOrDefaultAsync(x => x.Id == invoice.SalesRepId.Value && x.IsActive);
+                }
+
+                if (salesRep != null)
+                {
+                    dto.SalesRepCode = salesRep.SalesRepCode;
+                    dto.SalesRepName = salesRep.Name;
+                    dto.SalesRepPhone = salesRep.Phone;
+                }
+            }
+
+            return dto;
         }
         public async Task<InvoiceDto> CreateAsync(CreateInvoiceDto dto)
         {

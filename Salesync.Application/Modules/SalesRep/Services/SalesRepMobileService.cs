@@ -195,7 +195,10 @@ namespace Salesync.Application.Modules.SalesRep.Services
             var invoice = await _unitOfWork.Invoices
                 .GetQueryable()
                 .AsNoTracking()
+                .Include(x => x.Customer)
+                .Include(x => x.SalesRep)
                 .Include(x => x.InvoiceItems)
+                .Include(x => x.Payments)
                 .FirstOrDefaultAsync(x =>
                     x.Id == invoiceId &&
                     x.IsActive &&
@@ -206,19 +209,26 @@ namespace Salesync.Application.Modules.SalesRep.Services
 
             var dto = _mapper.Map<InvoiceDto>(invoice);
 
-            var customerName = await _unitOfWork.Customers
-                .GetQueryable()
-                .AsNoTracking()
-                .Where(x => x.Id == invoice.CustomerId)
-                .Select(x => x.Name)
-                .FirstOrDefaultAsync();
+            dto.CustomerCode = invoice.CustomerId.ToString();
 
-            dto.CustomerName = customerName;
+            if (invoice.Customer is not null)
+            {
+                dto.CustomerName = invoice.Customer.Name;
+                dto.CustomerPhone = invoice.Customer.Phone;
+                dto.CustomerAddress = invoice.Customer.Address;
+            }
+
+            dto.SalesRepCode = salesRep.SalesRepCode;
+            dto.SalesRepName = salesRep.Name;
+            dto.SalesRepPhone = salesRep.Phone;
 
             dto.RemainingAmount = dto.TotalAmount - dto.PaidAmount;
+            dto.DueDate = dto.DueDate ?? invoice.CreatedAt;
+            dto.ReturnsAmount = dto.ReturnsAmount < 0 ? 0 : dto.ReturnsAmount;
 
             return dto;
         }
+
         public async Task<CustomerVisitDto> StartVisitAsync(StartSalesRepMobileVisitDto dto)
         {
             var startVisitDto = new StartCustomerVisitDto
