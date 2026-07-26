@@ -99,14 +99,78 @@ namespace Salesync.Application.Modules.SalesRep.Services
 
             var isDayClosed = session.EndTime.HasValue;
 
+            var routeCustomers = await GetAssignedRouteCustomersAsync(salesRep.Id);
+
+            var visits = await _unitOfWork.CustomerVisits
+                .GetQueryable()
+                .AsNoTracking()
+                .Where(x =>
+                    x.SalesRepId == salesRep.Id &&
+                    x.SalesRepSessionId == session.Id &&
+                    x.IsActive)
+                .ToListAsync();
+
+            var invoices = await _unitOfWork.Invoices
+                .GetQueryable()
+                .AsNoTracking()
+                .Where(x =>
+                    x.SalesRepId == salesRep.Id &&
+                    x.SalesRepSessionId == session.Id &&
+                    x.IsActive)
+                .ToListAsync();
+
+            var payments = await _unitOfWork.Payments
+                .GetQueryable()
+                .AsNoTracking()
+                .Where(x =>
+                    x.SalesRepId == salesRep.Id &&
+                    x.SalesRepSessionId == session.Id &&
+                    x.IsActive)
+                .ToListAsync();
+
+            var totalCustomers = routeCustomers
+                .Select(x => x.CustomerId)
+                .Distinct()
+                .Count();
+
+            var visitedCustomers = visits
+                .Select(x => x.CustomerId)
+                .Distinct()
+                .Count();
+
+            var remainingCustomers = totalCustomers - visitedCustomers;
+
+            if (remainingCustomers < 0)
+                remainingCustomers = 0;
+
+            var salesTotal = invoices.Sum(x => x.TotalAmount);
+            var paidTotal = payments.Sum(x => x.Amount);
+            var remainingTotal = invoices.Sum(x => x.TotalAmount - x.PaidAmount);
+
+            if (remainingTotal < 0)
+                remainingTotal = 0;
+
             return new SalesRepMobileTodayDto
             {
                 HasTodaySession = true,
                 HasOpenSession = !isDayClosed,
                 IsDayClosed = isDayClosed,
-                Session = _mapper.Map<SalesRepSessionDto>(session)
+                Session = _mapper.Map<SalesRepSessionDto>(session),
+
+                TotalCustomers = totalCustomers,
+                VisitedCustomers = visitedCustomers,
+                RemainingCustomers = remainingCustomers,
+
+                InvoicesCount = invoices.Count,
+                SalesTotal = salesTotal,
+
+                PaidTotal = paidTotal,
+                RemainingTotal = remainingTotal,
+
+                PaymentsCount = payments.Count
             };
         }
+
         public async Task<SalesRepSessionDto> StartDayAsync(StartSalesRepMobileDayDto dto)
         {
             var salesRep = await GetCurrentSalesRepAsync();
