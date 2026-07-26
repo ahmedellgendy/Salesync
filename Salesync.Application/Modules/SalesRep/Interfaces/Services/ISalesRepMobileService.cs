@@ -15,11 +15,17 @@ namespace Salesync.Application.Modules.SalesRep.Interfaces.Services
         Task<SalesRepSessionDto> CloseDayAsync(int sessionId);
         Task<CustomerVisitDto> StartVisitAsync(StartSalesRepMobileVisitDto dto);
         Task<CustomerVisitDto> CompleteVisitAsync(int visitId, CompleteSalesRepMobileVisitDto dto);
+        
         Task<IEnumerable<SalesRepMobileInvoiceDto>> GetInvoicesAsync(int sessionId);
+        Task<InvoiceDto> GetInvoiceDetailsAsync(int invoiceId);
+       
         Task<PaymentDto> CreatePaymentAsync(CreateSalesRepMobilePaymentDto dto);
+        Task<InvoiceDto> CreateInvoiceAsync(CreateSalesRepMobileInvoiceDto dto);
+        
         Task<IEnumerable<SalesRepMobileRouteDto>> GetRoutesAsync(int sessionId);
         Task<IEnumerable<SalesRepMobileCustomerDto>> GetRouteCustomersAsync(int sessionId, int routeId);
-        Task<InvoiceDto> CreateInvoiceAsync(CreateSalesRepMobileInvoiceDto dto);
-        Task<InvoiceDto> GetInvoiceDetailsAsync(int invoiceId);
+        
+        Task<IEnumerable<MobileProductOptionDto>> GetProductsAsync();
+        Task<IEnumerable<MobileWarehouseOptionDto>> GetWarehousesAsync();
     }
 }
