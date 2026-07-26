@@ -67,7 +67,8 @@ namespace Salesync.Application.Modules.SalesRep.Services
                 Email = salesRep.Email,
                 BranchId = salesRep.BranchId,
                 BranchName = branchName,
-                BusinessUnitId = salesRep.BusinessUnitId
+                BusinessUnitId = salesRep.BusinessUnitId,
+                ProfileImageUrl = salesRep.ProfileImageUrl
             };
         }
         public async Task<SalesRepMobileTodayDto> GetTodayAsync()

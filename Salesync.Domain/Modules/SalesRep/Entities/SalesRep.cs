@@ -23,8 +23,9 @@ namespace Salesync.Domain.Modules.SalesRep.Entities
         public bool ProofOfVisit { get; set; }                 
         public int? MaxVisitsWithoutProof { get; set; }        
         public int? SupervisorId { get; set; }                 
-        public int? BusinessUnitId { get; set; }     
-        
+        public int? BusinessUnitId { get; set; }
+        public string? ProfileImageUrl { get; set; }
+
 
         // Navigation Properties
         public Branch Branch { get; set; } = null!;            
