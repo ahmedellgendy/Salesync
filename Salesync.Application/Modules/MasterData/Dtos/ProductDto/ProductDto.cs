@@ -15,6 +15,9 @@
         public int MaxStockLevel { get; set; }
         public bool EnableReturn { get; set; }
         public string? Unit { get; set; }
+        public string SmallUnit { get; set; } = "قطعة";
+        public string LargeUnit { get; set; } = "كرتونة";
+        public int UnitsPerLargeUnit { get; set; } = 1;
         public int? WarehouseId { get; set; }
         public string? WarehouseName { get; set; }
         public bool IsActive { get; set; }

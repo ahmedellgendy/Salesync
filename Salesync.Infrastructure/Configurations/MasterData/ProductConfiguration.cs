@@ -36,7 +36,7 @@ namespace Salesync.Infrastructure.Configurations.MasterData
                 .HasPrecision(18, 2);
 
             builder.Property(p => p.MinStockLevel)
-                .HasDefaultValue(0);    
+                .HasDefaultValue(0);
 
             builder.Property(p => p.MaxStockLevel)
                 .HasDefaultValue(0);
@@ -48,6 +48,20 @@ namespace Salesync.Infrastructure.Configurations.MasterData
             builder.Property(p => p.IsActive)
                 .IsRequired()
                 .HasDefaultValue(true);
+
+            builder.Property(p => p.SmallUnit)
+                .IsRequired()
+                .HasMaxLength(50)
+                .HasDefaultValue("قطعة");
+
+            builder.Property(p => p.LargeUnit)
+                .IsRequired()
+                .HasMaxLength(50)
+                .HasDefaultValue("كرتونة");
+
+            builder.Property(p => p.UnitsPerLargeUnit)
+                .IsRequired()
+                .HasDefaultValue(1);
 
             // Relationships
             builder.HasOne(p => p.Warehouse)
