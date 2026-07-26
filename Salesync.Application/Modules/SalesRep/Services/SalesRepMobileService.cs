@@ -666,14 +666,39 @@ namespace Salesync.Application.Modules.SalesRep.Services
                 if (item.BonusLargeQuantity < 0)
                     throw new ArgumentException("Bonus quantity cannot be negative.");
 
-                if (item.DiscountAmount < 0 || item.DiscountPercentage < 0)
-                    throw new ArgumentException("Discount cannot be negative.");
+                if (item.DiscountAmount < 0)
+                    throw new ArgumentException("Discount amount cannot be negative.");
+
+                if (item.DiscountPercentage < 0 || item.DiscountPercentage > 100)
+                    throw new ArgumentException("Discount percentage must be between 0 and 100.");
             }
 
             var productIds = items
                 .Select(x => x.ProductId)
                 .Distinct()
                 .ToList();
+
+            var products = await _unitOfWork.Products
+                .GetQueryable()
+                .AsNoTracking()
+                .Where(x =>
+                    productIds.Contains(x.Id) &&
+                    x.IsActive)
+                .Select(x => new
+                {
+                    x.Id,
+                    x.Name,
+                    x.SmallUnit,
+                    x.LargeUnit,
+                    x.UnitsPerLargeUnit
+                })
+                .ToListAsync();
+
+            foreach (var productId in productIds)
+            {
+                if (!products.Any(x => x.Id == productId))
+                    throw new KeyNotFoundException($"Product with id {productId} not found or inactive.");
+            }
 
             var inventories = await _unitOfWork.SalesRepInventories
                 .GetQueryable()
@@ -686,18 +711,42 @@ namespace Salesync.Application.Modules.SalesRep.Services
 
             foreach (var group in items.GroupBy(x => x.ProductId))
             {
-                var requestedQuantity = group.Sum(x => x.SaleLargeQuantity + x.BonusLargeQuantity);
+                var product = products.First(x => x.Id == group.Key);
+
+                var unitsPerLargeUnit = product.UnitsPerLargeUnit <= 0
+                    ? 1
+                    : product.UnitsPerLargeUnit;
+
+                var requestedSmallQuantity = group.Sum(x =>
+                    (x.SaleLargeQuantity + x.BonusLargeQuantity) * unitsPerLargeUnit);
 
                 var inventory = inventories
                     .FirstOrDefault(x => x.ProductId == group.Key);
 
                 if (inventory is null)
+                {
                     throw new InvalidOperationException(
-                        $"No sales rep inventory found for product {group.Key}.");
+                        $"No sales rep inventory found for product {product.Name}.");
+                }
 
-                if (requestedQuantity > inventory.Quantity)
+                if (inventory.Quantity < requestedSmallQuantity)
+                {
+                    var largeUnit = string.IsNullOrWhiteSpace(product.LargeUnit)
+                        ? "كرتونة"
+                        : product.LargeUnit;
+
+                    var smallUnit = string.IsNullOrWhiteSpace(product.SmallUnit)
+                        ? "قطعة"
+                        : product.SmallUnit;
+
+                    var requestedLargeQuantity = group.Sum(x =>
+                        x.SaleLargeQuantity + x.BonusLargeQuantity);
+
                     throw new InvalidOperationException(
-                        $"Requested quantity for product {group.Key} is greater than available quantity.");
+                        $"Requested quantity for product {product.Name} is greater than available quantity. " +
+                        $"Requested: {requestedLargeQuantity} {largeUnit} = {requestedSmallQuantity} {smallUnit}, " +
+                        $"Available: {inventory.Quantity} {smallUnit}.");
+                }
             }
         }
 
