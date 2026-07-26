@@ -440,7 +440,10 @@ namespace Salesync.Application.Modules.SalesRep.Services
                     ItemCode = x.ItemCode,
                     Name = x.Name,
                     UnitPrice = x.UnitPrice,
-                    Unit = x.Unit
+                    Unit = x.Unit,
+                    SmallUnit = x.SmallUnit,
+                    LargeUnit = x.LargeUnit,
+                    UnitsPerLargeUnit = x.UnitsPerLargeUnit
                 })
                 .ToListAsync();
 
