@@ -128,5 +128,15 @@ namespace Salesync.API.Controllers.Mobile
                 "Invoice created and visit completed successfully."));
         }
 
+        [HttpGet("invoices/{invoiceId:int}")] // GET: api/mobile/salesrep/invoices/1
+        public async Task<IActionResult> GetInvoiceDetailsAsync(int invoiceId)
+        {
+            var result = await _salesRepMobileService.GetInvoiceDetailsAsync(invoiceId);
+
+            return Ok(ApiResponse<InvoiceDto>.SuccessResponse(
+                result,
+                "Invoice details retrieved successfully."));
+        }
+
     }
 }
