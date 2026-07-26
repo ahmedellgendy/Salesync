@@ -138,5 +138,25 @@ namespace Salesync.API.Controllers.Mobile
                 "Invoice details retrieved successfully."));
         }
 
+        [HttpGet("products")]  // GET: api/mobile/salesrep/products
+        public async Task<IActionResult> GetProducts()
+        {
+            var result = await _salesRepMobileService.GetProductsAsync();
+
+            return Ok(ApiResponse<IEnumerable<MobileProductOptionDto>>.SuccessResponse(
+                result,
+                "Products retrieved successfully."));
+        }
+
+        [HttpGet("warehouses")] // GET: api/mobile/salesrep/warehouses
+        public async Task<IActionResult> GetWarehouses()
+        {
+            var result = await _salesRepMobileService.GetWarehousesAsync();
+
+            return Ok(ApiResponse<IEnumerable<MobileWarehouseOptionDto>>.SuccessResponse(
+                result,
+                "Warehouses retrieved successfully."));
+        }
+
     }
 }

@@ -427,6 +427,50 @@ namespace Salesync.Application.Modules.SalesRep.Services
             return confirmedInvoice;
         }
 
+        public async Task<IEnumerable<MobileProductOptionDto>> GetProductsAsync()
+        {
+            var products = await _unitOfWork.Products
+                .GetQueryable()
+                .AsNoTracking()
+                .Where(x => x.IsActive)
+                .OrderBy(x => x.Name)
+                .Select(x => new MobileProductOptionDto
+                {
+                    Id = x.Id,
+                    ItemCode = x.ItemCode,
+                    Name = x.Name,
+                    UnitPrice = x.UnitPrice,
+                    Unit = x.Unit
+                })
+                .ToListAsync();
+
+            return products;
+        }
+        public async Task<IEnumerable<MobileWarehouseOptionDto>> GetWarehousesAsync()
+        {
+            var salesRep = await GetCurrentSalesRepAsync();
+
+            var warehouses = await _unitOfWork.Warehouses
+                .GetQueryable()
+                .AsNoTracking()
+                .Where(x =>
+                    x.IsActive &&
+                    x.BranchId == salesRep.BranchId)
+                .OrderBy(x => x.Name)
+                .Select(x => new MobileWarehouseOptionDto
+                {
+                    Id = x.Id,
+                    WarehouseCode = x.WarehouseCode,
+                    Name = x.Name,
+                    BranchId = x.BranchId,
+                    Location = x.Location
+                })
+                .ToListAsync();
+
+            return warehouses;
+        }
+
+
         #region Helper Method
 
         private async Task<SalesRepEntity> GetCurrentSalesRepAsync()
