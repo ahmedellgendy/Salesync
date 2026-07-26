@@ -144,14 +144,39 @@ namespace Salesync.Application.Modules.LoadRequest.Services
                 if (!product.IsActive)
                     throw new InvalidOperationException($"Product with id {itemDto.ProductId} is inactive.");
 
+                var unitsPerLargeUnit = product.UnitsPerLargeUnit <= 0
+    ? 1
+    : product.UnitsPerLargeUnit;
+
+                var requestedSmallQuantity = itemDto.RequestedLargeQuantity * unitsPerLargeUnit;
+
                 request.Items.Add(new LoadRequestItem
                 {
                     ProductId = product.Id,
                     ProductName = product.Name,
                     ItemCode = product.ItemCode,
-                    RequestedQuantity = itemDto.RequestedQuantity,
+
+                    // Quantities
+                    RequestedLargeQuantity = itemDto.RequestedLargeQuantity,
+                    RequestedQuantity = requestedSmallQuantity,
+
+                    ApprovedLargeQuantity = 0,
                     ApprovedQuantity = 0,
+
+                    ConfirmedLargeQuantity = 0,
                     ConfirmedQuantity = 0,
+
+                    // Unit snapshot وقت الطلب
+                    SmallUnit = string.IsNullOrWhiteSpace(product.SmallUnit)
+                        ? "قطعة"
+                        : product.SmallUnit,
+
+                    LargeUnit = string.IsNullOrWhiteSpace(product.LargeUnit)
+                        ? "كرتونة"
+                        : product.LargeUnit,
+
+                    UnitsPerLargeUnit = unitsPerLargeUnit,
+
                     Notes = itemDto.Notes,
                     CreatedAt = DateTime.UtcNow,
                     IsActive = true
@@ -185,15 +210,18 @@ namespace Salesync.Application.Modules.LoadRequest.Services
             {
                 var item = request.Items.First(x => x.Id == itemDto.LoadRequestItemId);
 
-                if (itemDto.ApprovedQuantity > item.RequestedQuantity)
+                if (itemDto.ApprovedLargeQuantity > item.RequestedLargeQuantity)
                     throw new InvalidOperationException(
                         $"Approved quantity cannot exceed requested quantity for product {item.ProductName}.");
 
-                item.ApprovedQuantity = itemDto.ApprovedQuantity;
+                var approvedSmallQuantity = itemDto.ApprovedLargeQuantity * item.UnitsPerLargeUnit;
+
+                item.ApprovedLargeQuantity = itemDto.ApprovedLargeQuantity;
+                item.ApprovedQuantity = approvedSmallQuantity;
                 item.UpdatedAt = DateTime.UtcNow;
             }
 
-            if (request.Items.Sum(x => x.ApprovedQuantity) <= 0)
+            if (request.Items.Sum(x => x.ApprovedLargeQuantity) <= 0)
                 throw new InvalidOperationException("At least one item must have approved quantity greater than zero.");
 
             request.Status = LoadRequestStatus.Approved;
@@ -253,12 +281,12 @@ namespace Salesync.Application.Modules.LoadRequest.Services
             {
                 var item = request.Items.First(x => x.Id == itemDto.LoadRequestItemId);
 
-                if (itemDto.ConfirmedQuantity > item.ApprovedQuantity)
+                if (itemDto.ConfirmedLargeQuantity > item.ApprovedLargeQuantity)
                     throw new InvalidOperationException(
                         $"Confirmed quantity cannot exceed approved quantity for product {item.ProductName}.");
             }
 
-            if (dto.Items.Sum(x => x.ConfirmedQuantity) <= 0)
+            if (dto.Items.Sum(x => x.ConfirmedLargeQuantity) <= 0)
                 throw new InvalidOperationException("At least one item must have confirmed quantity greater than zero.");
 
             await EnsureWarehouseStockAvailableAsync(request.WarehouseId, request.Items, dto.Items);
@@ -271,28 +299,31 @@ namespace Salesync.Application.Modules.LoadRequest.Services
                 {
                     var item = request.Items.First(x => x.Id == itemDto.LoadRequestItemId);
 
-                    item.ConfirmedQuantity = itemDto.ConfirmedQuantity;
+                    var confirmedSmallQuantity = itemDto.ConfirmedLargeQuantity * item.UnitsPerLargeUnit;
+
+                    item.ConfirmedLargeQuantity = itemDto.ConfirmedLargeQuantity;
+                    item.ConfirmedQuantity = confirmedSmallQuantity;
                     item.UpdatedAt = DateTime.UtcNow;
 
-                    if (itemDto.ConfirmedQuantity > 0)
+                    if (confirmedSmallQuantity > 0)
                     {
                         await _inventoryService.StockOutAsync(
                             item.ProductId,
                             request.WarehouseId,
-                            itemDto.ConfirmedQuantity,
+                            confirmedSmallQuantity,
                             StockMovementSource.LoadRequest,
                             request.Id,
                             request.LoadRequestNumber,
-                            $"Stouk out for load request {request.LoadRequestNumber}");
+                            $"Stock out for load request {request.LoadRequestNumber}");
 
                         await IncreaseSalesRepInventoryAsync(
-                              request.SalesRepId,
-                              item.ProductId,
-                              itemDto.ConfirmedQuantity,
-                              SalesRepInventoryMovementSource.LoadRequest,
-                              request.Id,
-                              request.LoadRequestNumber,
-                              $"Stock in for load request {request.LoadRequestNumber}");
+                            request.SalesRepId,
+                            item.ProductId,
+                            confirmedSmallQuantity,
+                            SalesRepInventoryMovementSource.LoadRequest,
+                            request.Id,
+                            request.LoadRequestNumber,
+                            $"Stock in for load request {request.LoadRequestNumber}");
                     }
                 }
 
@@ -556,22 +587,22 @@ namespace Salesync.Application.Modules.LoadRequest.Services
                 throw new UnauthorizedAccessException("You cannot access another sales rep inventory.");
         }
 
-        private async Task EnsureWarehouseStockAvailableAsync(
-             int warehouseId,
-             IEnumerable<LoadRequestItem> requestItems,
-             IEnumerable<ConfirmLoadRequestItemDto> confirmedItems)
+        private async Task EnsureWarehouseStockAvailableAsync(int warehouseId, IEnumerable<LoadRequestItem> requestItems, IEnumerable<ConfirmLoadRequestItemDto> confirmedItems)
         {
             var requiredStock = confirmedItems
-                .Where(x => x.ConfirmedQuantity > 0)
+                .Where(x => x.ConfirmedLargeQuantity > 0)
                 .Select(x =>
                 {
                     var requestItem = requestItems.First(i => i.Id == x.LoadRequestItemId);
+
+                    var confirmedSmallQuantity =
+                        x.ConfirmedLargeQuantity * requestItem.UnitsPerLargeUnit;
 
                     return new
                     {
                         ProductId = requestItem.ProductId,
                         ProductName = requestItem.ProductName,
-                        Quantity = x.ConfirmedQuantity
+                        Quantity = confirmedSmallQuantity
                     };
                 })
                 .GroupBy(x => x.ProductId)

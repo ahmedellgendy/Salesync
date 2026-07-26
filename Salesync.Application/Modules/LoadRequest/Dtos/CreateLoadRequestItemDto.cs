@@ -3,7 +3,7 @@
     public class CreateLoadRequestItemDto
     {
         public int ProductId { get; set; }
-        public int RequestedQuantity { get; set; }
+        public int RequestedLargeQuantity { get; set; }
         public string? Notes { get; set; }
     }
 }
