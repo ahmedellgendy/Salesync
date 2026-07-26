@@ -185,6 +185,40 @@ namespace Salesync.Application.Modules.SalesRep.Services
 
             return invoices;
         }
+        public async Task<InvoiceDto> GetInvoiceDetailsAsync(int invoiceId)
+        {
+            if (invoiceId <= 0)
+                throw new ArgumentException("Invalid invoice id.");
+
+            var salesRep = await GetCurrentSalesRepAsync();
+
+            var invoice = await _unitOfWork.Invoices
+                .GetQueryable()
+                .AsNoTracking()
+                .Include(x => x.InvoiceItems)
+                .FirstOrDefaultAsync(x =>
+                    x.Id == invoiceId &&
+                    x.IsActive &&
+                    x.SalesRepId == salesRep.Id);
+
+            if (invoice is null)
+                throw new KeyNotFoundException("Invoice not found for current sales rep.");
+
+            var dto = _mapper.Map<InvoiceDto>(invoice);
+
+            var customerName = await _unitOfWork.Customers
+                .GetQueryable()
+                .AsNoTracking()
+                .Where(x => x.Id == invoice.CustomerId)
+                .Select(x => x.Name)
+                .FirstOrDefaultAsync();
+
+            dto.CustomerName = customerName;
+
+            dto.RemainingAmount = dto.TotalAmount - dto.PaidAmount;
+
+            return dto;
+        }
         public async Task<CustomerVisitDto> StartVisitAsync(StartSalesRepMobileVisitDto dto)
         {
             var startVisitDto = new StartCustomerVisitDto

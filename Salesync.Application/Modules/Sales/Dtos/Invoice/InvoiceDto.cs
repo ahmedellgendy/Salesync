@@ -8,6 +8,7 @@ namespace Salesync.Application.Modules.Sales.Dtos.Invoice
         public int Id { get; set; }
         public string InvoiceNumber { get; set; } = null!;
         public int CustomerId { get; set; }
+        public string? CustomerName { get; set; }
         public int WarehouseId { get; set; }
         public int? SalesRepId { get; set; }
         public int? SalesRepSessionId { get; set; }

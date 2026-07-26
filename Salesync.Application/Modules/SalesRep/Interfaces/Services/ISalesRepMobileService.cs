@@ -20,5 +20,6 @@ namespace Salesync.Application.Modules.SalesRep.Interfaces.Services
         Task<IEnumerable<SalesRepMobileRouteDto>> GetRoutesAsync(int sessionId);
         Task<IEnumerable<SalesRepMobileCustomerDto>> GetRouteCustomersAsync(int sessionId, int routeId);
         Task<InvoiceDto> CreateInvoiceAsync(CreateSalesRepMobileInvoiceDto dto);
+        Task<InvoiceDto> GetInvoiceDetailsAsync(int invoiceId);
     }
 }
