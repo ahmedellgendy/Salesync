@@ -126,7 +126,10 @@ namespace Salesync.Application.Mappings
             CreateMap<SalesRepInventory, SalesRepInventoryDto>()
                 .ForMember(dest => dest.SalesRepName, opt => opt.MapFrom(src => src.SalesRep.Name))
                 .ForMember(dest => dest.ProductName, opt => opt.MapFrom(src => src.Product.Name))
-                .ForMember(dest => dest.ItemCode, opt => opt.MapFrom(src => src.Product.ItemCode));
+                .ForMember(dest => dest.ItemCode, opt => opt.MapFrom(src => src.Product.ItemCode))
+                .ForMember(dest => dest.SmallUnit, opt => opt.MapFrom(src => string.IsNullOrWhiteSpace(src.Product.SmallUnit) ? "قطعة" : src.Product.SmallUnit))
+                .ForMember(dest => dest.LargeUnit, opt => opt.MapFrom(src => string.IsNullOrWhiteSpace(src.Product.LargeUnit) ? "كرتونة" : src.Product.LargeUnit))
+                .ForMember(dest => dest.UnitsPerLargeUnit, opt => opt.MapFrom(src => src.Product.UnitsPerLargeUnit <= 0 ? 1 : src.Product.UnitsPerLargeUnit));
 
             CreateMap<SalesRepInventoryMovement, SalesRepInventoryMovementDto>()
                 .ForMember(dest => dest.SalesRepName, opt => opt.MapFrom(src => src.SalesRep.Name))

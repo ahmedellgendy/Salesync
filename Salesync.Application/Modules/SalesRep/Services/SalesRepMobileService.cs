@@ -401,10 +401,10 @@ namespace Salesync.Application.Modules.SalesRep.Services
                 Items = dto.Items.Select(x => new CreateInvoiceItemDto
                 {
                     ProductId = x.ProductId,
-                    Quantity = x.Quantity,
+                    SaleLargeQuantity = x.SaleLargeQuantity,
+                    BonusLargeQuantity = x.BonusLargeQuantity,
                     DiscountAmount = x.DiscountAmount,
-                    DiscountPercentage = x.DiscountPercentage,
-                    BonusQuantity = x.BonusQuantity
+                    DiscountPercentage = x.DiscountPercentage
                 }).ToList()
             };
 
@@ -650,10 +650,10 @@ namespace Salesync.Application.Modules.SalesRep.Services
                 if (item.ProductId <= 0)
                     throw new ArgumentException("Invalid product id.");
 
-                if (item.Quantity <= 0)
+                if (item.SaleLargeQuantity <= 0)
                     throw new ArgumentException("Item quantity must be greater than zero.");
 
-                if (item.BonusQuantity < 0)
+                if (item.BonusLargeQuantity < 0)
                     throw new ArgumentException("Bonus quantity cannot be negative.");
 
                 if (item.DiscountAmount < 0 || item.DiscountPercentage < 0)
@@ -676,7 +676,7 @@ namespace Salesync.Application.Modules.SalesRep.Services
 
             foreach (var group in items.GroupBy(x => x.ProductId))
             {
-                var requestedQuantity = group.Sum(x => x.Quantity + x.BonusQuantity);
+                var requestedQuantity = group.Sum(x => x.SaleLargeQuantity + x.BonusLargeQuantity);
 
                 var inventory = inventories
                     .FirstOrDefault(x => x.ProductId == group.Key);

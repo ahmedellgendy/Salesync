@@ -36,24 +36,28 @@ namespace Salesync.Application.Modules.Sales.Validators
                 .WithMessage("Invoice must contain at least one item.");
 
             RuleForEach(x => x.Items)
-                .ChildRules(item =>
-                {
-                    item.RuleFor(x => x.ProductId)
-                        .GreaterThan(0)
-                        .WithMessage("ProductId is required.");
+                 .ChildRules(item =>
+                 {
+                     item.RuleFor(x => x.ProductId)
+                         .GreaterThan(0)
+                         .WithMessage("ProductId is required.");
 
-                    item.RuleFor(x => x.Quantity)
-                        .GreaterThan(0)
-                        .WithMessage("Quantity must be greater than zero.");
+                     item.RuleFor(x => x.SaleLargeQuantity)
+                         .GreaterThan(0)
+                         .WithMessage("Sale large quantity must be greater than zero.");
 
-                    item.RuleFor(x => x.BonusQuantity)
-                        .GreaterThanOrEqualTo(0)
-                        .WithMessage("Bonus quantity cannot be negative.");
+                     item.RuleFor(x => x.BonusLargeQuantity)
+                         .GreaterThanOrEqualTo(0)
+                         .WithMessage("Bonus large quantity cannot be negative.");
 
-                    item.RuleFor(x => x.DiscountPercentage)
-                        .InclusiveBetween(0, 100)
-                        .WithMessage("Discount percentage must be between 0 and 100.");
-                });
+                     item.RuleFor(x => x.DiscountAmount)
+                         .GreaterThanOrEqualTo(0)
+                         .WithMessage("Discount amount cannot be negative.");
+
+                     item.RuleFor(x => x.DiscountPercentage)
+                         .InclusiveBetween(0, 100)
+                         .WithMessage("Discount percentage must be between 0 and 100.");
+                 });
         }
     }
 }

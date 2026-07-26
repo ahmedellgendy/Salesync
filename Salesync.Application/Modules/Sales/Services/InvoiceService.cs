@@ -127,10 +127,24 @@ namespace Salesync.Application.Modules.Sales.Services
             {
                 var product = await _unitOfWork.Products.GetByIdAsync(itemDto.ProductId)
                     ?? throw new KeyNotFoundException($"Product with id {itemDto.ProductId} not found.");
+
                 if (!product.IsActive)
                     throw new InvalidOperationException($"Product with id {itemDto.ProductId} is inactive.");
 
-                var grossAmount = product.UnitPrice * itemDto.Quantity;
+                var unitsPerLargeUnit = product.UnitsPerLargeUnit <= 0
+                    ? 1
+                    : product.UnitsPerLargeUnit;
+
+                var saleSmallQuantity = itemDto.SaleLargeQuantity * unitsPerLargeUnit;
+                var bonusSmallQuantity = itemDto.BonusLargeQuantity * unitsPerLargeUnit;
+
+                if (saleSmallQuantity <= 0)
+                    throw new InvalidOperationException($"Quantity must be greater than zero for product {product.Name}.");
+
+                if (bonusSmallQuantity < 0)
+                    throw new InvalidOperationException($"Bonus quantity cannot be negative for product {product.Name}.");
+
+                var grossAmount = product.UnitPrice * saleSmallQuantity;
 
                 var itemDiscountAmount = itemDto.DiscountAmount;
 
@@ -146,11 +160,29 @@ namespace Salesync.Application.Modules.Sales.Services
 
                 var invoiceItem = new InvoiceItem
                 {
-                    ProductId = itemDto.ProductId,
+                    ProductId = product.Id,
                     ProductName = product.Name,
                     ItemCode = product.ItemCode,
-                    Quantity = itemDto.Quantity,
-                    BonusQuantity = itemDto.BonusQuantity,
+
+                    // Large unit quantities from user
+                    SaleLargeQuantity = itemDto.SaleLargeQuantity,
+                    BonusLargeQuantity = itemDto.BonusLargeQuantity,
+
+                    // Small unit quantities for stock/accounting
+                    Quantity = saleSmallQuantity,
+                    BonusQuantity = bonusSmallQuantity,
+
+                    // Unit snapshot
+                    SmallUnit = string.IsNullOrWhiteSpace(product.SmallUnit)
+                        ? "قطعة"
+                        : product.SmallUnit,
+
+                    LargeUnit = string.IsNullOrWhiteSpace(product.LargeUnit)
+                        ? "كرتونة"
+                        : product.LargeUnit,
+
+                    UnitsPerLargeUnit = unitsPerLargeUnit,
+
                     UnitPrice = product.UnitPrice,
                     DiscountPercentage = itemDto.DiscountPercentage,
                     DiscountAmount = itemDiscountAmount,
