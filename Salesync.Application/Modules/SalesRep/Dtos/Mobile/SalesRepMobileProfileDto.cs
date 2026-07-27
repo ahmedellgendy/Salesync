@@ -11,5 +11,6 @@
         public int BranchId { get; set; }
         public string? BranchName { get; set; }
         public int? BusinessUnitId { get; set; }
+        public string? ProfileImageUrl { get; set; }
     }
 }

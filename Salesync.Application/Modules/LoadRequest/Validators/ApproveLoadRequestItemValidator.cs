@@ -11,7 +11,7 @@ namespace Salesync.Application.Modules.LoadRequest.Validators
                 .GreaterThan(0)
                 .WithMessage("LoadRequestItemId is required.");
 
-            RuleFor(x => x.ApprovedQuantity)
+            RuleFor(x => x.ApprovedLargeQuantity)
                 .GreaterThanOrEqualTo(0)
                 .WithMessage("ApprovedQuantity cannot be negative.");
         }

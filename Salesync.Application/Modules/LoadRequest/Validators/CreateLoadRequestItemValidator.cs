@@ -11,7 +11,7 @@ namespace Salesync.Application.Modules.LoadRequest.Validators
                 .GreaterThan(0)
                 .WithMessage("ProductId is required.");
 
-            RuleFor(x => x.RequestedQuantity)
+            RuleFor(x => x.RequestedLargeQuantity)
                 .GreaterThan(0)
                 .WithMessage("RequestedQuantity must be greater than zero.");
 

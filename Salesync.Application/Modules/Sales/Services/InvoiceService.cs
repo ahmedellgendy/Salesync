@@ -39,16 +39,46 @@ namespace Salesync.Application.Modules.Sales.Services
         }
         public async Task<InvoiceDto> GetByIdAsync(int id)
         {
+            if (id <= 0)
+                throw new ArgumentException("Invalid invoice id.");
+
             var invoice = await _unitOfWork.Invoices
                  .GetQueryable()
+                 .AsNoTracking()
+                 .Include(i => i.Customer)
+                 .Include(i => i.SalesRep)
                  .Include(i => i.InvoiceItems)
                  .Include(i => i.Payments)
-                 .FirstOrDefaultAsync(i => i.Id == id);
+                 .FirstOrDefaultAsync(i => i.Id == id && i.IsActive);
 
             if (invoice == null)
                 throw new KeyNotFoundException($"Invoice with id {id} not found.");
 
-            return _mapper.Map<InvoiceDto>(invoice);
+            var dto = _mapper.Map<InvoiceDto>(invoice);
+
+            dto.CustomerCode = invoice.CustomerId.ToString();
+
+            if (invoice.SalesRepId.HasValue)
+            {
+                var salesRep = invoice.SalesRep;
+
+                if (salesRep == null)
+                {
+                    salesRep = await _unitOfWork.SalesReps
+                        .GetQueryable()
+                        .AsNoTracking()
+                        .FirstOrDefaultAsync(x => x.Id == invoice.SalesRepId.Value && x.IsActive);
+                }
+
+                if (salesRep != null)
+                {
+                    dto.SalesRepCode = salesRep.SalesRepCode;
+                    dto.SalesRepName = salesRep.Name;
+                    dto.SalesRepPhone = salesRep.Phone;
+                }
+            }
+
+            return dto;
         }
         public async Task<InvoiceDto> CreateAsync(CreateInvoiceDto dto)
         {
@@ -127,10 +157,24 @@ namespace Salesync.Application.Modules.Sales.Services
             {
                 var product = await _unitOfWork.Products.GetByIdAsync(itemDto.ProductId)
                     ?? throw new KeyNotFoundException($"Product with id {itemDto.ProductId} not found.");
+
                 if (!product.IsActive)
                     throw new InvalidOperationException($"Product with id {itemDto.ProductId} is inactive.");
 
-                var grossAmount = product.UnitPrice * itemDto.Quantity;
+                var unitsPerLargeUnit = product.UnitsPerLargeUnit <= 0
+                    ? 1
+                    : product.UnitsPerLargeUnit;
+
+                var saleSmallQuantity = itemDto.SaleLargeQuantity * unitsPerLargeUnit;
+                var bonusSmallQuantity = itemDto.BonusLargeQuantity * unitsPerLargeUnit;
+
+                if (saleSmallQuantity <= 0)
+                    throw new InvalidOperationException($"Quantity must be greater than zero for product {product.Name}.");
+
+                if (bonusSmallQuantity < 0)
+                    throw new InvalidOperationException($"Bonus quantity cannot be negative for product {product.Name}.");
+
+                var grossAmount = product.UnitPrice * saleSmallQuantity;
 
                 var itemDiscountAmount = itemDto.DiscountAmount;
 
@@ -146,11 +190,29 @@ namespace Salesync.Application.Modules.Sales.Services
 
                 var invoiceItem = new InvoiceItem
                 {
-                    ProductId = itemDto.ProductId,
+                    ProductId = product.Id,
                     ProductName = product.Name,
                     ItemCode = product.ItemCode,
-                    Quantity = itemDto.Quantity,
-                    BonusQuantity = itemDto.BonusQuantity,
+
+                    // Large unit quantities from user
+                    SaleLargeQuantity = itemDto.SaleLargeQuantity,
+                    BonusLargeQuantity = itemDto.BonusLargeQuantity,
+
+                    // Small unit quantities for stock/accounting
+                    Quantity = saleSmallQuantity,
+                    BonusQuantity = bonusSmallQuantity,
+
+                    // Unit snapshot
+                    SmallUnit = string.IsNullOrWhiteSpace(product.SmallUnit)
+                        ? "قطعة"
+                        : product.SmallUnit,
+
+                    LargeUnit = string.IsNullOrWhiteSpace(product.LargeUnit)
+                        ? "كرتونة"
+                        : product.LargeUnit,
+
+                    UnitsPerLargeUnit = unitsPerLargeUnit,
+
                     UnitPrice = product.UnitPrice,
                     DiscountPercentage = itemDto.DiscountPercentage,
                     DiscountAmount = itemDiscountAmount,

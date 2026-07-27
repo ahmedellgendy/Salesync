@@ -67,7 +67,8 @@ namespace Salesync.Application.Modules.SalesRep.Services
                 Email = salesRep.Email,
                 BranchId = salesRep.BranchId,
                 BranchName = branchName,
-                BusinessUnitId = salesRep.BusinessUnitId
+                BusinessUnitId = salesRep.BusinessUnitId,
+                ProfileImageUrl = salesRep.ProfileImageUrl
             };
         }
         public async Task<SalesRepMobileTodayDto> GetTodayAsync()
@@ -99,14 +100,78 @@ namespace Salesync.Application.Modules.SalesRep.Services
 
             var isDayClosed = session.EndTime.HasValue;
 
+            var routeCustomers = await GetAssignedRouteCustomersAsync(salesRep.Id);
+
+            var visits = await _unitOfWork.CustomerVisits
+                .GetQueryable()
+                .AsNoTracking()
+                .Where(x =>
+                    x.SalesRepId == salesRep.Id &&
+                    x.SalesRepSessionId == session.Id &&
+                    x.IsActive)
+                .ToListAsync();
+
+            var invoices = await _unitOfWork.Invoices
+                .GetQueryable()
+                .AsNoTracking()
+                .Where(x =>
+                    x.SalesRepId == salesRep.Id &&
+                    x.SalesRepSessionId == session.Id &&
+                    x.IsActive)
+                .ToListAsync();
+
+            var payments = await _unitOfWork.Payments
+                .GetQueryable()
+                .AsNoTracking()
+                .Where(x =>
+                    x.SalesRepId == salesRep.Id &&
+                    x.SalesRepSessionId == session.Id &&
+                    x.IsActive)
+                .ToListAsync();
+
+            var totalCustomers = routeCustomers
+                .Select(x => x.CustomerId)
+                .Distinct()
+                .Count();
+
+            var visitedCustomers = visits
+                .Select(x => x.CustomerId)
+                .Distinct()
+                .Count();
+
+            var remainingCustomers = totalCustomers - visitedCustomers;
+
+            if (remainingCustomers < 0)
+                remainingCustomers = 0;
+
+            var salesTotal = invoices.Sum(x => x.TotalAmount);
+            var paidTotal = payments.Sum(x => x.Amount);
+            var remainingTotal = invoices.Sum(x => x.TotalAmount - x.PaidAmount);
+
+            if (remainingTotal < 0)
+                remainingTotal = 0;
+
             return new SalesRepMobileTodayDto
             {
                 HasTodaySession = true,
                 HasOpenSession = !isDayClosed,
                 IsDayClosed = isDayClosed,
-                Session = _mapper.Map<SalesRepSessionDto>(session)
+                Session = _mapper.Map<SalesRepSessionDto>(session),
+
+                TotalCustomers = totalCustomers,
+                VisitedCustomers = visitedCustomers,
+                RemainingCustomers = remainingCustomers,
+
+                InvoicesCount = invoices.Count,
+                SalesTotal = salesTotal,
+
+                PaidTotal = paidTotal,
+                RemainingTotal = remainingTotal,
+
+                PaymentsCount = payments.Count
             };
         }
+
         public async Task<SalesRepSessionDto> StartDayAsync(StartSalesRepMobileDayDto dto)
         {
             var salesRep = await GetCurrentSalesRepAsync();
@@ -195,7 +260,10 @@ namespace Salesync.Application.Modules.SalesRep.Services
             var invoice = await _unitOfWork.Invoices
                 .GetQueryable()
                 .AsNoTracking()
+                .Include(x => x.Customer)
+                .Include(x => x.SalesRep)
                 .Include(x => x.InvoiceItems)
+                .Include(x => x.Payments)
                 .FirstOrDefaultAsync(x =>
                     x.Id == invoiceId &&
                     x.IsActive &&
@@ -206,19 +274,26 @@ namespace Salesync.Application.Modules.SalesRep.Services
 
             var dto = _mapper.Map<InvoiceDto>(invoice);
 
-            var customerName = await _unitOfWork.Customers
-                .GetQueryable()
-                .AsNoTracking()
-                .Where(x => x.Id == invoice.CustomerId)
-                .Select(x => x.Name)
-                .FirstOrDefaultAsync();
+            dto.CustomerCode = invoice.CustomerId.ToString();
 
-            dto.CustomerName = customerName;
+            if (invoice.Customer is not null)
+            {
+                dto.CustomerName = invoice.Customer.Name;
+                dto.CustomerPhone = invoice.Customer.Phone;
+                dto.CustomerAddress = invoice.Customer.Address;
+            }
+
+            dto.SalesRepCode = salesRep.SalesRepCode;
+            dto.SalesRepName = salesRep.Name;
+            dto.SalesRepPhone = salesRep.Phone;
 
             dto.RemainingAmount = dto.TotalAmount - dto.PaidAmount;
+            dto.DueDate = dto.DueDate ?? invoice.CreatedAt;
+            dto.ReturnsAmount = dto.ReturnsAmount < 0 ? 0 : dto.ReturnsAmount;
 
             return dto;
         }
+
         public async Task<CustomerVisitDto> StartVisitAsync(StartSalesRepMobileVisitDto dto)
         {
             var startVisitDto = new StartCustomerVisitDto
@@ -401,10 +476,10 @@ namespace Salesync.Application.Modules.SalesRep.Services
                 Items = dto.Items.Select(x => new CreateInvoiceItemDto
                 {
                     ProductId = x.ProductId,
-                    Quantity = x.Quantity,
+                    SaleLargeQuantity = x.SaleLargeQuantity,
+                    BonusLargeQuantity = x.BonusLargeQuantity,
                     DiscountAmount = x.DiscountAmount,
-                    DiscountPercentage = x.DiscountPercentage,
-                    BonusQuantity = x.BonusQuantity
+                    DiscountPercentage = x.DiscountPercentage
                 }).ToList()
             };
 
@@ -650,20 +725,45 @@ namespace Salesync.Application.Modules.SalesRep.Services
                 if (item.ProductId <= 0)
                     throw new ArgumentException("Invalid product id.");
 
-                if (item.Quantity <= 0)
+                if (item.SaleLargeQuantity <= 0)
                     throw new ArgumentException("Item quantity must be greater than zero.");
 
-                if (item.BonusQuantity < 0)
+                if (item.BonusLargeQuantity < 0)
                     throw new ArgumentException("Bonus quantity cannot be negative.");
 
-                if (item.DiscountAmount < 0 || item.DiscountPercentage < 0)
-                    throw new ArgumentException("Discount cannot be negative.");
+                if (item.DiscountAmount < 0)
+                    throw new ArgumentException("Discount amount cannot be negative.");
+
+                if (item.DiscountPercentage < 0 || item.DiscountPercentage > 100)
+                    throw new ArgumentException("Discount percentage must be between 0 and 100.");
             }
 
             var productIds = items
                 .Select(x => x.ProductId)
                 .Distinct()
                 .ToList();
+
+            var products = await _unitOfWork.Products
+                .GetQueryable()
+                .AsNoTracking()
+                .Where(x =>
+                    productIds.Contains(x.Id) &&
+                    x.IsActive)
+                .Select(x => new
+                {
+                    x.Id,
+                    x.Name,
+                    x.SmallUnit,
+                    x.LargeUnit,
+                    x.UnitsPerLargeUnit
+                })
+                .ToListAsync();
+
+            foreach (var productId in productIds)
+            {
+                if (!products.Any(x => x.Id == productId))
+                    throw new KeyNotFoundException($"Product with id {productId} not found or inactive.");
+            }
 
             var inventories = await _unitOfWork.SalesRepInventories
                 .GetQueryable()
@@ -676,18 +776,42 @@ namespace Salesync.Application.Modules.SalesRep.Services
 
             foreach (var group in items.GroupBy(x => x.ProductId))
             {
-                var requestedQuantity = group.Sum(x => x.Quantity + x.BonusQuantity);
+                var product = products.First(x => x.Id == group.Key);
+
+                var unitsPerLargeUnit = product.UnitsPerLargeUnit <= 0
+                    ? 1
+                    : product.UnitsPerLargeUnit;
+
+                var requestedSmallQuantity = group.Sum(x =>
+                    (x.SaleLargeQuantity + x.BonusLargeQuantity) * unitsPerLargeUnit);
 
                 var inventory = inventories
                     .FirstOrDefault(x => x.ProductId == group.Key);
 
                 if (inventory is null)
+                {
                     throw new InvalidOperationException(
-                        $"No sales rep inventory found for product {group.Key}.");
+                        $"No sales rep inventory found for product {product.Name}.");
+                }
 
-                if (requestedQuantity > inventory.Quantity)
+                if (inventory.Quantity < requestedSmallQuantity)
+                {
+                    var largeUnit = string.IsNullOrWhiteSpace(product.LargeUnit)
+                        ? "كرتونة"
+                        : product.LargeUnit;
+
+                    var smallUnit = string.IsNullOrWhiteSpace(product.SmallUnit)
+                        ? "قطعة"
+                        : product.SmallUnit;
+
+                    var requestedLargeQuantity = group.Sum(x =>
+                        x.SaleLargeQuantity + x.BonusLargeQuantity);
+
                     throw new InvalidOperationException(
-                        $"Requested quantity for product {group.Key} is greater than available quantity.");
+                        $"Requested quantity for product {product.Name} is greater than available quantity. " +
+                        $"Requested: {requestedLargeQuantity} {largeUnit} = {requestedSmallQuantity} {smallUnit}, " +
+                        $"Available: {inventory.Quantity} {smallUnit}.");
+                }
             }
         }
 

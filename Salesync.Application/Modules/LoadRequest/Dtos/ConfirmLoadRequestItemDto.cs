@@ -3,6 +3,6 @@
     public class ConfirmLoadRequestItemDto
     {
         public int LoadRequestItemId { get; set; }
-        public int ConfirmedQuantity { get; set; }
+        public int ConfirmedLargeQuantity { get; set; }
     }
 }

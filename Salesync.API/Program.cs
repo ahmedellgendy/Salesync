@@ -97,7 +97,7 @@ if (app.Environment.IsDevelopment())
 }
 
 
-
+app.UseStaticFiles();
 app.UseExceptionHandler();
 app.UseHttpsRedirection();
 app.UseCors("SalesyncPwaPolicy");
