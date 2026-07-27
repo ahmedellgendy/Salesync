@@ -15,6 +15,7 @@ using Salesync.Application.Modules.SalesRep.Dtos.RouteCustomerDto;
 using Salesync.Application.Modules.SalesRep.Dtos.RouteDto;
 using Salesync.Application.Modules.SalesRep.Dtos.SalesRepDto;
 using Salesync.Application.Modules.Treasury.Dtos;
+using Salesync.Application.Modules.UnloadRequest.Dtos;
 using Salesync.Domain.Common.Enums.Sales.SalesRepDayClosing;
 using Salesync.Domain.Modules.CustomerVisit.Entities;
 using Salesync.Domain.Modules.Inventory.Entities;
@@ -23,6 +24,7 @@ using Salesync.Domain.Modules.MasterData.Entities;
 using Salesync.Domain.Modules.Sales.Entities;
 using Salesync.Domain.Modules.SalesRep.Entities;
 using Salesync.Domain.Modules.Treasury.Entities;
+using Salesync.Domain.Modules.UnloadRequest.Entities;
 using ClosingEntity = Salesync.Domain.Modules.Sales.Entities.SalesRepDayClosing;
 using ClosingItemEntity = Salesync.Domain.Modules.Sales.Entities.SalesRepDayClosingItem;
 
@@ -173,6 +175,15 @@ namespace Salesync.Application.Mappings
             CreateMap<CashReceipt, CashReceiptDto>();
 
             CreateMap<SalesRepCashLedger, SalesRepCashLedgerDto>();
+
+            #endregion
+
+            #region UnloadRequest 
+
+            CreateMap<SalesRepUnloadRequest, SalesRepUnloadRequestDto>()
+                .ForMember(dest => dest.Items, opt => opt.MapFrom(src => src.Items));
+
+            CreateMap<SalesRepUnloadRequestItem, SalesRepUnloadRequestItemDto>();
 
             #endregion
         }

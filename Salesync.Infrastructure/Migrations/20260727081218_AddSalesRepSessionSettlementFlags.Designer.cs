@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Salesync.Infrastructure.Data;
 
@@ -11,9 +12,11 @@ using Salesync.Infrastructure.Data;
 namespace Salesync.Infrastructure.Migrations
 {
     [DbContext(typeof(SalesyncDbContext))]
-    partial class SalesyncDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260727081218_AddSalesRepSessionSettlementFlags")]
+    partial class AddSalesRepSessionSettlementFlags
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -2358,9 +2361,6 @@ namespace Salesync.Infrastructure.Migrations
                     b.Property<int>("ConfirmedQuantity")
                         .HasColumnType("int");
 
-                    b.Property<int>("ConfirmedSmallQuantity")
-                        .HasColumnType("int");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -2392,9 +2392,6 @@ namespace Salesync.Infrastructure.Migrations
                         .HasColumnType("int");
 
                     b.Property<int>("RequestedQuantity")
-                        .HasColumnType("int");
-
-                    b.Property<int>("RequestedSmallQuantity")
                         .HasColumnType("int");
 
                     b.Property<int>("SalesRepInventoryAfterUnload")
