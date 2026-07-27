@@ -184,7 +184,14 @@ namespace Salesync.Application.Modules.UnloadRequest.Services
                 .OrderByDescending(x => x.Id)
                 .ToListAsync();
 
-            return _mapper.Map<IEnumerable<SalesRepUnloadRequestDto>>(requests);
+            var dtos = _mapper.Map<List<SalesRepUnloadRequestDto>>(requests);
+
+            foreach (var dto in dtos)
+            {
+                await FillDisplayDataAsync(dto);
+            }
+
+            return dtos;
         }
 
         public async Task<SalesRepUnloadRequestDto> GetByIdAsync(int id)
@@ -486,6 +493,65 @@ namespace Salesync.Application.Modules.UnloadRequest.Services
                 throw new UnauthorizedAccessException("Sales rep not found for current user.");
 
             return salesRep;
+        }
+
+        public async Task<SalesRepUnloadRequestDto> GetMyRequestByIdAsync(int id)
+        {
+            if (id <= 0)
+                throw new ArgumentException("Invalid unload request id.");
+
+            var salesRep = await GetCurrentSalesRepAsync();
+
+            var request = await _unitOfWork.SalesRepUnloadRequests
+                .GetQueryable()
+                .AsNoTracking()
+                .Include(x => x.Items)
+                .FirstOrDefaultAsync(x =>
+                    x.Id == id &&
+                    x.SalesRepId == salesRep.Id &&
+                    x.IsActive);
+
+            if (request is null)
+                throw new KeyNotFoundException($"Unload request with id {id} not found for current sales rep.");
+
+            var dto = _mapper.Map<SalesRepUnloadRequestDto>(request);
+
+            await FillDisplayDataAsync(dto);
+
+            return dto;
+        }
+
+        public async Task CancelMyRequestAsync(int id, string? reason)
+        {
+            if (id <= 0)
+                throw new ArgumentException("Invalid unload request id.");
+
+            var salesRep = await GetCurrentSalesRepAsync();
+
+            var request = await _unitOfWork.SalesRepUnloadRequests
+                .GetQueryable()
+                .FirstOrDefaultAsync(x =>
+                    x.Id == id &&
+                    x.SalesRepId == salesRep.Id &&
+                    x.IsActive);
+
+            if (request is null)
+                throw new KeyNotFoundException($"Unload request with id {id} not found for current sales rep.");
+
+            if (request.Status == UnloadRequestStatus.Confirmed ||
+                request.Status == UnloadRequestStatus.PartiallyConfirmed)
+            {
+                throw new InvalidOperationException("Confirmed unload request cannot be cancelled.");
+            }
+
+            request.Status = UnloadRequestStatus.Cancelled;
+            request.CancelledAt = DateTime.UtcNow;
+            request.CancelledByUserId = _currentUser.UserId;
+            request.CancellationReason = reason;
+            request.UpdatedAt = DateTime.UtcNow;
+
+            _unitOfWork.SalesRepUnloadRequests.Update(request);
+            await _unitOfWork.CompleteAsync();
         }
 
         private async Task FillDisplayDataAsync(SalesRepUnloadRequestDto dto)

@@ -7,6 +7,7 @@ using Salesync.Application.Modules.Sales.Dtos.Payment;
 using Salesync.Application.Modules.Sales.Dtos.SalesRepSession;
 using Salesync.Application.Modules.SalesRep.Dtos.Mobile;
 using Salesync.Application.Modules.SalesRep.Interfaces.Services;
+using Salesync.Application.Modules.UnloadRequest.Dtos;
 
 namespace Salesync.API.Controllers.Mobile
 {
@@ -157,6 +158,50 @@ namespace Salesync.API.Controllers.Mobile
                 result,
                 "Warehouses retrieved successfully."));
         }
+
+        #region Unload Requests
+
+        [HttpPost("unload-requests")] // POST: api/mobile/salesrep/unload-requests
+        public async Task<IActionResult> CreateUnloadRequest([FromBody] CreateSalesRepUnloadRequestDto dto)
+        {
+            var result = await _salesRepMobileService.CreateUnloadRequestAsync(dto);
+
+            return Ok(ApiResponse<SalesRepUnloadRequestDto>.SuccessResponse(
+                result,
+                "Unload request created successfully."));
+        }
+
+        [HttpGet("unload-requests/my")] // GET: api/mobile/salesrep/unload-requests/my
+        public async Task<IActionResult> GetMyUnloadRequests()
+        {
+            var result = await _salesRepMobileService.GetMyUnloadRequestsAsync();
+
+            return Ok(ApiResponse<IEnumerable<SalesRepUnloadRequestDto>>.SuccessResponse(
+                result,
+                "Unload requests retrieved successfully."));
+        }
+
+        [HttpGet("unload-requests/{id:int}")]  // GET: api/mobile/salesrep/unload-requests/1
+        public async Task<IActionResult> GetUnloadRequestById(int id)
+        {
+            var result = await _salesRepMobileService.GetUnloadRequestByIdAsync(id);
+
+            return Ok(ApiResponse<SalesRepUnloadRequestDto>.SuccessResponse(
+                result,
+                "Unload request retrieved successfully."));
+        }
+
+        [HttpPut("unload-requests/{id:int}/cancel")]  // PUT: api/mobile/salesrep/unload-requests/1/cancel
+        public async Task<IActionResult> CancelUnloadRequest(int id,[FromBody] CancelUnloadRequestDto? dto)
+        {
+            await _salesRepMobileService.CancelUnloadRequestAsync(id, dto?.Reason);
+
+            return Ok(ApiResponse<string>.SuccessResponse(
+                "Cancelled",
+                "Unload request cancelled successfully."));
+        }
+
+        #endregion
 
     }
 }
