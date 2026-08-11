@@ -1,4 +1,5 @@
 ﻿using Salesync.Domain.Common;
+using Salesync.Domain.Common.Enums.Sales;
 using Salesync.Domain.Modules.MasterData.Entities;
 
 namespace Salesync.Domain.Modules.Sales.Entities
@@ -17,6 +18,7 @@ namespace Salesync.Domain.Modules.Sales.Entities
         public decimal TotalAmount { get; set; }
         public string? Notes { get; set; }
 
+        public ReturnCondition Condition { get; set; }
 
         // Navigation Properties
         public InvoiceReturn InvoiceReturn { get; set; } = null!;

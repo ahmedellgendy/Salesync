@@ -79,6 +79,10 @@ namespace Salesync.Application.Modules.Sales.Services
                 throw new InvalidOperationException(
                     "Return must contain at least one item.");
 
+            if (!Enum.IsDefined(typeof(ReturnReason), dto.ReturnReason))
+                throw new InvalidOperationException(
+                    "Invalid return reason.");
+
             var duplicateInvoiceItemIds = dto.Items
                 .GroupBy(x => x.InvoiceItemId)
                 .Where(g => g.Count() > 1)
@@ -131,6 +135,14 @@ namespace Salesync.Application.Modules.Sales.Services
 
             foreach (var itemDto in dto.Items)
             {
+                if (!Enum.IsDefined(typeof(ReturnCondition), itemDto.Condition))
+                    throw new InvalidOperationException(
+                        "Invalid return item condition.");
+
+                if (itemDto.Quantity <= 0)
+                    throw new InvalidOperationException(
+                        "Return quantity must be greater than zero.");
+
                 var invoiceItem = invoice.InvoiceItems
                     .FirstOrDefault(i =>
                         i.Id == itemDto.InvoiceItemId);
@@ -138,10 +150,6 @@ namespace Salesync.Application.Modules.Sales.Services
                 if (invoiceItem == null)
                     throw new InvalidOperationException(
                         $"Invoice item with id {itemDto.InvoiceItemId} does not belong to this invoice.");
-
-                if (itemDto.Quantity <= 0)
-                    throw new InvalidOperationException(
-                        $"Return quantity for product {invoiceItem.ProductName} must be greater than zero.");
 
                 var previouslyReturnedQuantity = previousReturns
                     .SelectMany(x => x.Items)
@@ -167,11 +175,21 @@ namespace Salesync.Application.Modules.Sales.Services
                     ProductId = invoiceItem.ProductId,
                     ProductName = invoiceItem.ProductName,
                     ItemCode = invoiceItem.ItemCode,
+
                     Quantity = itemDto.Quantity,
+
                     UnitPrice = invoiceItem.UnitPrice,
-                    TotalAmount = itemDto.Quantity * invoiceItem.UnitPrice,
+
+                    TotalAmount =
+                        itemDto.Quantity *
+                        invoiceItem.UnitPrice,
+
+                    Condition = itemDto.Condition,
+
                     Notes = itemDto.Notes,
+
                     CreatedAt = DateTime.UtcNow,
+
                     IsActive = true
                 };
 
@@ -181,7 +199,9 @@ namespace Salesync.Application.Modules.Sales.Services
             invoiceReturn.TotalAmount =
                 invoiceReturn.Items.Sum(i => i.TotalAmount);
 
-            await _unitOfWork.InvoiceReturns.AddAsync(invoiceReturn);
+            await _unitOfWork.InvoiceReturns
+                .AddAsync(invoiceReturn);
+
             await _unitOfWork.CompleteAsync();
 
             return _mapper.Map<InvoiceReturnDto>(invoiceReturn);
@@ -380,20 +400,14 @@ namespace Salesync.Application.Modules.Sales.Services
                     .Select(x => new InvoiceReturnItemDto
                     {
                         Id = x.Id,
-
                         InvoiceItemId = x.InvoiceItemId,
-
                         ProductId = x.ProductId,
-
                         ProductName = x.ProductName,
                         ItemCode = x.ItemCode,
-
                         Quantity = x.Quantity,
-
                         UnitPrice = x.UnitPrice,
-
                         TotalAmount = x.TotalAmount,
-
+                        Condition = x.Condition,
                         Notes = x.Notes
                     })
                     .ToList()

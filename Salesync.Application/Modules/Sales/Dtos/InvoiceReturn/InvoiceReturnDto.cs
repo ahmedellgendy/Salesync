@@ -21,7 +21,6 @@ namespace Salesync.Application.Modules.Sales.Dtos.InvoiceReturn
         public ReturnStatus Status { get; set; }
 
         public ReturnReason ReturnReason { get; set; }
-
         public decimal TotalAmount { get; set; }
 
         public string? ReasonNotes { get; set; }

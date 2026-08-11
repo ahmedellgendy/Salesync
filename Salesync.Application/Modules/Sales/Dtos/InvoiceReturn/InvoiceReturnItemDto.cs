@@ -1,4 +1,6 @@
-﻿namespace Salesync.Application.Modules.Sales.Dtos.InvoiceReturn
+﻿using Salesync.Domain.Common.Enums.Sales;
+
+namespace Salesync.Application.Modules.Sales.Dtos.InvoiceReturn
 {
     public class InvoiceReturnItemDto
     {
@@ -17,7 +19,7 @@
         public decimal UnitPrice { get; set; }
 
         public decimal TotalAmount { get; set; }
-
+        public ReturnCondition Condition { get; set; }
         public string? Notes { get; set; }
     }
 }
