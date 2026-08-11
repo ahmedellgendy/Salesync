@@ -191,6 +191,21 @@ namespace Salesync.API.Controllers.Mobile
             return Ok(ApiResponse<InvoiceReturnDto>.SuccessResponse(result, "Return cancelled successfully"));
         }
 
+        [HttpGet("customers/{customerId:int}/returnable-invoices")]
+        public async Task<IActionResult> GetReturnableInvoices(int customerId)
+        {
+            var result = await _salesRepMobileService.GetReturnableInvoicesAsync(customerId);
+
+            return Ok(ApiResponse<IEnumerable<MobileReturnableInvoiceDto>>.SuccessResponse(result, "Returnable invoices retrieved successfully."));
+        }
+
+        [HttpGet("returns/invoices/{invoiceId:int}")]
+        public async Task<IActionResult> GetReturnableInvoiceDetails(int invoiceId)
+        {
+            var result = await _salesRepMobileService.GetReturnableInvoiceDetailsAsync(invoiceId);
+
+            return Ok(ApiResponse<MobileReturnableInvoiceDetailsDto>.SuccessResponse(result, "Returnable invoice details retrieved successfully."));
+        }
         #endregion
 
         #region Unload Requests

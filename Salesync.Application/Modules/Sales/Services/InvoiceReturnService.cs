@@ -21,8 +21,7 @@ namespace Salesync.Application.Modules.Sales.Services
             _mapper = mapper;
         }
 
-        public async Task<IEnumerable<InvoiceReturnDto>> GetByInvoiceIdAsync(
-            int invoiceId)
+        public async Task<IEnumerable<InvoiceReturnDto>> GetByInvoiceIdAsync(int invoiceId)
         {
             if (invoiceId <= 0)
                 throw new ArgumentException("Invalid invoice id.");
@@ -68,8 +67,7 @@ namespace Salesync.Application.Modules.Sales.Services
             return MapReturnDto(invoiceReturn);
         }
 
-        public async Task<IEnumerable<InvoiceReturnDto>> GetBySalesRepIdAsync(
-            int salesRepId)
+        public async Task<IEnumerable<InvoiceReturnDto>> GetBySalesRepIdAsync(int salesRepId)
         {
             if (salesRepId <= 0)
                 throw new ArgumentException("Invalid sales rep id.");
@@ -91,8 +89,236 @@ namespace Salesync.Application.Modules.Sales.Services
                 .ToList();
         }
 
-        public async Task<InvoiceReturnDto> CreateAsync(
-            CreateInvoiceReturnDto dto)
+        public async Task<IEnumerable<MobileReturnableInvoiceDto>> GetReturnableInvoicesAsync(int salesRepId, int customerId)
+        {
+            if (salesRepId <= 0)
+                throw new ArgumentException("Invalid sales rep id.");
+
+            if (customerId <= 0)
+                throw new ArgumentException("Invalid customer id.");
+
+            var invoices = await _unitOfWork.Invoices
+                .GetQueryable()
+                .AsNoTracking()
+                .Include(x => x.InvoiceItems)
+                .Where(x =>
+                    x.SalesRepId == salesRepId &&
+                    x.CustomerId == customerId &&
+                    x.Status == InvoiceStatus.Confirmed &&
+                    x.IsActive)
+                .OrderByDescending(x => x.CreatedAt)
+                .ToListAsync();
+
+            if (invoices.Count == 0)
+                return Enumerable.Empty<MobileReturnableInvoiceDto>();
+
+            var invoiceIds = invoices
+                .Select(x => x.Id)
+                .ToList();
+
+            var previousReturns = await _unitOfWork.InvoiceReturns
+                .GetQueryable()
+                .AsNoTracking()
+                .Include(x => x.Items)
+                .Where(x =>
+                    invoiceIds.Contains(x.InvoiceId) &&
+                    x.IsActive &&
+                    x.Status != ReturnStatus.Rejected &&
+                    x.Status != ReturnStatus.Cancelled)
+                .ToListAsync();
+
+            var result = new List<MobileReturnableInvoiceDto>();
+
+            foreach (var invoice in invoices)
+            {
+                var invoiceReturns = previousReturns
+                    .Where(x => x.InvoiceId == invoice.Id)
+                    .ToList();
+
+                var returnableItemsCount = 0;
+
+                foreach (var invoiceItem in invoice.InvoiceItems.Where(x => x.IsActive))
+                {
+                    var returnedQuantity = invoiceReturns
+                        .SelectMany(x => x.Items)
+                        .Where(x =>
+                            x.IsActive &&
+                            x.InvoiceItemId == invoiceItem.Id)
+                        .Sum(x => x.Quantity);
+
+                    var returnedBonusQuantity = invoiceReturns
+                        .SelectMany(x => x.Items)
+                        .Where(x =>
+                            x.IsActive &&
+                            x.InvoiceItemId == invoiceItem.Id)
+                        .Sum(x => x.BonusQuantity);
+
+                    var remainingQuantity =
+                        invoiceItem.Quantity - returnedQuantity;
+
+                    var remainingBonusQuantity =
+                        invoiceItem.BonusQuantity - returnedBonusQuantity;
+
+                    if (remainingQuantity > 0 ||
+                        remainingBonusQuantity > 0)
+                    {
+                        returnableItemsCount++;
+                    }
+                }
+
+                if (returnableItemsCount == 0)
+                    continue;
+
+                result.Add(new MobileReturnableInvoiceDto
+                {
+                    Id = invoice.Id,
+                    InvoiceNumber = invoice.InvoiceNumber,
+                    CustomerId = invoice.CustomerId,
+                    CustomerName = string.Empty,
+                    CreatedAt = invoice.CreatedAt,
+                    TotalAmount = invoice.TotalAmount,
+                    ReturnableItemsCount = returnableItemsCount
+                });
+            }
+
+            var customerName = await _unitOfWork.Customers
+                .GetQueryable()
+                .AsNoTracking()
+                .Where(x =>
+                    x.Id == customerId &&
+                    x.IsActive)
+                .Select(x => x.Name)
+                .FirstOrDefaultAsync();
+
+            foreach (var item in result)
+                item.CustomerName = customerName ?? string.Empty;
+
+            return result;
+        }
+
+        public async Task<MobileReturnableInvoiceDetailsDto> GetReturnableInvoiceDetailsAsync(int salesRepId, int invoiceId)
+        {
+            if (salesRepId <= 0)
+                throw new ArgumentException("Invalid sales rep id.");
+
+            if (invoiceId <= 0)
+                throw new ArgumentException("Invalid invoice id.");
+
+            var invoice = await _unitOfWork.Invoices
+                .GetQueryable()
+                .AsNoTracking()
+                .Include(x => x.InvoiceItems)
+                .Include(x => x.Customer)
+                .FirstOrDefaultAsync(x =>
+                    x.Id == invoiceId &&
+                    x.SalesRepId == salesRepId &&
+                    x.Status == InvoiceStatus.Confirmed &&
+                    x.IsActive);
+
+            if (invoice == null)
+                throw new KeyNotFoundException(
+                    "Confirmed invoice not found for current sales rep.");
+
+            var previousReturns = await _unitOfWork.InvoiceReturns
+                .GetQueryable()
+                .AsNoTracking()
+                .Include(x => x.Items)
+                .Where(x =>
+                    x.InvoiceId == invoiceId &&
+                    x.IsActive &&
+                    x.Status != ReturnStatus.Rejected &&
+                    x.Status != ReturnStatus.Cancelled)
+                .ToListAsync();
+
+            var items = new List<MobileReturnableInvoiceItemDto>();
+
+            foreach (var invoiceItem in invoice.InvoiceItems.Where(x => x.IsActive))
+            {
+                var previouslyReturnedQuantity = previousReturns
+                    .SelectMany(x => x.Items)
+                    .Where(x =>
+                        x.IsActive &&
+                        x.InvoiceItemId == invoiceItem.Id)
+                    .Sum(x => x.Quantity);
+
+                var previouslyReturnedBonusQuantity = previousReturns
+                    .SelectMany(x => x.Items)
+                    .Where(x =>
+                        x.IsActive &&
+                        x.InvoiceItemId == invoiceItem.Id)
+                    .Sum(x => x.BonusQuantity);
+
+                var remainingReturnableQuantity =
+                    Math.Max(
+                        0,
+                        invoiceItem.Quantity -
+                        previouslyReturnedQuantity);
+
+                var remainingReturnableBonusQuantity =
+                    Math.Max(
+                        0,
+                        invoiceItem.BonusQuantity -
+                        previouslyReturnedBonusQuantity);
+
+                if (remainingReturnableQuantity == 0 &&
+                    remainingReturnableBonusQuantity == 0)
+                {
+                    continue;
+                }
+
+                items.Add(new MobileReturnableInvoiceItemDto
+                {
+                    InvoiceItemId = invoiceItem.Id,
+                    ProductId = invoiceItem.ProductId,
+                    ProductName = invoiceItem.ProductName,
+                    ItemCode = invoiceItem.ItemCode,
+
+                    SoldQuantity = invoiceItem.Quantity,
+                    BonusQuantity = invoiceItem.BonusQuantity,
+
+                    PreviouslyReturnedQuantity =
+                        previouslyReturnedQuantity,
+
+                    PreviouslyReturnedBonusQuantity =
+                        previouslyReturnedBonusQuantity,
+
+                    RemainingReturnableQuantity =
+                        remainingReturnableQuantity,
+
+                    RemainingReturnableBonusQuantity =
+                        remainingReturnableBonusQuantity,
+
+                    SmallUnit = invoiceItem.SmallUnit,
+                    LargeUnit = invoiceItem.LargeUnit,
+
+                    UnitsPerLargeUnit =
+                        invoiceItem.UnitsPerLargeUnit <= 0
+                            ? 1
+                            : invoiceItem.UnitsPerLargeUnit,
+
+                    UnitPrice = invoiceItem.UnitPrice
+                });
+            }
+
+            if (items.Count == 0)
+            {
+                throw new InvalidOperationException(
+                    "This invoice has no remaining quantities available for return.");
+            }
+
+            return new MobileReturnableInvoiceDetailsDto
+            {
+                Id = invoice.Id,
+                InvoiceNumber = invoice.InvoiceNumber,
+                CustomerId = invoice.CustomerId,
+                CustomerName = invoice.Customer?.Name ?? string.Empty,
+                CreatedAt = invoice.CreatedAt,
+                TotalAmount = invoice.TotalAmount,
+                Items = items
+            };
+        }
+
+        public async Task<InvoiceReturnDto> CreateAsync(CreateInvoiceReturnDto dto)
         {
             if (dto.Items == null ||
                 dto.Items.Count == 0)
@@ -413,8 +639,7 @@ namespace Salesync.Application.Modules.Sales.Services
                 invoiceReturn.Id);
         }
 
-        public async Task<InvoiceReturnDto> ApproveAsync(
-            int id)
+        public async Task<InvoiceReturnDto> ApproveAsync(int id)
         {
             if (id <= 0)
                 throw new ArgumentException(
@@ -535,8 +760,7 @@ namespace Salesync.Application.Modules.Sales.Services
             return await GetByIdAsync(id);
         }
 
-        public async Task<InvoiceReturnDto> RejectAsync(
-            int id)
+        public async Task<InvoiceReturnDto> RejectAsync(int id)
         {
             if (id <= 0)
                 throw new ArgumentException(
@@ -581,7 +805,7 @@ namespace Salesync.Application.Modules.Sales.Services
             if (id <= 0)
                 throw new ArgumentException("Invalid return id.");
 
-            var invoiceReturn =await _unitOfWork.InvoiceReturns
+            var invoiceReturn = await _unitOfWork.InvoiceReturns
                     .GetQueryable()
                     .FirstOrDefaultAsync(x =>
                         x.Id == id &&
@@ -592,14 +816,14 @@ namespace Salesync.Application.Modules.Sales.Services
                 throw new KeyNotFoundException($"Return with id {id} not found.");
             }
 
-            if (invoiceReturn.Status !=ReturnStatus.Pending)
+            if (invoiceReturn.Status != ReturnStatus.Pending)
             {
                 throw new InvalidOperationException("Only pending returns can be cancelled.");
             }
 
-            invoiceReturn.Status =ReturnStatus.Cancelled;
+            invoiceReturn.Status = ReturnStatus.Cancelled;
 
-            invoiceReturn.UpdatedAt =DateTime.UtcNow;
+            invoiceReturn.UpdatedAt = DateTime.UtcNow;
 
             _unitOfWork.InvoiceReturns.Update(invoiceReturn);
 

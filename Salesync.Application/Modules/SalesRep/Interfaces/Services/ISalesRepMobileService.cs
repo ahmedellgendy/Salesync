@@ -40,6 +40,10 @@ namespace Salesync.Application.Modules.SalesRep.Interfaces.Services
 
         Task<InvoiceReturnDto> CancelReturnAsync(int id);
 
+        Task<IEnumerable<MobileReturnableInvoiceDto>> GetReturnableInvoicesAsync(int customerId);
+
+        Task<MobileReturnableInvoiceDetailsDto> GetReturnableInvoiceDetailsAsync(int invoiceId);
+
         #endregion
 
         #region Unload Requests

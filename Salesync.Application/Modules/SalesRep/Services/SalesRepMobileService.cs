@@ -584,8 +584,7 @@ namespace Salesync.Application.Modules.SalesRep.Services
             return invoiceReturn;
         }
 
-        public async Task<InvoiceReturnDto> CreateReturnAsync(
-            CreateInvoiceReturnDto dto)
+        public async Task<InvoiceReturnDto> CreateReturnAsync(CreateInvoiceReturnDto dto)
         {
             if (dto.InvoiceId <= 0)
                 throw new ArgumentException("Invalid invoice id.");
@@ -631,6 +630,32 @@ namespace Salesync.Application.Modules.SalesRep.Services
 
             return await _invoiceReturnService
                 .CancelAsync(id);
+        }
+
+        public async Task<IEnumerable<MobileReturnableInvoiceDto>>GetReturnableInvoicesAsync(int customerId)
+        {
+            if (customerId <= 0)
+                throw new ArgumentException("Invalid customer id.");
+
+            var salesRep = await GetCurrentSalesRepAsync();
+
+            return await _invoiceReturnService
+                .GetReturnableInvoicesAsync(
+                    salesRep.Id,
+                    customerId);
+        }
+
+        public async Task<MobileReturnableInvoiceDetailsDto>GetReturnableInvoiceDetailsAsync(int invoiceId)
+        {
+            if (invoiceId <= 0)
+                throw new ArgumentException("Invalid invoice id.");
+
+            var salesRep = await GetCurrentSalesRepAsync();
+
+            return await _invoiceReturnService
+                .GetReturnableInvoiceDetailsAsync(
+                    salesRep.Id,
+                    invoiceId);
         }
 
         #endregion
