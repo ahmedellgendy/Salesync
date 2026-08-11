@@ -6,6 +6,7 @@
         Invoice = 2,
         InvoiceReturn = 3,
         StockAdjustment = 4,
-        EndDayReturn = 5
+        EndDayReturn = 5,
+        UnloadRequest = 6
     }
 }

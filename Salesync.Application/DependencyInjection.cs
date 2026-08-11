@@ -13,6 +13,8 @@ using Salesync.Application.Modules.SalesRep.Interfaces.Services;
 using Salesync.Application.Modules.SalesRep.Services;
 using Salesync.Application.Modules.Treasury.Interfaces.Services;
 using Salesync.Application.Modules.Treasury.Services;
+using Salesync.Application.Modules.UnloadRequest.Interfaces;
+using Salesync.Application.Modules.UnloadRequest.Services;
 
 namespace Salesync.Application
 {
@@ -54,6 +56,8 @@ namespace Salesync.Application
             // Register Treasury Service
             services.AddScoped<ITreasuryService, TreasuryService>();
 
+            // Register UnloadRequset Service
+            services.AddScoped<ISalesRepUnloadRequestService, SalesRepUnloadRequestService>();
 
             return services;
         }

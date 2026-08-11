@@ -8,6 +8,7 @@
         LoadRequest = 4,       // طلب حمولة
         StockTransfer = 5,     // تحويل مخازن
         StockAdjustment = 6,   // تسوية / تعديل يدوي
-        Purchase = 7           // شراء / إضافة من مورد
+        Purchase = 7,           // شراء / إضافة من مورد
+        UnloadRequest = 8
     }
 }

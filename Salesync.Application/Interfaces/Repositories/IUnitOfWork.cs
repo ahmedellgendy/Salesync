@@ -4,6 +4,7 @@ using Salesync.Domain.Modules.MasterData.Entities;
 using Salesync.Domain.Modules.Sales.Entities;
 using Salesync.Domain.Modules.SalesRep.Entities;
 using Salesync.Domain.Modules.Treasury.Entities;
+using Salesync.Domain.Modules.UnloadRequest.Entities;
 using CustomerVisitEntity = Salesync.Domain.Modules.CustomerVisit.Entities.CustomerVisit;
 
 namespace Salesync.Application.Interfaces.Repositories
@@ -69,6 +70,13 @@ namespace Salesync.Application.Interfaces.Repositories
         IGenericRepository<CashBox> CashBoxes { get; }
         IGenericRepository<CashReceipt> CashReceipts { get; }
         IGenericRepository<SalesRepCashLedger> SalesRepCashLedgers { get; }
+
+        #endregion
+
+        #region UnLoadRequest
+
+        IGenericRepository<SalesRepUnloadRequest> SalesRepUnloadRequests { get; }
+        IGenericRepository<SalesRepUnloadRequestItem> SalesRepUnloadRequestItems { get; }
 
         #endregion
 

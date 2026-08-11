@@ -11,6 +11,8 @@ using Salesync.Application.Modules.Sales.Dtos.SalesRepSession;
 using Salesync.Application.Modules.Sales.Interfaces;
 using Salesync.Application.Modules.SalesRep.Dtos.Mobile;
 using Salesync.Application.Modules.SalesRep.Interfaces.Services;
+using Salesync.Application.Modules.UnloadRequest.Dtos;
+using Salesync.Application.Modules.UnloadRequest.Interfaces;
 using Salesync.Domain.Common.Enums.CustomerVisit;
 using Salesync.Domain.Common.Enums.Sales;
 using Salesync.Domain.Modules.Sales.Entities;
@@ -27,6 +29,7 @@ namespace Salesync.Application.Modules.SalesRep.Services
         private readonly ICustomerVisitService _customerVisitService;
         private readonly IPaymentService _paymentService;
         private readonly IInvoiceService _invoiceService;
+        private readonly ISalesRepUnloadRequestService _unloadRequestService;
 
         public SalesRepMobileService(
             IUnitOfWork unitOfWork,
@@ -35,7 +38,8 @@ namespace Salesync.Application.Modules.SalesRep.Services
             ISalesRepSessionService salesRepSessionService,
             ICustomerVisitService customerVisitService,
             IPaymentService paymentService,
-            IInvoiceService invoiceService)
+            IInvoiceService invoiceService ,
+            ISalesRepUnloadRequestService unloadRequestService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
@@ -44,6 +48,7 @@ namespace Salesync.Application.Modules.SalesRep.Services
             _customerVisitService = customerVisitService;
             _paymentService = paymentService;
             _invoiceService = invoiceService;
+            _unloadRequestService = unloadRequestService;
         }
 
         public async Task<SalesRepMobileProfileDto> GetProfileAsync()
@@ -547,6 +552,31 @@ namespace Salesync.Application.Modules.SalesRep.Services
 
             return warehouses;
         }
+
+        #region Unload Requests
+
+        public async Task<SalesRepUnloadRequestDto> CreateUnloadRequestAsync(
+            CreateSalesRepUnloadRequestDto dto)
+        {
+            return await _unloadRequestService.CreateAsync(dto);
+        }
+
+        public async Task<IEnumerable<SalesRepUnloadRequestDto>> GetMyUnloadRequestsAsync()
+        {
+            return await _unloadRequestService.GetMyRequestsAsync();
+        }
+
+        public async Task<SalesRepUnloadRequestDto> GetUnloadRequestByIdAsync(int id)
+        {
+            return await _unloadRequestService.GetMyRequestByIdAsync(id);
+        }
+
+        public async Task CancelUnloadRequestAsync(int id, string? reason)
+        {
+            await _unloadRequestService.CancelMyRequestAsync(id, reason);
+        }
+
+        #endregion
 
 
         #region Helper Method

@@ -23,6 +23,13 @@ namespace Salesync.Domain.Modules.Sales.Entities
         public int TotalInvoices { get; set; }
         public int TotalVisits { get; set; }
 
+        public bool IsStockSettled { get; set; }
+        public DateTime? StockSettledAt { get; set; }
+
+        public bool IsTreasurySettled { get; set; }
+        public DateTime? TreasurySettledAt { get; set; }
+
+
         public string? Notes { get; set; }
 
 

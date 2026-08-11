@@ -6,6 +6,7 @@ using Salesync.Domain.Modules.MasterData.Entities;
 using Salesync.Domain.Modules.Sales.Entities;
 using Salesync.Domain.Modules.SalesRep.Entities;
 using Salesync.Domain.Modules.Treasury.Entities;
+using Salesync.Domain.Modules.UnloadRequest.Entities;
 using Salesync.Infrastructure.Data;
 using CustomerVisitEntity = Salesync.Domain.Modules.CustomerVisit.Entities.CustomerVisit;
 
@@ -49,6 +50,8 @@ namespace Salesync.Infrastructure.Repositories.Common
         public IGenericRepository<CashReceipt> CashReceipts { get; }
         public IGenericRepository<SalesRepCashLedger> SalesRepCashLedgers { get; }
 
+        public IGenericRepository<SalesRepUnloadRequest> SalesRepUnloadRequests { get; }
+        public IGenericRepository<SalesRepUnloadRequestItem> SalesRepUnloadRequestItems { get; }
 
         public UnitOfWork(SalesyncDbContext context)
         {
@@ -85,6 +88,9 @@ namespace Salesync.Infrastructure.Repositories.Common
             CashBoxes = new GenericRepository<CashBox>(_context);
             CashReceipts = new GenericRepository<CashReceipt>(_context);
             SalesRepCashLedgers = new GenericRepository<SalesRepCashLedger>(_context);
+
+            SalesRepUnloadRequests = new GenericRepository<SalesRepUnloadRequest>(_context);
+            SalesRepUnloadRequestItems = new GenericRepository<SalesRepUnloadRequestItem>(_context);
         }
 
         public async Task BeginTransactionAsync()
