@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Salesync.API.Responses;
 using Salesync.Application.Modules.CustomerVisit.Dtos;
 using Salesync.Application.Modules.Sales.Dtos.Invoice;
+using Salesync.Application.Modules.Sales.Dtos.InvoiceReturn;
 using Salesync.Application.Modules.Sales.Dtos.Payment;
 using Salesync.Application.Modules.Sales.Dtos.SalesRepSession;
 using Salesync.Application.Modules.SalesRep.Dtos.Mobile;
@@ -159,6 +160,39 @@ namespace Salesync.API.Controllers.Mobile
                 "Warehouses retrieved successfully."));
         }
 
+        #region Invoice Returns
+
+        [HttpGet("returns")]
+        public async Task<IActionResult> GetMyReturnsAsync()
+        {
+            var result = await _salesRepMobileService.GetMyReturnsAsync();
+            return Ok(ApiResponse<IEnumerable<InvoiceReturnDto>>.SuccessResponse(result));
+        }
+
+        [HttpGet("returns/{id:int}")]
+        public async Task<IActionResult> GetReturnByIdAsync(int id)
+        {
+            var result = await _salesRepMobileService.GetReturnByIdAsync(id);
+            return Ok(ApiResponse<InvoiceReturnDto>.SuccessResponse(result));
+        }
+
+        [HttpPost("returns")]
+        public async Task<IActionResult> CreateReturnAsync(
+            [FromBody] CreateInvoiceReturnDto dto)
+        {
+            var result = await _salesRepMobileService.CreateReturnAsync(dto);
+            return Ok(ApiResponse<InvoiceReturnDto>.SuccessResponse(result, "Return created successfully"));
+        }
+
+        [HttpPut("returns/{id:int}/cancel")]
+        public async Task<IActionResult> CancelReturnAsync(int id)
+        {
+            var result = await _salesRepMobileService.CancelReturnAsync(id);
+            return Ok(ApiResponse<InvoiceReturnDto>.SuccessResponse(result, "Return cancelled successfully"));
+        }
+
+        #endregion
+
         #region Unload Requests
 
         [HttpPost("unload-requests")] // POST: api/mobile/salesrep/unload-requests
@@ -192,7 +226,7 @@ namespace Salesync.API.Controllers.Mobile
         }
 
         [HttpPut("unload-requests/{id:int}/cancel")]  // PUT: api/mobile/salesrep/unload-requests/1/cancel
-        public async Task<IActionResult> CancelUnloadRequest(int id,[FromBody] CancelUnloadRequestDto? dto)
+        public async Task<IActionResult> CancelUnloadRequest(int id, [FromBody] CancelUnloadRequestDto? dto)
         {
             await _salesRepMobileService.CancelUnloadRequestAsync(id, dto?.Reason);
 

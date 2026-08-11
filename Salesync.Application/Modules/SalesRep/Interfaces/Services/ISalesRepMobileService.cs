@@ -1,5 +1,6 @@
 ﻿using Salesync.Application.Modules.CustomerVisit.Dtos;
 using Salesync.Application.Modules.Sales.Dtos.Invoice;
+using Salesync.Application.Modules.Sales.Dtos.InvoiceReturn;
 using Salesync.Application.Modules.Sales.Dtos.Payment;
 using Salesync.Application.Modules.Sales.Dtos.SalesRepSession;
 using Salesync.Application.Modules.SalesRep.Dtos.Mobile;
@@ -28,6 +29,18 @@ namespace Salesync.Application.Modules.SalesRep.Interfaces.Services
 
         Task<IEnumerable<MobileProductOptionDto>> GetProductsAsync();
         Task<IEnumerable<MobileWarehouseOptionDto>> GetWarehousesAsync();
+
+        #region Invoice Returns
+
+        Task<IEnumerable<InvoiceReturnDto>> GetMyReturnsAsync();
+
+        Task<InvoiceReturnDto> GetReturnByIdAsync(int id);
+
+        Task<InvoiceReturnDto> CreateReturnAsync(CreateInvoiceReturnDto dto);
+
+        Task<InvoiceReturnDto> CancelReturnAsync(int id);
+
+        #endregion
 
         #region Unload Requests
 

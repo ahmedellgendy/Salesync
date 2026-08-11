@@ -28,6 +28,51 @@ namespace Salesync.Application.Modules.Sales.Services
             var returns = await _unitOfWork.InvoiceReturns.FindAsync(r => r.InvoiceId == invoiceId);
             return _mapper.Map<IEnumerable<InvoiceReturnDto>>(returns);
         }
+
+        public async Task<InvoiceReturnDto> GetByIdAsync(int id)
+        {
+            if (id <= 0)
+                throw new ArgumentException("Invalid return id.");
+
+            var invoiceReturn = await _unitOfWork.InvoiceReturns
+                .GetQueryable()
+                .AsNoTracking()
+                .Include(x => x.Items)
+                .Include(x => x.Invoice)
+                .Include(x => x.Customer)
+                .FirstOrDefaultAsync(x =>
+                    x.Id == id &&
+                    x.IsActive);
+
+            if (invoiceReturn == null)
+                throw new KeyNotFoundException(
+                    $"Return with id {id} not found.");
+
+            return MapReturnDto(invoiceReturn);
+        }
+
+        public async Task<IEnumerable<InvoiceReturnDto>> GetBySalesRepIdAsync(int salesRepId)
+        {
+            if (salesRepId <= 0)
+                throw new ArgumentException("Invalid sales rep id.");
+
+            var returns = await _unitOfWork.InvoiceReturns
+                .GetQueryable()
+                .AsNoTracking()
+                .Include(x => x.Items)
+                .Include(x => x.Invoice)
+                .Include(x => x.Customer)
+                .Where(x =>
+                    x.SalesRepId == salesRepId &&
+                    x.IsActive)
+                .OrderByDescending(x => x.CreatedAt)
+                .ToListAsync();
+
+            return returns
+                .Select(MapReturnDto)
+                .ToList();
+        }
+
         public async Task<InvoiceReturnDto> CreateAsync(CreateInvoiceReturnDto dto)
         {
             if (dto.Items == null || dto.Items.Count == 0)
@@ -141,6 +186,7 @@ namespace Salesync.Application.Modules.Sales.Services
 
             return _mapper.Map<InvoiceReturnDto>(invoiceReturn);
         }
+
         public async Task<InvoiceReturnDto> ApproveAsync(int id)
         {
             var invoiceReturn = await _unitOfWork.InvoiceReturns
@@ -301,6 +347,57 @@ namespace Salesync.Application.Modules.Sales.Services
             };
 
             await _unitOfWork.SalesRepInventoryMovements.AddAsync(movement);
+        }
+
+        private InvoiceReturnDto MapReturnDto(InvoiceReturn invoiceReturn)
+        {
+            return new InvoiceReturnDto
+            {
+                Id = invoiceReturn.Id,
+
+                ReturnNumber = invoiceReturn.ReturnNumber,
+
+                InvoiceId = invoiceReturn.InvoiceId,
+                InvoiceNumber = invoiceReturn.Invoice?.InvoiceNumber,
+
+                CustomerId = invoiceReturn.CustomerId,
+                CustomerName = invoiceReturn.Customer?.Name,
+
+                SalesRepId = invoiceReturn.SalesRepId,
+                SalesRepSessionId = invoiceReturn.SalesRepSessionId,
+
+                Status = invoiceReturn.Status,
+                ReturnReason = invoiceReturn.ReturnReason,
+
+                TotalAmount = invoiceReturn.TotalAmount,
+
+                ReasonNotes = invoiceReturn.ReasonNotes,
+
+                CreatedAt = invoiceReturn.CreatedAt,
+
+                Items = invoiceReturn.Items
+                    .Where(x => x.IsActive)
+                    .Select(x => new InvoiceReturnItemDto
+                    {
+                        Id = x.Id,
+
+                        InvoiceItemId = x.InvoiceItemId,
+
+                        ProductId = x.ProductId,
+
+                        ProductName = x.ProductName,
+                        ItemCode = x.ItemCode,
+
+                        Quantity = x.Quantity,
+
+                        UnitPrice = x.UnitPrice,
+
+                        TotalAmount = x.TotalAmount,
+
+                        Notes = x.Notes
+                    })
+                    .ToList()
+            };
         }
 
         #endregion
