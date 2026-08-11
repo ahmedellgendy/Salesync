@@ -5,6 +5,7 @@ using Salesync.Application.Modules.Sales.Dtos.SalesRepSession;
 using Salesync.Application.Modules.Sales.Interfaces;
 using Salesync.Domain.Common.Enums.CustomerVisit;
 using Salesync.Domain.Common.Enums.Sales;
+using Salesync.Domain.Common.Enums.UnloadRequest;
 using Salesync.Domain.Modules.Sales.Entities;
 using Salesync.Domain.Modules.SalesRep.Entities;
 using System;
@@ -76,25 +77,60 @@ namespace Salesync.Application.Modules.Sales.Services
         }
         public async Task<SalesRepSessionDto> CloseSessionAsync(int id)
         {
+            if (id <= 0)
+                throw new ArgumentException("Invalid session id.");
+
             var session = await _unitOfWork.SalesRepSessions.GetByIdAsync(id)
                 ?? throw new KeyNotFoundException($"Session with id {id} not found.");
 
             if (session.Status == DayStatus.Closed)
                 throw new InvalidOperationException($"Session with id {id} is already closed.");
 
+            // 1. امنع قفل اليوم لو فيه طلب تفريغ لسه مستني المخزن
+            var hasPendingUnloadRequest = await _unitOfWork.SalesRepUnloadRequests
+                .GetQueryable()
+                .AnyAsync(x =>
+                    x.SalesRepSessionId == id &&
+                    x.SalesRepId == session.SalesRepId &&
+                    x.IsActive &&
+                    x.Status == UnloadRequestStatus.PendingWarehouse);
+
+            if (hasPendingUnloadRequest)
+                throw new InvalidOperationException("Cannot close day while unload request is still pending warehouse confirmation.");
+
+            // 2. امنع قفل اليوم لو المندوب لسه معاه بضاعة
+            var hasRemainingStock = await _unitOfWork.SalesRepInventories
+                .GetQueryable()
+                .AnyAsync(x =>
+                    x.SalesRepId == session.SalesRepId &&
+                    x.IsActive &&
+                    x.Quantity > 0);
+
+            if (hasRemainingStock)
+                throw new InvalidOperationException("Cannot close day before unloading the remaining stock to warehouse.");
+
             var invoices = await _unitOfWork.Invoices
                 .GetQueryable()
-                .Where(i => i.SalesRepSessionId == id && i.Status == InvoiceStatus.Confirmed && i.IsActive)
+                .Where(i =>
+                    i.SalesRepSessionId == id &&
+                    i.Status == InvoiceStatus.Confirmed &&
+                    i.IsActive)
                 .ToListAsync();
 
             var payments = await _unitOfWork.Payments
                 .GetQueryable()
-                .Where(p => p.SalesRepSessionId == id && p.Status == PaymentStatus.Paid && p.IsActive)
+                .Where(p =>
+                    p.SalesRepSessionId == id &&
+                    p.Status == PaymentStatus.Paid &&
+                    p.IsActive)
                 .ToListAsync();
 
             var returns = await _unitOfWork.InvoiceReturns
                 .GetQueryable()
-                .Where(r => r.SalesRepSessionId == id && r.Status == ReturnStatus.Approved && r.IsActive)
+                .Where(r =>
+                    r.SalesRepSessionId == id &&
+                    r.Status == ReturnStatus.Approved &&
+                    r.IsActive)
                 .ToListAsync();
 
             var grossSales = invoices.Sum(i => i.SubTotal);
@@ -104,8 +140,11 @@ namespace Salesync.Application.Modules.Sales.Services
             var netSales = invoices.Sum(i => i.TotalAmount) - totalReturnAmount;
 
             var totalVisits = await _unitOfWork.CustomerVisits
-                 .GetQueryable()
-                 .CountAsync(x => x.SalesRepSessionId == id && x.Status == VisitStatus.Completed && x.IsActive);
+                .GetQueryable()
+                .CountAsync(x =>
+                    x.SalesRepSessionId == id &&
+                    x.Status == VisitStatus.Completed &&
+                    x.IsActive);
 
             session.GrossSales = grossSales;
             session.NetSales = netSales;
@@ -118,8 +157,6 @@ namespace Salesync.Application.Modules.Sales.Services
             session.EndTime = DateTime.UtcNow;
             session.UpdatedAt = DateTime.UtcNow;
             session.IsActive = true;
-
-
 
             _unitOfWork.SalesRepSessions.Update(session);
             await _unitOfWork.CompleteAsync();
