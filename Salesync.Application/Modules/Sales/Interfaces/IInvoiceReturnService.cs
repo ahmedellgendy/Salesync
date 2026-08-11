@@ -8,5 +8,6 @@ namespace Salesync.Application.Modules.Sales.Interfaces
         Task<InvoiceReturnDto> CreateAsync(CreateInvoiceReturnDto dto);
         Task<InvoiceReturnDto> ApproveAsync(int id);
         Task<InvoiceReturnDto> RejectAsync(int id);
+        Task<InvoiceReturnDto> CancelAsync(int id);
     }
 }

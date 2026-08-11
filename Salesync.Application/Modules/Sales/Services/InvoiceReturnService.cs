@@ -30,19 +30,47 @@ namespace Salesync.Application.Modules.Sales.Services
         }
         public async Task<InvoiceReturnDto> CreateAsync(CreateInvoiceReturnDto dto)
         {
+            if (dto.Items == null || dto.Items.Count == 0)
+                throw new InvalidOperationException(
+                    "Return must contain at least one item.");
+
+            var duplicateInvoiceItemIds = dto.Items
+                .GroupBy(x => x.InvoiceItemId)
+                .Where(g => g.Count() > 1)
+                .Select(g => g.Key)
+                .ToList();
+
+            if (duplicateInvoiceItemIds.Count > 0)
+                throw new InvalidOperationException(
+                    "The same invoice item cannot be added more than once.");
+
             var invoice = await _unitOfWork.Invoices
                 .GetQueryable()
                 .Include(i => i.InvoiceItems)
                 .FirstOrDefaultAsync(i => i.Id == dto.InvoiceId);
 
             if (invoice == null)
-                throw new KeyNotFoundException($"Invoice with id {dto.InvoiceId} not found.");
+                throw new KeyNotFoundException(
+                    $"Invoice with id {dto.InvoiceId} not found.");
 
             if (invoice.Status != InvoiceStatus.Confirmed)
-                throw new InvalidOperationException("Returns are allowed only for confirmed invoices.");
+                throw new InvalidOperationException(
+                    "Returns are allowed only for confirmed invoices.");
 
             if (!invoice.InvoiceItems.Any())
-                throw new InvalidOperationException("Cannot create return for invoice without items.");
+                throw new InvalidOperationException(
+                    "Cannot create return for invoice without items.");
+
+            var previousReturns = await _unitOfWork.InvoiceReturns
+                .GetQueryable()
+                .AsNoTracking()
+                .Include(x => x.Items)
+                .Where(x =>
+                    x.InvoiceId == dto.InvoiceId &&
+                    x.IsActive &&
+                    x.Status != ReturnStatus.Rejected &&
+                    x.Status != ReturnStatus.Cancelled)
+                .ToListAsync();
 
             var invoiceReturn = _mapper.Map<InvoiceReturn>(dto);
 
@@ -59,16 +87,34 @@ namespace Salesync.Application.Modules.Sales.Services
             foreach (var itemDto in dto.Items)
             {
                 var invoiceItem = invoice.InvoiceItems
-                    .FirstOrDefault(i => i.Id == itemDto.InvoiceItemId);
+                    .FirstOrDefault(i =>
+                        i.Id == itemDto.InvoiceItemId);
 
                 if (invoiceItem == null)
-                    throw new InvalidOperationException($"Invoice item with id {itemDto.InvoiceItemId} does not belong to this invoice.");
+                    throw new InvalidOperationException(
+                        $"Invoice item with id {itemDto.InvoiceItemId} does not belong to this invoice.");
 
                 if (itemDto.Quantity <= 0)
-                    throw new InvalidOperationException("Return quantity must be greater than zero.");
+                    throw new InvalidOperationException(
+                        $"Return quantity for product {invoiceItem.ProductName} must be greater than zero.");
 
-                if (itemDto.Quantity > invoiceItem.Quantity)
-                    throw new InvalidOperationException("Return quantity cannot be greater than sold quantity.");
+                var previouslyReturnedQuantity = previousReturns
+                    .SelectMany(x => x.Items)
+                    .Where(x =>
+                        x.InvoiceItemId == invoiceItem.Id)
+                    .Sum(x => x.Quantity);
+
+                var remainingReturnableQuantity =
+                    invoiceItem.Quantity -
+                    previouslyReturnedQuantity;
+
+                if (remainingReturnableQuantity <= 0)
+                    throw new InvalidOperationException(
+                        $"Product {invoiceItem.ProductName} has already been fully returned.");
+
+                if (itemDto.Quantity > remainingReturnableQuantity)
+                    throw new InvalidOperationException(
+                        $"Return quantity for product {invoiceItem.ProductName} cannot exceed remaining returnable quantity ({remainingReturnableQuantity}).");
 
                 var returnItem = new InvoiceReturnItem
                 {
@@ -87,8 +133,8 @@ namespace Salesync.Application.Modules.Sales.Services
                 invoiceReturn.Items.Add(returnItem);
             }
 
-            invoiceReturn.TotalAmount = invoiceReturn.Items.Sum(i => i.TotalAmount);
-
+            invoiceReturn.TotalAmount =
+                invoiceReturn.Items.Sum(i => i.TotalAmount);
 
             await _unitOfWork.InvoiceReturns.AddAsync(invoiceReturn);
             await _unitOfWork.CompleteAsync();
@@ -177,6 +223,30 @@ namespace Salesync.Application.Modules.Sales.Services
             return _mapper.Map<InvoiceReturnDto>(invoiceReturn);
         }
 
+        public async Task<InvoiceReturnDto> CancelAsync(int id)
+        {
+            var invoiceReturn = await _unitOfWork.InvoiceReturns
+                .GetByIdAsync(id)
+                ?? throw new KeyNotFoundException(
+                    $"Return with id {id} not found.");
+
+            if (!invoiceReturn.IsActive)
+                throw new InvalidOperationException(
+                    "Cannot cancel inactive return.");
+
+            if (invoiceReturn.Status != ReturnStatus.Pending)
+                throw new InvalidOperationException(
+                    "Only pending returns can be cancelled.");
+
+            invoiceReturn.Status = ReturnStatus.Cancelled;
+            invoiceReturn.UpdatedAt = DateTime.UtcNow;
+
+            _unitOfWork.InvoiceReturns.Update(invoiceReturn);
+
+            await _unitOfWork.CompleteAsync();
+
+            return _mapper.Map<InvoiceReturnDto>(invoiceReturn);
+        }
 
         #region Helper Method
 
