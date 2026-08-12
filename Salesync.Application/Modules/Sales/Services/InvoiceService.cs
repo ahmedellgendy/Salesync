@@ -166,15 +166,21 @@ namespace Salesync.Application.Modules.Sales.Services
                     : product.UnitsPerLargeUnit;
 
                 var saleSmallQuantity = itemDto.SaleLargeQuantity * unitsPerLargeUnit;
-                var bonusSmallQuantity = itemDto.BonusLargeQuantity * unitsPerLargeUnit;
+
+                var bonusSmallQuantity =
+                    itemDto.BonusLargeQuantity * unitsPerLargeUnit;
 
                 if (saleSmallQuantity <= 0)
-                    throw new InvalidOperationException($"Quantity must be greater than zero for product {product.Name}.");
+                    throw new InvalidOperationException(
+                        $"Quantity must be greater than zero for product {product.Name}.");
 
                 if (bonusSmallQuantity < 0)
-                    throw new InvalidOperationException($"Bonus quantity cannot be negative for product {product.Name}.");
+                    throw new InvalidOperationException(
+                        $"Bonus quantity cannot be negative for product {product.Name}.");
 
-                var grossAmount = product.UnitPrice * saleSmallQuantity;
+
+                // UnitPrice is price of LARGE unit
+                var grossAmount = product.UnitPrice * itemDto.SaleLargeQuantity;
 
                 var itemDiscountAmount = itemDto.DiscountAmount;
 
