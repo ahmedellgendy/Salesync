@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Salesync.API.Responses;
+using Salesync.Application.Modules.MasterData.Dtos.CustomerDto;
 using Salesync.Application.Modules.SalesRep.Dtos.RouteCustomerDto;
 using Salesync.Application.Modules.SalesRep.Interfaces.Services;
 using System.Security.Claims;
@@ -37,6 +38,20 @@ namespace Salesync.API.Controllers.SalesRep
                     .SuccessResponse(
                         result,
                         "Route customers retrieved successfully"));
+        }
+
+        [Authorize(Roles = "Supervisor")]
+        [HttpGet("my-team/customers")] // GET: api/RouteCustomer/my-team/customers
+        public async Task<IActionResult> GetMyTeamCustomers()
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            var result = await _routeCustomerService.GetMyTeamCustomersAsync(userId!);
+
+            return Ok(ApiResponse<IEnumerable<CustomerDto>>
+                    .SuccessResponse(
+                        result,
+                        "Supervisor team customers retrieved successfully"));
         }
 
         [HttpPost] // POST: api/RouteCustomer
