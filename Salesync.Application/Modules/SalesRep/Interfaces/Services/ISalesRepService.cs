@@ -5,6 +5,7 @@ namespace Salesync.Application.Modules.SalesRep.Interfaces.Services
     public interface ISalesRepService
     {
         Task<IEnumerable<SalesRepDto>> GetAllAsync();
+        Task<IEnumerable<SalesRepDto>> GetMyTeamAsync(string userId);
         Task<SalesRepDto> GetByIdAsync(int id);
         Task<SalesRepDto> UpdateAsync(int id, UpdateSalesRepDto dto);
         Task DeleteAsync(int id);
