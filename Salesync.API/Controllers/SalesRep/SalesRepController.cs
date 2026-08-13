@@ -4,6 +4,7 @@ using Salesync.API.Responses;
 using Salesync.Application.Modules.SalesRep.Dtos.SalesRepAccount;
 using Salesync.Application.Modules.SalesRep.Dtos.SalesRepDto;
 using Salesync.Application.Modules.SalesRep.Interfaces.Services;
+using System.Security.Claims;
 
 namespace Salesync.API.Controllers.SalesRep
 {
@@ -32,6 +33,21 @@ namespace Salesync.API.Controllers.SalesRep
             ));
         }
 
+        [HttpGet("my-team")] // GET: api/SalesRep/my-team
+        [Authorize(Roles = "Supervisor")]
+        public async Task<IActionResult> GetMyTeamAsync()
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            if (string.IsNullOrWhiteSpace(userId))
+                return Unauthorized();
+
+            var result = await _salesRepService.GetMyTeamAsync(userId);
+
+            return Ok(ApiResponse<IEnumerable<SalesRepDto>>
+                .SuccessResponse(result, "Supervisor team retrieved successfully"));
+        }
+
         [HttpGet("{id:int}")] // GET: api/SalesRep/{id}
         public async Task<IActionResult> GetByIdAsync(int id)
         {
@@ -47,7 +63,7 @@ namespace Salesync.API.Controllers.SalesRep
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> CreateAsync([FromBody] CreateSalesRepWithAccountDto dto)
         {
-            var result =await _salesRepAccountService.CreateAsync(dto);
+            var result = await _salesRepAccountService.CreateAsync(dto);
             return Ok(ApiResponse<CreatedSalesRepWithAccountDto>.SuccessResponse(result, "Sales representative and login account created successfully."));
         }
 

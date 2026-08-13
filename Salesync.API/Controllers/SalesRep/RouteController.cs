@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Salesync.API.Responses;
 using Salesync.Application.Modules.SalesRep.Dtos.RouteDto;
 using Salesync.Application.Modules.SalesRep.Interfaces.Services;
+using System.Security.Claims;
 
 namespace Salesync.API.Controllers.SalesRep
 {
@@ -30,6 +31,19 @@ namespace Salesync.API.Controllers.SalesRep
         {
             var result = await _routeService.GetByIdAsync(id);
             return Ok(ApiResponse<RouteDto>.SuccessResponse(result));
+        }
+
+        [Authorize(Roles = "Supervisor")]
+        [HttpGet("by-salesrep/{salesRepId:int}")] // GET: api/routes/by-salesrep/{salesRepId}
+        public async Task<IActionResult> GetBySalesRep(int salesRepId)
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            var routes = await _routeService.GetBySalesRepAsync(salesRepId, userId!);
+
+            return Ok(ApiResponse<IEnumerable<RouteDto>>.SuccessResponse(
+                routes,
+                "Sales rep routes retrieved successfully"));
         }
 
         [HttpPost] // POST: api/routes

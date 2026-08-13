@@ -1,10 +1,13 @@
-﻿using Salesync.Application.Modules.SalesRep.Dtos.RouteCustomerDto;
+﻿using Salesync.Application.Modules.MasterData.Dtos.CustomerDto;
+using Salesync.Application.Modules.SalesRep.Dtos.RouteCustomerDto;
 
 namespace Salesync.Application.Modules.SalesRep.Interfaces.Services
 {
     public interface IRouteCustomerService
     {
         Task<IEnumerable<RouteCustomerDto>> GetByRouteIdAsync(int routeId);
+        Task<IEnumerable<RouteCustomerDetailsDto>> GetRouteCustomersAsync(int routeId,string userId);
+        Task<IEnumerable<CustomerDto>> GetMyTeamCustomersAsync(string userId);
         Task<RouteCustomerDto> CreateAsync(CreateRouteCustomerDto dto);
         Task<RouteCustomerDto> UpdateAsync(int id, UpdateRouteCustomerDto dto);
         Task DeleteAsync(int id);

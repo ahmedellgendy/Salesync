@@ -1,8 +1,10 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Salesync.API.Responses;
+using Salesync.Application.Modules.MasterData.Dtos.CustomerDto;
 using Salesync.Application.Modules.SalesRep.Dtos.RouteCustomerDto;
 using Salesync.Application.Modules.SalesRep.Interfaces.Services;
+using System.Security.Claims;
 
 namespace Salesync.API.Controllers.SalesRep
 {
@@ -23,6 +25,33 @@ namespace Salesync.API.Controllers.SalesRep
         {
             var result = await _routeCustomerService.GetByRouteIdAsync(routeId);
             return Ok(ApiResponse<IEnumerable<RouteCustomerDto>>.SuccessResponse(result));
+        }
+
+        [Authorize(Roles = "Supervisor")]
+        [HttpGet("route/{routeId:int}/customers")] // GET: api/RouteCustomer/route/{routeId}/customers
+        public async Task<IActionResult> GetRouteCustomers(int routeId)
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var result = await _routeCustomerService.GetRouteCustomersAsync(routeId, userId!);
+
+            return Ok(ApiResponse<IEnumerable<RouteCustomerDetailsDto>>
+                    .SuccessResponse(
+                        result,
+                        "Route customers retrieved successfully"));
+        }
+
+        [Authorize(Roles = "Supervisor")]
+        [HttpGet("my-team/customers")] // GET: api/RouteCustomer/my-team/customers
+        public async Task<IActionResult> GetMyTeamCustomers()
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            var result = await _routeCustomerService.GetMyTeamCustomersAsync(userId!);
+
+            return Ok(ApiResponse<IEnumerable<CustomerDto>>
+                    .SuccessResponse(
+                        result,
+                        "Supervisor team customers retrieved successfully"));
         }
 
         [HttpPost] // POST: api/RouteCustomer

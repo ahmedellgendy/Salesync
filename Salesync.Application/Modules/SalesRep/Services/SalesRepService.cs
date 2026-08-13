@@ -1,5 +1,6 @@
 ﻿using AutoMapper;
 using FluentValidation;
+using Microsoft.EntityFrameworkCore;
 using Salesync.Application.Interfaces.Repositories;
 using Salesync.Application.Modules.SalesRep.Dtos.SalesRepDto;
 using Salesync.Application.Modules.SalesRep.Interfaces.Services;
@@ -21,6 +22,32 @@ namespace Salesync.Application.Modules.SalesRep.Services
         {
             var salesReps = await _unitOfWork.SalesReps.GetAllAsync();
             return _mapper.Map<IEnumerable<SalesRepDto>>(salesReps);
+        }
+        public async Task<IEnumerable<SalesRepDto>> GetMyTeamAsync(string userId)
+        {
+            if (string.IsNullOrWhiteSpace(userId))
+                throw new UnauthorizedAccessException("Authenticated user was not found.");
+
+            var supervisor = await _unitOfWork.SalesReps
+                .GetQueryable()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x =>
+                    x.UserId == userId &&
+                    x.IsActive);
+
+            if (supervisor is null)
+                throw new KeyNotFoundException("Supervisor profile was not found.");
+
+            var teamMembers = await _unitOfWork.SalesReps
+                .GetQueryable()
+                .AsNoTracking()
+                .Where(x =>
+                    x.SupervisorId == supervisor.Id &&
+                    x.IsActive)
+                .OrderBy(x => x.Name)
+                .ToListAsync();
+
+            return _mapper.Map<IEnumerable<SalesRepDto>>(teamMembers);
         }
         public async Task<SalesRepDto> GetByIdAsync(int id)
         {
