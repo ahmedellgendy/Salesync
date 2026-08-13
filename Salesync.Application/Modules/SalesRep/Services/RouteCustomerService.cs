@@ -1,5 +1,8 @@
 ﻿using AutoMapper;
+using Microsoft.EntityFrameworkCore;
+using Salesync.Application.Common.Exceptions;
 using Salesync.Application.Interfaces.Repositories;
+using Salesync.Application.Modules.MasterData.Dtos.CustomerDto;
 using Salesync.Application.Modules.SalesRep.Dtos.RouteCustomerDto;
 using Salesync.Application.Modules.SalesRep.Interfaces.Services;
 using Salesync.Domain.Modules.SalesRep.Entities;
@@ -21,6 +24,70 @@ namespace Salesync.Application.Modules.SalesRep.Services
         {
             var routeCustomers = await _unitOfWork.RouteCustomers.FindAsync(rc => rc.RouteId == routeId);
             return _mapper.Map<IEnumerable<RouteCustomerDto>>(routeCustomers);
+        }
+        public async Task<IEnumerable<RouteCustomerDetailsDto>> GetRouteCustomersAsync(int routeId,string userId)
+        {
+            if (routeId <= 0)
+                throw new ArgumentException("Invalid route id.");
+
+            if (string.IsNullOrWhiteSpace(userId))
+                throw new UnauthorizedAccessException(
+                    "Authenticated user was not found.");
+
+            var supervisor = await _unitOfWork.SalesReps
+                .GetQueryable()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x =>
+                    x.UserId == userId &&
+                    x.IsActive);
+
+            if (supervisor is null)
+                throw new KeyNotFoundException("Supervisor profile was not found.");
+
+            var route = await _unitOfWork.Routes
+                .GetQueryable()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x =>
+                    x.Id == routeId &&
+                    x.IsActive);
+
+            if (route is null)
+                throw new KeyNotFoundException($"Route with id {routeId} not found.");
+
+            if (route.AssignedSalesRepId is null)
+                throw new ForbiddenException("You are not allowed to access this route.");
+
+            var salesRep = await _unitOfWork.SalesReps
+                .GetQueryable()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x =>
+                    x.Id == route.AssignedSalesRepId.Value &&
+                    x.IsActive);
+
+            if (salesRep is null)
+                throw new KeyNotFoundException("Assigned sales rep was not found.");
+
+            if (salesRep.SupervisorId != supervisor.Id)
+                throw new ForbiddenException("You are not allowed to access this route.");
+
+            var routeCustomers = await _unitOfWork.RouteCustomers
+                .GetQueryable()
+                .AsNoTracking()
+                .Include(x => x.Customer)
+                .Where(x => x.RouteId == routeId)
+                .OrderBy(x => x.VisitSequence)
+                .ToListAsync();
+
+            return routeCustomers.Select(x => new RouteCustomerDetailsDto
+            {
+                Id = x.Id,
+                RouteId = x.RouteId,
+                CustomerId = x.CustomerId,
+                VisitSequence = x.VisitSequence,
+                VisitDays = x.VisitDays,
+                Notes = x.Notes,
+                Customer = _mapper.Map<CustomerDto>(x.Customer)
+            });
         }
         public async Task<RouteCustomerDto> CreateAsync(CreateRouteCustomerDto dto)
         {
