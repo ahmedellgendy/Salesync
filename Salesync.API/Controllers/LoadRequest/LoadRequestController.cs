@@ -86,7 +86,7 @@ namespace Salesync.API.Controllers.LoadRequest
         }
 
         [HttpPut("{id:int}/warehouse-confirm")] // PUT: api/loadrequest/1/warehouse-confirm
-        [Authorize(Roles = "Admin,Supervisor,Warehouse")]
+        [Authorize(Roles = "Admin,Warehouse")]
         public async Task<IActionResult> ConfirmWarehouseAsync(int id, [FromBody] ConfirmLoadRequestDto dto)
         {
             var result = await _loadRequestService.ConfirmWarehouseAsync(id, dto);

@@ -6,6 +6,7 @@ using Salesync.Application.Modules.CustomerVisit.Dtos;
 using Salesync.Application.Modules.CustomerVisit.Interfaces;
 using Salesync.Application.Modules.Sales.Dtos.Invoice;
 using Salesync.Application.Modules.Sales.Dtos.InvoiceItem;
+using Salesync.Application.Modules.Sales.Dtos.InvoiceReturn;
 using Salesync.Application.Modules.Sales.Dtos.Payment;
 using Salesync.Application.Modules.Sales.Dtos.SalesRepSession;
 using Salesync.Application.Modules.Sales.Interfaces;
@@ -30,6 +31,7 @@ namespace Salesync.Application.Modules.SalesRep.Services
         private readonly IPaymentService _paymentService;
         private readonly IInvoiceService _invoiceService;
         private readonly ISalesRepUnloadRequestService _unloadRequestService;
+        private readonly IInvoiceReturnService _invoiceReturnService;
 
         public SalesRepMobileService(
             IUnitOfWork unitOfWork,
@@ -39,7 +41,8 @@ namespace Salesync.Application.Modules.SalesRep.Services
             ICustomerVisitService customerVisitService,
             IPaymentService paymentService,
             IInvoiceService invoiceService ,
-            ISalesRepUnloadRequestService unloadRequestService)
+            ISalesRepUnloadRequestService unloadRequestService,
+            IInvoiceReturnService invoiceReturnService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
@@ -49,6 +52,7 @@ namespace Salesync.Application.Modules.SalesRep.Services
             _paymentService = paymentService;
             _invoiceService = invoiceService;
             _unloadRequestService = unloadRequestService;
+            _invoiceReturnService = invoiceReturnService;
         }
 
         public async Task<SalesRepMobileProfileDto> GetProfileAsync()
@@ -553,6 +557,109 @@ namespace Salesync.Application.Modules.SalesRep.Services
             return warehouses;
         }
 
+        #region Invoice Returns
+
+        public async Task<IEnumerable<InvoiceReturnDto>> GetMyReturnsAsync()
+        {
+            var salesRep = await GetCurrentSalesRepAsync();
+
+            return await _invoiceReturnService
+                .GetBySalesRepIdAsync(salesRep.Id);
+        }
+
+        public async Task<InvoiceReturnDto> GetReturnByIdAsync(int id)
+        {
+            if (id <= 0)
+                throw new ArgumentException("Invalid return id.");
+
+            var salesRep = await GetCurrentSalesRepAsync();
+
+            var invoiceReturn =
+                await _invoiceReturnService.GetByIdAsync(id);
+
+            if (invoiceReturn.SalesRepId != salesRep.Id)
+                throw new UnauthorizedAccessException(
+                    "Return does not belong to current sales rep.");
+
+            return invoiceReturn;
+        }
+
+        public async Task<InvoiceReturnDto> CreateReturnAsync(CreateInvoiceReturnDto dto)
+        {
+            if (dto.InvoiceId <= 0)
+                throw new ArgumentException("Invalid invoice id.");
+
+            if (dto.Items is null || dto.Items.Count == 0)
+                throw new ArgumentException(
+                    "Return must contain at least one item.");
+
+            var salesRep = await GetCurrentSalesRepAsync();
+
+            var currentSession =await GetCurrentOpenSessionAsync(salesRep.Id);
+
+            var invoice = await _unitOfWork.Invoices
+                .GetQueryable()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x =>
+                    x.Id == dto.InvoiceId &&
+                    x.IsActive &&
+                    x.SalesRepId == salesRep.Id);
+
+            if (invoice is null)
+                throw new KeyNotFoundException("Invoice not found for current sales rep.");
+
+            dto.SalesRepId = salesRep.Id;
+            dto.SalesRepSessionId = currentSession.Id;
+
+            return await _invoiceReturnService.CreateAsync(dto);
+        }
+
+        public async Task<InvoiceReturnDto> CancelReturnAsync(int id)
+        {
+            if (id <= 0)
+                throw new ArgumentException("Invalid return id.");
+
+            var salesRep = await GetCurrentSalesRepAsync();
+
+            var invoiceReturn =
+                await _invoiceReturnService.GetByIdAsync(id);
+
+            if (invoiceReturn.SalesRepId != salesRep.Id)
+                throw new UnauthorizedAccessException(
+                    "Return does not belong to current sales rep.");
+
+            return await _invoiceReturnService
+                .CancelAsync(id);
+        }
+
+        public async Task<IEnumerable<MobileReturnableInvoiceDto>>GetReturnableInvoicesAsync(int customerId)
+        {
+            if (customerId <= 0)
+                throw new ArgumentException("Invalid customer id.");
+
+            var salesRep = await GetCurrentSalesRepAsync();
+
+            return await _invoiceReturnService
+                .GetReturnableInvoicesAsync(
+                    salesRep.Id,
+                    customerId);
+        }
+
+        public async Task<MobileReturnableInvoiceDetailsDto>GetReturnableInvoiceDetailsAsync(int invoiceId)
+        {
+            if (invoiceId <= 0)
+                throw new ArgumentException("Invalid invoice id.");
+
+            var salesRep = await GetCurrentSalesRepAsync();
+
+            return await _invoiceReturnService
+                .GetReturnableInvoiceDetailsAsync(
+                    salesRep.Id,
+                    invoiceId);
+        }
+
+        #endregion
+
         #region Unload Requests
 
         public async Task<SalesRepUnloadRequestDto> CreateUnloadRequestAsync(
@@ -598,7 +705,31 @@ namespace Salesync.Application.Modules.SalesRep.Services
 
             return salesRep;
         }
+        private async Task<SalesRepSession> GetCurrentOpenSessionAsync(int salesRepId)
+        {
+            var today = DateTime.UtcNow.Date;
 
+            var session = await _unitOfWork.SalesRepSessions
+                .GetQueryable()
+                .AsNoTracking()
+                .Where(x =>
+                    x.SalesRepId == salesRepId &&
+                    x.WorkingDate == today &&
+                    x.IsActive &&
+                    !x.EndTime.HasValue)
+                .OrderByDescending(x => x.Id)
+                .FirstOrDefaultAsync();
+
+            if (session is null)
+                throw new InvalidOperationException(
+                    "No open sales rep session found for today.");
+
+            if (session.IsStockSettled)
+                throw new InvalidOperationException(
+                    "Cannot create return after stock has been settled.");
+
+            return session;
+        }
         private async Task<List<RouteCustomerMobileProjection>> GetAssignedRouteCustomersAsync(int salesRepId)
         {
             return await (

@@ -13,7 +13,16 @@ namespace Salesync.Infrastructure.Seeds
             var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
             var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<ApplicationRole>>();
 
-            var roles = new[] { "Admin", "SalesRep", "Supervisor", "User", "Treasury" };
+            var roles = new[]
+            {
+                "Admin",
+                "SalesRep",
+                "Supervisor",
+                "Warehouse",
+                "User",
+                "Treasury"
+            };
+
             foreach (var role in roles)
             {
                 if (!await roleManager.RoleExistsAsync(role))
@@ -31,6 +40,49 @@ namespace Salesync.Infrastructure.Seeds
             var adminUser = await userManager.FindByNameAsync("ahmed.elgendy");
             if (adminUser != null && !await userManager.IsInRoleAsync(adminUser, "Admin"))
                 await userManager.AddToRoleAsync(adminUser, "Admin");
+        }
+
+        public static async Task SeedSupervisorUserAsync(IServiceProvider serviceProvider)
+        {
+            using var scope = serviceProvider.CreateScope();
+
+            var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+
+            var supervisor = await userManager.FindByNameAsync("supervisor.test");
+
+            if (supervisor is null)
+            {
+                supervisor = await userManager.FindByEmailAsync("supervisor@salesync.local");
+            }
+
+            if (supervisor is null)
+            {
+                supervisor = new ApplicationUser
+                {
+                    UserName = "supervisor.test",
+                    Email = "supervisor@salesync.local",
+                    FullName = "Test Supervisor",
+                    IsActive = true,
+                    EmailConfirmed = true
+                };
+
+                var createResult = await userManager.CreateAsync(supervisor, "Supervisor@12345");
+
+                if (!createResult.Succeeded)
+                {
+                    throw new Exception(string.Join(" | ", createResult.Errors.Select(x => x.Description)));
+                }
+            }
+
+            if (!await userManager.IsInRoleAsync(supervisor, "Supervisor"))
+            {
+                var roleResult = await userManager.AddToRoleAsync(supervisor, "Supervisor");
+
+                if (!roleResult.Succeeded)
+                {
+                    throw new Exception(string.Join(" | ", roleResult.Errors.Select(x => x.Description)));
+                }
+            }
         }
     }
 }

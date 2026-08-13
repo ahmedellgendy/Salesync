@@ -50,5 +50,14 @@ namespace Salesync.API.Controllers.Sales
             var result = await _returnService.RejectAsync(id);
             return Ok(ApiResponse<InvoiceReturnDto>.SuccessResponse(result, "Return rejected successfully"));
         }
+
+        [HttpPut("{id}/cancel")]
+        [Authorize(Roles = "SalesRep")]
+        public async Task<IActionResult> CancelAsync(int id)
+        {
+            var result = await _returnService.CancelAsync(id);
+
+            return Ok(ApiResponse<InvoiceReturnDto>.SuccessResponse(result, "Return cancelled successfully"));
+        }
     }
 }

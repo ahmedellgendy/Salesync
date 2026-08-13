@@ -5,7 +5,8 @@
         Pending = 1,
         Approved = 2,
         Rejected = 3,
-        ReceivedAtWarehouse = 4
+        ReceivedAtWarehouse = 4,
+        Cancelled = 5
     }
 
 }

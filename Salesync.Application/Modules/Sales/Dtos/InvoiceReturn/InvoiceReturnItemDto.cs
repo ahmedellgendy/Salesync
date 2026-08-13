@@ -2,18 +2,18 @@
 
 namespace Salesync.Application.Modules.Sales.Dtos.InvoiceReturn
 {
-    public class CreateInvoiceReturnItemDto
+    public class InvoiceReturnItemDto
     {
+        public int Id { get; set; }
         public int InvoiceItemId { get; set; }
-
-        // Paid quantity
+        public int ProductId { get; set; }
+        public string ProductName { get; set; } = string.Empty;
+        public string ItemCode { get; set; } = string.Empty;
         public int Quantity { get; set; }
-
-        // Free / bonus quantity
         public int BonusQuantity { get; set; }
-
+        public decimal UnitPrice { get; set; }
+        public decimal TotalAmount { get; set; }
         public ReturnCondition Condition { get; set; }
-
         public string? Notes { get; set; }
     }
 }
