@@ -1,6 +1,7 @@
 ﻿using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics;
 using Salesync.API.Responses;
+using Salesync.Application.Common.Exceptions;
 using System.Net;
 
 namespace Salesync.API.Middleware
@@ -52,6 +53,15 @@ namespace Salesync.API.Middleware
                         );
                     break;
 
+                // handle forbidden exceptions - 403 Forbidden
+                case ForbiddenException:
+                    statusCode = (int)HttpStatusCode.Forbidden;
+                    response = ApiResponse<object>.ErrorResponse(
+                        exception.Message,
+                        statusCode
+                    );
+                    break;
+
                 // unauthorized access exceptions - 401 Unauthorized
                 case UnauthorizedAccessException:
                     statusCode = (int)HttpStatusCode.Unauthorized;
@@ -63,7 +73,7 @@ namespace Salesync.API.Middleware
 
                 // handle conflict exceptions - 409 Conflict
                 case InvalidOperationException:
-                    statusCode = (int)HttpStatusCode.Conflict; 
+                    statusCode = (int)HttpStatusCode.Conflict;
                     response = ApiResponse<object>.ErrorResponse(
                         exception.Message,
                         statusCode

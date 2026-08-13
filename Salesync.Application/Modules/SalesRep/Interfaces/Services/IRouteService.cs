@@ -6,6 +6,7 @@ namespace Salesync.Application.Modules.SalesRep.Interfaces.Services
     {
         Task<IEnumerable<RouteDto>> GetAllAsync();
         Task<RouteDto> GetByIdAsync(int id);
+        Task<IEnumerable<RouteDto>> GetBySalesRepAsync(int salesRepId, string userId);
         Task<RouteDto> CreateAsync(CreateRouteDto dto);
         Task<RouteDto> UpdateAsync(int id, UpdateRouteDto dto);
         Task DeleteAsync(int id);
