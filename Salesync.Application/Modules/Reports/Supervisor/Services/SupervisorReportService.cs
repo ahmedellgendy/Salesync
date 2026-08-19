@@ -13,13 +13,18 @@ namespace Salesync.Application.Modules.Reports.Supervisor.Services
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IReportScopeService _reportScopeService;
+        private readonly IReportQueryService _reportQueryService;
+
 
         public SupervisorReportService(
             IUnitOfWork unitOfWork,
-            IReportScopeService reportScopeService)
+            IReportScopeService reportScopeService,
+            IReportQueryService reportQueryService)
+
         {
             _unitOfWork = unitOfWork;
             _reportScopeService = reportScopeService;
+            _reportQueryService = reportQueryService;
         }
 
         public async Task<SupervisorSummaryReportDto> GetSummaryAsync(ReportFilter filter, CancellationToken cancellationToken = default)
@@ -29,105 +34,49 @@ namespace Salesync.Application.Modules.Reports.Supervisor.Services
                 validatePagination: false,
                 cancellationToken);
 
+            var grossSales = await _reportQueryService
+                .GetGrossSalesAsync(
+                    context.SalesRepIds,
+                    context.FromDate,
+                    context.ToDateExclusive,
+                    cancellationToken);
 
-            // INVOICES
-            var invoiceSummary = await _unitOfWork.Invoices
-                .GetQueryable()
-                .AsNoTracking()
-                .Where(x =>
-                    x.SalesRepId.HasValue &&
-                    context.SalesRepIds.Contains(x.SalesRepId.Value) &&
-                    x.Status == InvoiceStatus.Confirmed &&
-                    x.CreatedAt >= context.FromDate &&
-                    x.CreatedAt < context.ToDateExclusive)
-                .GroupBy(_ => 1)
-                .Select(g => new
-                {
-                    TotalInvoices = g.Count(),
-                    GrossSales = g.Sum(x => x.TotalAmount)
-                })
-                .FirstOrDefaultAsync(cancellationToken);
+            var totalInvoices = await _reportQueryService
+                .GetTotalInvoicesAsync(
+                    context.SalesRepIds,
+                    context.FromDate,
+                    context.ToDateExclusive,
+                    cancellationToken);
 
-            var totalInvoices =
-                invoiceSummary?.TotalInvoices ?? 0;
+            var totalCollections = await _reportQueryService
+                .GetTotalCollectionsAsync(
+                    context.SalesRepIds,
+                    context.FromDate,
+                    context.ToDateExclusive,
+                    cancellationToken);
 
-            var grossSales =
-                invoiceSummary?.GrossSales ?? 0m;
+            var totalReturns = await _reportQueryService
+                .GetTotalReturnsAsync(
+                    context.SalesRepIds,
+                    context.FromDate,
+                    context.ToDateExclusive,
+                    cancellationToken);
 
+            var totalVisits = await _reportQueryService
+                .GetTotalVisitsAsync(
+                    context.SalesRepIds,
+                    context.FromDate,
+                    context.ToDateExclusive,
+                    cancellationToken);
 
-            // PAYMENTS / COLLECTIONS
-            var paymentSummary = await _unitOfWork.Payments
-                .GetQueryable()
-                .AsNoTracking()
-                .Where(x =>
-                    x.SalesRepId.HasValue &&
-                    context.SalesRepIds.Contains(x.SalesRepId.Value) &&
-                    x.Status == PaymentStatus.Paid &&
-                    x.PaymentDate >= context.FromDate &&
-                    x.PaymentDate < context.ToDateExclusive)
-                .GroupBy(_ => 1)
-                .Select(g => new
-                {
-                    TotalCollections = g.Sum(x => x.Amount)
-                })
-                .FirstOrDefaultAsync(cancellationToken);
+            var customersVisited = await _reportQueryService
+                .GetCustomersVisitedAsync(
+                    context.SalesRepIds,
+                    context.FromDate,
+                    context.ToDateExclusive,
+                    cancellationToken);
 
-            var totalCollections =
-                paymentSummary?.TotalCollections ?? 0m;
-
-
-            // RETURNS
-            var returnSummary = await _unitOfWork.InvoiceReturns
-                .GetQueryable()
-                .AsNoTracking()
-                .Where(x =>
-                    x.SalesRepId.HasValue &&
-                    context.SalesRepIds.Contains(x.SalesRepId.Value) &&
-                    x.Status == ReturnStatus.Approved &&
-                    x.CreatedAt >= context.FromDate &&
-                    x.CreatedAt < context.ToDateExclusive)
-                .GroupBy(_ => 1)
-                .Select(g => new
-                {
-                    TotalReturns = g.Sum(x => x.TotalAmount)
-                })
-                .FirstOrDefaultAsync(cancellationToken);
-
-            var totalReturns =
-                returnSummary?.TotalReturns ?? 0m;
-
-
-            // VISITS
-            var visitSummary = await _unitOfWork.CustomerVisits
-                .GetQueryable()
-                .AsNoTracking()
-                .Where(x =>
-                    context.SalesRepIds.Contains(x.SalesRepId) &&
-                    x.Status == VisitStatus.Completed &&
-                    x.VisitDate >= context.FromDate &&
-                    x.VisitDate < context.ToDateExclusive)
-                .GroupBy(_ => 1)
-                .Select(g => new
-                {
-                    TotalVisits = g.Count(),
-
-                    CustomersVisited = g
-                        .Select(x => x.CustomerId)
-                        .Distinct()
-                        .Count()
-                })
-                .FirstOrDefaultAsync(cancellationToken);
-
-            var totalVisits =
-                visitSummary?.TotalVisits ?? 0;
-
-            var customersVisited =
-                visitSummary?.CustomersVisited ?? 0;
-
-
-            // CALCULATED KPIs
-            var netSales =
-                grossSales - totalReturns;
+            var netSales = grossSales - totalReturns;
 
             return new SupervisorSummaryReportDto
             {
@@ -454,8 +403,6 @@ namespace Salesync.Application.Modules.Reports.Supervisor.Services
                 validatePagination: false,
                 cancellationToken);
 
-
-            // SALES REPS
             var salesReps = await _unitOfWork.SalesReps
                 .GetQueryable()
                 .AsNoTracking()
@@ -469,139 +416,40 @@ namespace Salesync.Application.Modules.Reports.Supervisor.Services
                 })
                 .ToListAsync(cancellationToken);
 
+            var metrics = await _reportQueryService
+                .GetSalesRepMetricsAsync(
+                    context.SalesRepIds,
+                    context.FromDate,
+                    context.ToDateExclusive,
+                    cancellationToken);
 
-            // INVOICE STATS
-            var invoiceStats = await _unitOfWork.Invoices
-                .GetQueryable()
-                .AsNoTracking()
-                .Where(x =>
-                    x.SalesRepId.HasValue &&
-                    context.SalesRepIds.Contains(x.SalesRepId.Value) &&
-                    x.Status == InvoiceStatus.Confirmed &&
-                    x.CreatedAt >= context.FromDate &&
-                    x.CreatedAt < context.ToDateExclusive)
-                .GroupBy(x => x.SalesRepId!.Value)
-                .Select(g => new
-                {
-                    SalesRepId = g.Key,
-                    GrossSales = g.Sum(x => x.TotalAmount),
-                    TotalInvoices = g.Count()
-                })
-                .ToListAsync(cancellationToken);
-
-
-            // PAYMENT STATS
-            var paymentStats = await _unitOfWork.Payments
-                .GetQueryable()
-                .AsNoTracking()
-                .Where(x =>
-                    x.SalesRepId.HasValue &&
-                    context.SalesRepIds.Contains(x.SalesRepId.Value) &&
-                    x.Status == PaymentStatus.Paid &&
-                    x.PaymentDate >= context.FromDate &&
-                    x.PaymentDate < context.ToDateExclusive)
-                .GroupBy(x => x.SalesRepId!.Value)
-                .Select(g => new
-                {
-                    SalesRepId = g.Key,
-                    TotalCollections = g.Sum(x => x.Amount)
-                })
-                .ToListAsync(cancellationToken);
-
-
-            // RETURN STATS
-            var returnStats = await _unitOfWork.InvoiceReturns
-                .GetQueryable()
-                .AsNoTracking()
-                .Where(x =>
-                    x.SalesRepId.HasValue &&
-                    context.SalesRepIds.Contains(x.SalesRepId.Value) &&
-                    x.Status == ReturnStatus.Approved &&
-                    x.CreatedAt >= context.FromDate &&
-                    x.CreatedAt < context.ToDateExclusive)
-                .GroupBy(x => x.SalesRepId!.Value)
-                .Select(g => new
-                {
-                    SalesRepId = g.Key,
-                    TotalReturns = g.Sum(x => x.TotalAmount)
-                })
-                .ToListAsync(cancellationToken);
-
-
-            // VISIT STATS
-            var visitStats = await _unitOfWork.CustomerVisits
-                .GetQueryable()
-                .AsNoTracking()
-                .Where(x =>
-                    context.SalesRepIds.Contains(x.SalesRepId) &&
-                    x.Status == VisitStatus.Completed &&
-                    x.VisitDate >= context.FromDate &&
-                    x.VisitDate < context.ToDateExclusive)
-                .GroupBy(x => x.SalesRepId)
-                .Select(g => new
-                {
-                    SalesRepId = g.Key,
-                    TotalVisits = g.Count(),
-
-                    CustomersVisited = g
-                        .Select(x => x.CustomerId)
-                        .Distinct()
-                        .Count()
-                })
-                .ToListAsync(cancellationToken);
-
-
-            // LOOKUP DICTIONARIES
-            var invoicesByRep = invoiceStats
+            var metricsByRep = metrics
                 .ToDictionary(x => x.SalesRepId);
 
-            var paymentsByRep = paymentStats
-                .ToDictionary(x => x.SalesRepId);
-
-            var returnsByRep = returnStats
-                .ToDictionary(x => x.SalesRepId);
-
-            var visitsByRep = visitStats
-                .ToDictionary(x => x.SalesRepId);
-
-
-            // FINAL RESULT
             var result = salesReps
                 .Select(rep =>
                 {
-                    invoicesByRep.TryGetValue(
+                    metricsByRep.TryGetValue(
                         rep.Id,
-                        out var invoice);
-
-                    paymentsByRep.TryGetValue(
-                        rep.Id,
-                        out var payment);
-
-                    returnsByRep.TryGetValue(
-                        rep.Id,
-                        out var returnStat);
-
-                    visitsByRep.TryGetValue(
-                        rep.Id,
-                        out var visit);
+                        out var metric);
 
                     var grossSales =
-                        invoice?.GrossSales ?? 0m;
-
-                    var totalInvoices =
-                        invoice?.TotalInvoices ?? 0;
+                        metric?.GrossSales ?? 0m;
 
                     var totalCollections =
-                        payment?.TotalCollections ?? 0m;
+                        metric?.TotalCollections ?? 0m;
 
                     var totalReturns =
-                        returnStat?.TotalReturns ?? 0m;
+                        metric?.TotalReturns ?? 0m;
+
+                    var totalInvoices =
+                        metric?.TotalInvoices ?? 0;
 
                     var totalVisits =
-                        visit?.TotalVisits ?? 0;
+                        metric?.TotalVisits ?? 0;
 
                     var customersVisited =
-                        visit?.CustomersVisited ?? 0;
+                        metric?.CustomersVisited ?? 0;
 
                     var netSales =
                         grossSales - totalReturns;
