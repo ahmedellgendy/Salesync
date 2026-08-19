@@ -16,8 +16,9 @@ namespace Salesync.Infrastructure.Seeds
             var roles = new[]
             {
                 "Admin",
-                "SalesRep",
+                "Management",
                 "Supervisor",
+                "SalesRep",
                 "Warehouse",
                 "User",
                 "Treasury"
@@ -81,6 +82,64 @@ namespace Salesync.Infrastructure.Seeds
                 if (!roleResult.Succeeded)
                 {
                     throw new Exception(string.Join(" | ", roleResult.Errors.Select(x => x.Description)));
+                }
+            }
+        }
+
+        public static async Task SeedManagementUserAsync(IServiceProvider serviceProvider)
+        {
+            using var scope = serviceProvider.CreateScope();
+
+            var userManager = scope.ServiceProvider
+                .GetRequiredService<UserManager<ApplicationUser>>();
+
+            var management = await userManager
+                .FindByNameAsync("management.test");
+
+            if (management is null)
+            {
+                management = await userManager
+                    .FindByEmailAsync("management@salesync.local");
+            }
+
+            if (management is null)
+            {
+                management = new ApplicationUser
+                {
+                    UserName = "management.test",
+                    Email = "management@salesync.local",
+                    FullName = "Test Management",
+                    IsActive = true,
+                    EmailConfirmed = true
+                };
+
+                var createResult = await userManager.CreateAsync(
+                    management,
+                    "Management@12345");
+
+                if (!createResult.Succeeded)
+                {
+                    throw new Exception(
+                        string.Join(
+                            " | ",
+                            createResult.Errors.Select(x => x.Description)));
+                }
+            }
+
+            if (!await userManager.IsInRoleAsync(
+                    management,
+                    "Management"))
+            {
+                var roleResult = await userManager.AddToRoleAsync(
+                    management,
+                    "Management");
+
+                if (!roleResult.Succeeded)
+                {
+                    throw new Exception(
+                        string.Join(
+                            " | ",
+                            roleResult.Errors.Select(x => x.Description)));
                 }
             }
         }

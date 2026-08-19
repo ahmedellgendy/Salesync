@@ -36,17 +36,15 @@ namespace Salesync.Application.Modules.Reports.Common.Services
                     "User role was not found.");
             }
 
-            if (role.Equals(
-                "Admin",
-                StringComparison.OrdinalIgnoreCase))
+            if (role.Equals("Admin", StringComparison.OrdinalIgnoreCase) || role.Equals("Management", StringComparison.OrdinalIgnoreCase))
             {
-                return await BuildAdminScopeAsync(
+                return await BuildFullBusinessScopeAsync(
                     cancellationToken);
             }
 
             if (role.Equals(
-                "Supervisor",
-                StringComparison.OrdinalIgnoreCase))
+                    "Supervisor",
+                    StringComparison.OrdinalIgnoreCase))
             {
                 return await BuildSupervisorScopeAsync(
                     userId,
@@ -100,7 +98,7 @@ namespace Salesync.Application.Modules.Reports.Common.Services
             };
         }
 
-        private async Task<ReportScope> BuildAdminScopeAsync(CancellationToken cancellationToken)
+        private async Task<ReportScope> BuildFullBusinessScopeAsync(CancellationToken cancellationToken)
         {
             var allowedSalesReps = await _unitOfWork.SalesReps
                 .GetQueryable()

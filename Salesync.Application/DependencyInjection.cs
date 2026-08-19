@@ -11,6 +11,8 @@ using Salesync.Application.Modules.Reports.Admin.Interfaces;
 using Salesync.Application.Modules.Reports.Admin.Services;
 using Salesync.Application.Modules.Reports.Common.Interfaces;
 using Salesync.Application.Modules.Reports.Common.Services;
+using Salesync.Application.Modules.Reports.Management.Interfaces;
+using Salesync.Application.Modules.Reports.Management.Services;
 using Salesync.Application.Modules.Reports.Supervisor.Interfaces;
 using Salesync.Application.Modules.Reports.Supervisor.Services;
 using Salesync.Application.Modules.Sales.Interfaces;
@@ -76,6 +78,9 @@ namespace Salesync.Application
 
             // Register AdminReport Service
             services.AddScoped<IAdminReportService, AdminReportService>();
+
+            // Register ManagementReport Service
+            services.AddScoped<IManagementReportService, ManagementReportService>();
 
             return services;
         }
