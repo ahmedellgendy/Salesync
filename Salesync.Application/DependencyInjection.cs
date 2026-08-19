@@ -7,6 +7,10 @@ using Salesync.Application.Modules.Inventory.Services;
 using Salesync.Application.Modules.LoadRequest.Interfaces;
 using Salesync.Application.Modules.LoadRequest.Services;
 using Salesync.Application.Modules.MasterData.Validators.Customer;
+using Salesync.Application.Modules.Reports.Common.Interfaces;
+using Salesync.Application.Modules.Reports.Common.Services;
+using Salesync.Application.Modules.Reports.Supervisor.Interfaces;
+using Salesync.Application.Modules.Reports.Supervisor.Services;
 using Salesync.Application.Modules.Sales.Interfaces;
 using Salesync.Application.Modules.Sales.Services;
 using Salesync.Application.Modules.SalesRep.Interfaces.Services;
@@ -58,6 +62,12 @@ namespace Salesync.Application
 
             // Register UnloadRequset Service
             services.AddScoped<ISalesRepUnloadRequestService, SalesRepUnloadRequestService>();
+
+            // Register ReportScope Service
+            services.AddScoped<IReportScopeService, ReportScopeService>();
+
+            // Register SupervisorReport Service
+            services.AddScoped<ISupervisorReportService, SupervisorReportService>();
 
             return services;
         }
