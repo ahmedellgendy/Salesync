@@ -93,5 +93,29 @@ namespace Salesync.Application.Modules.Reports.Common.Interfaces
             int pageSize,
             Expression<Func<CustomerVisitEntity, TDto>> selector,
             CancellationToken cancellationToken = default);
+
+        Task<IReadOnlyCollection<SalesTrendMetrics>> GetDailySalesTrendAsync(
+            IReadOnlyCollection<int> salesRepIds,
+            DateTime fromDate,
+            DateTime toDateExclusive,
+            CancellationToken cancellationToken = default);
+
+        Task<IReadOnlyCollection<BranchReportMetrics>> GetBranchMetricsAsync(
+            IReadOnlyCollection<int> salesRepIds,
+            DateTime fromDate,
+            DateTime toDateExclusive,
+            CancellationToken cancellationToken = default);
+
+        Task<IReadOnlyCollection<CustomerReportMetrics>> GetCustomerMetricsAsync(
+            IReadOnlyCollection<int> salesRepIds,
+            DateTime fromDate,
+            DateTime toDateExclusive,
+            CancellationToken cancellationToken = default);
+
+        Task<IReadOnlyCollection<ProductReportMetrics>> GetProductMetricsAsync(
+            IReadOnlyCollection<int> salesRepIds,
+            DateTime fromDate,
+            DateTime toDateExclusive,
+            CancellationToken cancellationToken = default);
     }
 }

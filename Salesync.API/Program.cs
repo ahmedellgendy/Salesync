@@ -89,6 +89,7 @@ using (var scope = app.Services.CreateScope())
     await IdentitySeeder.SeedRolesAsync(scope.ServiceProvider);
     await IdentitySeeder.SeedAdminUserAsync(scope.ServiceProvider);
     await IdentitySeeder.SeedSupervisorUserAsync(app.Services);
+    await IdentitySeeder.SeedManagementUserAsync(app.Services);
 }
 
 // Configure pipeline
