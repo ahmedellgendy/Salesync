@@ -69,6 +69,9 @@ namespace Salesync.Application
             // Register SupervisorReport Service
             services.AddScoped<ISupervisorReportService, SupervisorReportService>();
 
+            // Register ReportQuery Service
+            services.AddScoped<IReportQueryService, ReportQueryService>();
+
             return services;
         }
     }
