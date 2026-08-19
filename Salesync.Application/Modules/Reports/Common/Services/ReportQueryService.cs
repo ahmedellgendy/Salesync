@@ -4,6 +4,9 @@ using Salesync.Application.Modules.Reports.Common.Interfaces;
 using Salesync.Application.Modules.Reports.Common.Models;
 using Salesync.Domain.Common.Enums.CustomerVisit;
 using Salesync.Domain.Common.Enums.Sales;
+using Salesync.Domain.Modules.Sales.Entities;
+using System.Linq.Expressions;
+using CustomerVisitEntity = Salesync.Domain.Modules.CustomerVisit.Entities.CustomerVisit;
 
 namespace Salesync.Application.Modules.Reports.Common.Services
 {
@@ -244,5 +247,203 @@ namespace Salesync.Application.Modules.Reports.Common.Services
 
             return result;
         }
+
+        public async Task<PagedResult<TDto>> GetConfirmedSalesAsync<TDto>(
+            IReadOnlyCollection<int> salesRepIds,
+            DateTime fromDate,
+            DateTime toDateExclusive,
+            int pageNumber,
+            int pageSize,
+            Expression<Func<Invoice, TDto>> selector,
+            CancellationToken cancellationToken = default)
+        {
+            var query = _unitOfWork.Invoices
+                .GetQueryable()
+                .AsNoTracking()
+                .Where(x =>
+                    x.SalesRepId.HasValue &&
+                    salesRepIds.Contains(x.SalesRepId.Value) &&
+                    x.Status == InvoiceStatus.Confirmed &&
+                    x.CreatedAt >= fromDate &&
+                    x.CreatedAt < toDateExclusive);
+
+            var totalCount = await query
+                .CountAsync(cancellationToken);
+
+            var items = await query
+                .OrderByDescending(x => x.CreatedAt)
+                .ThenByDescending(x => x.Id)
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .Select(selector)
+                .ToListAsync(cancellationToken);
+
+            return new PagedResult<TDto>
+            {
+                Items = items,
+                PageNumber = pageNumber,
+                PageSize = pageSize,
+                TotalCount = totalCount
+            };
+        }
+
+        public async Task<PagedResult<TDto>> GetInvoicesAsync<TDto>(
+            IReadOnlyCollection<int> salesRepIds,
+            DateTime fromDate,
+            DateTime toDateExclusive,
+            int pageNumber,
+            int pageSize,
+            Expression<Func<Invoice, TDto>> selector,
+            CancellationToken cancellationToken = default)
+        {
+            var query = _unitOfWork.Invoices
+                .GetQueryable()
+                .AsNoTracking()
+                .Where(x =>
+                    x.SalesRepId.HasValue &&
+                    salesRepIds.Contains(x.SalesRepId.Value) &&
+                    x.CreatedAt >= fromDate &&
+                    x.CreatedAt < toDateExclusive);
+
+            var totalCount = await query
+                .CountAsync(cancellationToken);
+
+            var items = await query
+                .OrderByDescending(x => x.CreatedAt)
+                .ThenByDescending(x => x.Id)
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .Select(selector)
+                .ToListAsync(cancellationToken);
+
+            return new PagedResult<TDto>
+            {
+                Items = items,
+                PageNumber = pageNumber,
+                PageSize = pageSize,
+                TotalCount = totalCount
+            };
+        }
+
+
+        public async Task<PagedResult<TDto>> GetPaymentsAsync<TDto>(
+            IReadOnlyCollection<int> salesRepIds,
+             DateTime fromDate,
+             DateTime toDateExclusive,
+             int pageNumber,
+             int pageSize,
+             Expression<Func<Payment, TDto>> selector,
+             CancellationToken cancellationToken = default)
+        {
+            var query = _unitOfWork.Payments
+                .GetQueryable()
+                .AsNoTracking()
+                .Where(x =>
+                    x.SalesRepId.HasValue &&
+                    salesRepIds.Contains(x.SalesRepId.Value) &&
+                    x.PaymentDate >= fromDate &&
+                    x.PaymentDate < toDateExclusive);
+
+            var totalCount = await query
+                .CountAsync(cancellationToken);
+
+            var items = await query
+                .OrderByDescending(x => x.PaymentDate)
+                .ThenByDescending(x => x.Id)
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .Select(selector)
+                .ToListAsync(cancellationToken);
+
+            return new PagedResult<TDto>
+            {
+                Items = items,
+                PageNumber = pageNumber,
+                PageSize = pageSize,
+                TotalCount = totalCount
+            };
+        }
+
+
+
+        public async Task<PagedResult<TDto>> GetReturnsAsync<TDto>(
+            IReadOnlyCollection<int> salesRepIds,
+              DateTime fromDate,
+              DateTime toDateExclusive,
+              int pageNumber,
+              int pageSize,
+              Expression<Func<InvoiceReturn, TDto>> selector,
+              CancellationToken cancellationToken = default)
+        {
+            var query = _unitOfWork.InvoiceReturns
+                .GetQueryable()
+                .AsNoTracking()
+                .Where(x =>
+                    x.SalesRepId.HasValue &&
+                    salesRepIds.Contains(x.SalesRepId.Value) &&
+                    x.CreatedAt >= fromDate &&
+                    x.CreatedAt < toDateExclusive);
+
+            var totalCount = await query
+                .CountAsync(cancellationToken);
+
+            var items = await query
+                .OrderByDescending(x => x.CreatedAt)
+                .ThenByDescending(x => x.Id)
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .Select(selector)
+                .ToListAsync(cancellationToken);
+
+            return new PagedResult<TDto>
+            {
+                Items = items,
+                PageNumber = pageNumber,
+                PageSize = pageSize,
+                TotalCount = totalCount
+            };
+        }
+
+
+        public async Task<PagedResult<TDto>> GetVisitsAsync<TDto>(
+            IReadOnlyCollection<int> salesRepIds,
+              DateTime fromDate,
+              DateTime toDateExclusive,
+              int pageNumber,
+              int pageSize,
+              Expression<Func<CustomerVisitEntity, TDto>> selector,
+              CancellationToken cancellationToken = default)
+        {
+            var query = _unitOfWork.CustomerVisits
+                .GetQueryable()
+                .AsNoTracking()
+                .Where(x =>
+                    salesRepIds.Contains(x.SalesRepId) &&
+                    x.VisitDate >= fromDate &&
+                    x.VisitDate < toDateExclusive);
+
+            var totalCount = await query
+                .CountAsync(cancellationToken);
+
+            var items = await query
+                .OrderByDescending(x => x.VisitDate)
+                .ThenByDescending(x => x.Id)
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .Select(selector)
+                .ToListAsync(cancellationToken);
+
+            return new PagedResult<TDto>
+            {
+                Items = items,
+                PageNumber = pageNumber,
+                PageSize = pageSize,
+                TotalCount = totalCount
+            };
+        }
+
+
+
+
     }
 }

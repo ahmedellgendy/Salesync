@@ -7,6 +7,8 @@ using Salesync.Application.Modules.Inventory.Services;
 using Salesync.Application.Modules.LoadRequest.Interfaces;
 using Salesync.Application.Modules.LoadRequest.Services;
 using Salesync.Application.Modules.MasterData.Validators.Customer;
+using Salesync.Application.Modules.Reports.Admin.Interfaces;
+using Salesync.Application.Modules.Reports.Admin.Services;
 using Salesync.Application.Modules.Reports.Common.Interfaces;
 using Salesync.Application.Modules.Reports.Common.Services;
 using Salesync.Application.Modules.Reports.Supervisor.Interfaces;
@@ -71,6 +73,9 @@ namespace Salesync.Application
 
             // Register ReportQuery Service
             services.AddScoped<IReportQueryService, ReportQueryService>();
+
+            // Register AdminReport Service
+            services.AddScoped<IAdminReportService, AdminReportService>();
 
             return services;
         }

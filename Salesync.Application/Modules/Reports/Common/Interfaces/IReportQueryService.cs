@@ -1,4 +1,7 @@
 ﻿using Salesync.Application.Modules.Reports.Common.Models;
+using Salesync.Domain.Modules.Sales.Entities;
+using System.Linq.Expressions;
+using CustomerVisitEntity = Salesync.Domain.Modules.CustomerVisit.Entities.CustomerVisit;
 
 namespace Salesync.Application.Modules.Reports.Common.Interfaces
 {
@@ -44,6 +47,51 @@ namespace Salesync.Application.Modules.Reports.Common.Interfaces
             IReadOnlyCollection<int> salesRepIds,
             DateTime fromDate,
             DateTime toDateExclusive,
+            CancellationToken cancellationToken = default);
+
+        Task<PagedResult<TDto>> GetConfirmedSalesAsync<TDto>(
+            IReadOnlyCollection<int> salesRepIds,
+            DateTime fromDate,
+            DateTime toDateExclusive,
+            int pageNumber,
+            int pageSize,
+            Expression<Func<Salesync.Domain.Modules.Sales.Entities.Invoice, TDto>> selector,
+            CancellationToken cancellationToken = default);
+
+        Task<PagedResult<TDto>> GetInvoicesAsync<TDto>(
+            IReadOnlyCollection<int> salesRepIds,
+           DateTime fromDate,
+           DateTime toDateExclusive,
+           int pageNumber,
+           int pageSize,
+           Expression<Func<Invoice, TDto>> selector,
+           CancellationToken cancellationToken = default);
+
+        Task<PagedResult<TDto>> GetPaymentsAsync<TDto>(
+            IReadOnlyCollection<int> salesRepIds,
+            DateTime fromDate,
+            DateTime toDateExclusive,
+            int pageNumber,
+            int pageSize,
+            Expression<Func<Payment, TDto>> selector,
+            CancellationToken cancellationToken = default);
+
+        Task<PagedResult<TDto>> GetReturnsAsync<TDto>(
+            IReadOnlyCollection<int> salesRepIds,
+            DateTime fromDate,
+            DateTime toDateExclusive,
+            int pageNumber,
+            int pageSize,
+            Expression<Func<InvoiceReturn, TDto>> selector,
+            CancellationToken cancellationToken = default);
+
+        Task<PagedResult<TDto>> GetVisitsAsync<TDto>(
+            IReadOnlyCollection<int> salesRepIds,
+            DateTime fromDate,
+            DateTime toDateExclusive,
+            int pageNumber,
+            int pageSize,
+            Expression<Func<CustomerVisitEntity, TDto>> selector,
             CancellationToken cancellationToken = default);
     }
 }
