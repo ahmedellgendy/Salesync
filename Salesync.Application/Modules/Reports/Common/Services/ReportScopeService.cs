@@ -22,34 +22,116 @@ namespace Salesync.Application.Modules.Reports.Common.Services
         public async Task<ReportScope> GetCurrentScopeAsync(CancellationToken cancellationToken = default)
         {
             var userId = _currentUser.UserId;
+            var role = _currentUser.Role;
 
             if (string.IsNullOrWhiteSpace(userId))
+            {
                 throw new UnauthorizedAccessException(
                     "Authenticated user was not found.");
+            }
 
+            if (string.IsNullOrWhiteSpace(role))
+            {
+                throw new UnauthorizedAccessException(
+                    "User role was not found.");
+            }
+
+            if (role.Equals(
+                "Admin",
+                StringComparison.OrdinalIgnoreCase))
+            {
+                return await BuildAdminScopeAsync(
+                    cancellationToken);
+            }
+
+            if (role.Equals(
+                "Supervisor",
+                StringComparison.OrdinalIgnoreCase))
+            {
+                return await BuildSupervisorScopeAsync(
+                    userId,
+                    cancellationToken);
+            }
+
+            throw new UnauthorizedAccessException(
+                "The current user is not allowed to access reports.");
+        }
+
+        private async Task<ReportScope> BuildSupervisorScopeAsync(string userId, CancellationToken cancellationToken)
+        {
             var supervisor = await _unitOfWork.SalesReps
                 .GetQueryable()
                 .AsNoTracking()
                 .FirstOrDefaultAsync(
-                    x => x.UserId == userId && x.IsActive,
+                    x =>
+                        x.UserId == userId &&
+                        x.IsActive,
                     cancellationToken);
 
             if (supervisor is null)
+            {
                 throw new KeyNotFoundException(
                     "Supervisor profile for the current user was not found.");
+            }
 
-            var allowedSalesRepIds = await _unitOfWork.SalesReps
+            var allowedSalesReps = await _unitOfWork.SalesReps
                 .GetQueryable()
                 .AsNoTracking()
                 .Where(x =>
                     x.SupervisorId == supervisor.Id &&
                     x.IsActive)
-                .Select(x => x.Id)
+                .Select(x => new
+                {
+                    x.Id,
+                    x.BranchId
+                })
                 .ToListAsync(cancellationToken);
 
             return new ReportScope
             {
-                AllowedSalesRepIds = allowedSalesRepIds
+                AllowedSalesRepIds = allowedSalesReps
+                    .Select(x => x.Id)
+                    .ToList(),
+
+                AllowedBranchIds = allowedSalesReps
+                    .Select(x => x.BranchId)
+                    .Distinct()
+                    .ToList()
+            };
+        }
+
+        private async Task<ReportScope> BuildAdminScopeAsync(CancellationToken cancellationToken)
+        {
+            var allowedSalesReps = await _unitOfWork.SalesReps
+                .GetQueryable()
+                .AsNoTracking()
+                .Where(x =>
+                    x.IsActive &&
+                    x.SupervisorId.HasValue)
+                .Select(x => new
+                {
+                    x.Id,
+                    x.BranchId,
+                    x.BusinessUnitId
+                })
+                .ToListAsync(cancellationToken);
+
+            return new ReportScope
+            {
+                AllowedSalesRepIds = allowedSalesReps
+                    .Select(x => x.Id)
+                    .ToList(),
+
+                AllowedBranchIds = allowedSalesReps
+                    .Select(x => x.BranchId)
+                    .Distinct()
+                    .ToList(),
+
+                AllowedBusinessUnitIds = allowedSalesReps
+                    .Where(x => x.BusinessUnitId.HasValue)
+                    .Select(x => x.BusinessUnitId!.Value)
+                    .Distinct()
+                    .ToList()
             };
         }
     }

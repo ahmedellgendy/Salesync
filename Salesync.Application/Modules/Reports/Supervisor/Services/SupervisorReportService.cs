@@ -104,29 +104,16 @@ namespace Salesync.Application.Modules.Reports.Supervisor.Services
                 validatePagination: true,
                 cancellationToken);
 
-            var query = _unitOfWork.Invoices
-                .GetQueryable()
-                .AsNoTracking()
-                .Where(x =>
-                    x.SalesRepId.HasValue &&
-                    context.SalesRepIds.Contains(x.SalesRepId.Value) &&
-                    x.Status == InvoiceStatus.Confirmed &&
-                    x.CreatedAt >= context.FromDate &&
-                    x.CreatedAt < context.ToDateExclusive);
-
-            var totalCount = await query
-                .CountAsync(cancellationToken);
-
-            var items = await query
-                .OrderByDescending(x => x.CreatedAt)
-                .ThenByDescending(x => x.Id)
-                .Skip((filter.PageNumber - 1) * filter.PageSize)
-                .Take(filter.PageSize)
-                .Select(x => new SupervisorSalesReportItemDto
+            return await _reportQueryService.GetConfirmedSalesAsync(
+                context.SalesRepIds,
+                context.FromDate,
+                context.ToDateExclusive,
+                filter.PageNumber,
+                filter.PageSize,
+                x => new SupervisorSalesReportItemDto
                 {
                     InvoiceId = x.Id,
                     InvoiceNumber = x.InvoiceNumber,
-
                     InvoiceDate = x.CreatedAt,
 
                     SalesRepId = x.SalesRepId!.Value,
@@ -143,16 +130,8 @@ namespace Salesync.Application.Modules.Reports.Supervisor.Services
                     TotalAmount = x.TotalAmount,
 
                     PaymentStatus = x.PaymentStatus
-                })
-                .ToListAsync(cancellationToken);
-
-            return new PagedResult<SupervisorSalesReportItemDto>
-            {
-                Items = items,
-                PageNumber = filter.PageNumber,
-                PageSize = filter.PageSize,
-                TotalCount = totalCount
-            };
+                },
+                cancellationToken);
         }
 
         public async Task<PagedResult<SupervisorInvoiceReportItemDto>> GetInvoicesAsync(ReportFilter filter, CancellationToken cancellationToken = default)
@@ -162,24 +141,13 @@ namespace Salesync.Application.Modules.Reports.Supervisor.Services
                 validatePagination: true,
                 cancellationToken);
 
-            var query = _unitOfWork.Invoices
-                .GetQueryable()
-                .AsNoTracking()
-                .Where(x =>
-                    x.SalesRepId.HasValue &&
-                    context.SalesRepIds.Contains(x.SalesRepId.Value) &&
-                    x.CreatedAt >= context.FromDate &&
-                    x.CreatedAt < context.ToDateExclusive);
-
-            var totalCount = await query
-                .CountAsync(cancellationToken);
-
-            var items = await query
-                .OrderByDescending(x => x.CreatedAt)
-                .ThenByDescending(x => x.Id)
-                .Skip((filter.PageNumber - 1) * filter.PageSize)
-                .Take(filter.PageSize)
-                .Select(x => new SupervisorInvoiceReportItemDto
+            return await _reportQueryService.GetInvoicesAsync(
+                context.SalesRepIds,
+                context.FromDate,
+                context.ToDateExclusive,
+                filter.PageNumber,
+                filter.PageSize,
+                x => new SupervisorInvoiceReportItemDto
                 {
                     InvoiceId = x.Id,
                     InvoiceNumber = x.InvoiceNumber,
@@ -203,17 +171,10 @@ namespace Salesync.Application.Modules.Reports.Supervisor.Services
                     TotalAmount = x.TotalAmount,
                     PaidAmount = x.PaidAmount,
 
-                    RemainingAmount = x.TotalAmount - x.PaidAmount
-                })
-                .ToListAsync(cancellationToken);
-
-            return new PagedResult<SupervisorInvoiceReportItemDto>
-            {
-                Items = items,
-                PageNumber = filter.PageNumber,
-                PageSize = filter.PageSize,
-                TotalCount = totalCount
-            };
+                    RemainingAmount =
+                        x.TotalAmount - x.PaidAmount
+                },
+                cancellationToken);
         }
 
         public async Task<PagedResult<SupervisorPaymentReportItemDto>> GetPaymentsAsync(ReportFilter filter, CancellationToken cancellationToken = default)
@@ -223,24 +184,13 @@ namespace Salesync.Application.Modules.Reports.Supervisor.Services
                 validatePagination: true,
                 cancellationToken);
 
-            var query = _unitOfWork.Payments
-                .GetQueryable()
-                .AsNoTracking()
-                .Where(x =>
-                    x.SalesRepId.HasValue &&
-                    context.SalesRepIds.Contains(x.SalesRepId.Value) &&
-                    x.PaymentDate >= context.FromDate &&
-                    x.PaymentDate < context.ToDateExclusive);
-
-            var totalCount = await query
-                .CountAsync(cancellationToken);
-
-            var items = await query
-                .OrderByDescending(x => x.PaymentDate)
-                .ThenByDescending(x => x.Id)
-                .Skip((filter.PageNumber - 1) * filter.PageSize)
-                .Take(filter.PageSize)
-                .Select(x => new SupervisorPaymentReportItemDto
+            return await _reportQueryService.GetPaymentsAsync(
+                context.SalesRepIds,
+                context.FromDate,
+                context.ToDateExclusive,
+                filter.PageNumber,
+                filter.PageSize,
+                x => new SupervisorPaymentReportItemDto
                 {
                     PaymentId = x.Id,
                     PaymentNumber = x.PaymentNumber,
@@ -266,16 +216,8 @@ namespace Salesync.Application.Modules.Reports.Supervisor.Services
                     CheckDueDate = x.CheckDueDate,
                     BankName = x.BankName,
                     TransactionReference = x.TransactionReference
-                })
-                .ToListAsync(cancellationToken);
-
-            return new PagedResult<SupervisorPaymentReportItemDto>
-            {
-                Items = items,
-                PageNumber = filter.PageNumber,
-                PageSize = filter.PageSize,
-                TotalCount = totalCount
-            };
+                },
+                cancellationToken);
         }
 
         public async Task<PagedResult<SupervisorReturnReportItemDto>> GetReturnsAsync(ReportFilter filter, CancellationToken cancellationToken = default)
@@ -285,24 +227,13 @@ namespace Salesync.Application.Modules.Reports.Supervisor.Services
                 validatePagination: true,
                 cancellationToken);
 
-            var query = _unitOfWork.InvoiceReturns
-                .GetQueryable()
-                .AsNoTracking()
-                .Where(x =>
-                    x.SalesRepId.HasValue &&
-                    context.SalesRepIds.Contains(x.SalesRepId.Value) &&
-                    x.CreatedAt >= context.FromDate &&
-                    x.CreatedAt < context.ToDateExclusive);
-
-            var totalCount = await query
-                .CountAsync(cancellationToken);
-
-            var items = await query
-                .OrderByDescending(x => x.CreatedAt)
-                .ThenByDescending(x => x.Id)
-                .Skip((filter.PageNumber - 1) * filter.PageSize)
-                .Take(filter.PageSize)
-                .Select(x => new SupervisorReturnReportItemDto
+            return await _reportQueryService.GetReturnsAsync(
+                context.SalesRepIds,
+                context.FromDate,
+                context.ToDateExclusive,
+                filter.PageNumber,
+                filter.PageSize,
+                x => new SupervisorReturnReportItemDto
                 {
                     ReturnId = x.Id,
                     ReturnNumber = x.ReturnNumber,
@@ -324,16 +255,8 @@ namespace Salesync.Application.Modules.Reports.Supervisor.Services
 
                     TotalAmount = x.TotalAmount,
                     ReasonNotes = x.ReasonNotes
-                })
-                .ToListAsync(cancellationToken);
-
-            return new PagedResult<SupervisorReturnReportItemDto>
-            {
-                Items = items,
-                PageNumber = filter.PageNumber,
-                PageSize = filter.PageSize,
-                TotalCount = totalCount
-            };
+                },
+                cancellationToken);
         }
 
         public async Task<PagedResult<SupervisorVisitReportItemDto>> GetVisitsAsync(ReportFilter filter, CancellationToken cancellationToken = default)
@@ -343,23 +266,13 @@ namespace Salesync.Application.Modules.Reports.Supervisor.Services
                 validatePagination: true,
                 cancellationToken);
 
-            var query = _unitOfWork.CustomerVisits
-                .GetQueryable()
-                .AsNoTracking()
-                .Where(x =>
-                    context.SalesRepIds.Contains(x.SalesRepId) &&
-                    x.VisitDate >= context.FromDate &&
-                    x.VisitDate < context.ToDateExclusive);
-
-            var totalCount = await query
-                .CountAsync(cancellationToken);
-
-            var items = await query
-                .OrderByDescending(x => x.VisitDate)
-                .ThenByDescending(x => x.Id)
-                .Skip((filter.PageNumber - 1) * filter.PageSize)
-                .Take(filter.PageSize)
-                .Select(x => new SupervisorVisitReportItemDto
+            return await _reportQueryService.GetVisitsAsync(
+                context.SalesRepIds,
+                context.FromDate,
+                context.ToDateExclusive,
+                filter.PageNumber,
+                filter.PageSize,
+                x => new SupervisorVisitReportItemDto
                 {
                     VisitId = x.Id,
 
@@ -376,7 +289,6 @@ namespace Salesync.Application.Modules.Reports.Supervisor.Services
 
                     VisitType = x.VisitType,
                     Status = x.Status,
-
                     NegativeReason = x.NegativeReason,
 
                     InvoiceId = x.InvoiceId,
@@ -384,16 +296,8 @@ namespace Salesync.Application.Modules.Reports.Supervisor.Services
                     InvoiceReturnId = x.InvoiceReturnId,
 
                     Notes = x.Notes
-                })
-                .ToListAsync(cancellationToken);
-
-            return new PagedResult<SupervisorVisitReportItemDto>
-            {
-                Items = items,
-                PageNumber = filter.PageNumber,
-                PageSize = filter.PageSize,
-                TotalCount = totalCount
-            };
+                },
+                cancellationToken);
         }
 
         public async Task<IReadOnlyCollection<SalesRepPerformanceReportItemDto>> GetSalesRepPerformanceAsync(ReportFilter filter, CancellationToken cancellationToken = default)
