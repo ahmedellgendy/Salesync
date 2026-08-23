@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Salesync.Application.Interfaces.Repositories;
 using Salesync.Application.Interfaces.Services;
 using Salesync.Application.Modules.Identity.Interfaces;
+using Salesync.Application.Modules.Profile.Interfaces;
 using Salesync.Application.Modules.SalesRep.Interfaces.Services;
 using Salesync.Application.Modules.SalesRep.Services;
 using Salesync.Infrastructure.Data;
@@ -32,6 +33,8 @@ namespace Salesync.Infrastructure.DependencyInjection
             // register services for current user context
             services.AddHttpContextAccessor();
             services.AddScoped<ICurrentUserService, CurrentUserService>();
+
+            services.AddScoped<IProfileService, ProfileService>();
 
             return services;
         }
