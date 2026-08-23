@@ -14,71 +14,86 @@ namespace Salesync.API.Controllers.MasterData
         public WarehouseController(IWarehouseService warehouseService)
         {
             _warehouseService = warehouseService;
-
         }
 
-
-        [HttpGet]  // GET: api/Warehouse --> Get All Warehouses
-        public async Task<IActionResult> GetAllAsync()
+        [HttpGet]
+        public async Task<IActionResult> GetAll()
         {
-            var warehouses = await _warehouseService.GetAllAsync();
-            return Ok(ApiResponse<IEnumerable<WarehouseDto>>.SuccessResponse(
-                warehouses,
-                "Warehouses retrieved successfully",
-                200
-            ));
+            var warehouses =
+                await _warehouseService.GetAllAsync();
+
+            return Ok(
+                ApiResponse<IEnumerable<WarehouseDto>>
+                    .SuccessResponse(
+                        warehouses,
+                        "Warehouses retrieved successfully",
+                        200));
         }
 
-        [HttpGet("{id}")] // GET: api/Warehouse/id --> Get Warehouse By Id 
-        public async Task<IActionResult> GetByIdAsync(int id)
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetById(int id)
         {
-            var warehouse = await _warehouseService.GetByIdAsync(id);
+            var warehouse =
+                await _warehouseService.GetByIdAsync(id);
+
             if (warehouse == null)
-                return NotFound(ApiResponse<object>.NotFoundResponse($"Warehouse with ID {id} not found"));
+            {
+                return NotFound(
+                    ApiResponse<object>.NotFoundResponse(
+                        $"Warehouse with ID {id} not found"));
+            }
 
-            return Ok(ApiResponse<WarehouseDto>.SuccessResponse(
-                warehouse,
-                "Warehouse retrieved successfully",
-                200
-            ));
-
+            return Ok(
+                ApiResponse<WarehouseDto>
+                    .SuccessResponse(
+                        warehouse,
+                        "Warehouse retrieved successfully",
+                        200));
         }
 
-        [HttpPost]  // POST: api/Warehouse --> Create New Warehouse
-        public async Task<IActionResult> CreateAsync([FromBody] CreateWarehouseDto warehouseDto)
+        [HttpPost]
+        public async Task<IActionResult> Create(
+            [FromBody] CreateWarehouseDto warehouseDto)
         {
-            var createdWarehouse = await _warehouseService.CreateAsync(warehouseDto);
-            return CreatedAtAction(nameof(GetByIdAsync), new { id = createdWarehouse.Id },
-                   ApiResponse<WarehouseDto>.SuccessResponse(
-                        createdWarehouse,
-                        "Warehouse created successfully",
-                        201
-                        ));
+            var createdWarehouse =
+                await _warehouseService.CreateAsync(warehouseDto);
+
+            return CreatedAtAction(
+                nameof(GetById),
+                new { id = createdWarehouse.Id },
+                ApiResponse<WarehouseDto>.SuccessResponse(
+                    createdWarehouse,
+                    "Warehouse created successfully",
+                    201));
         }
 
-        [HttpPut("{id}")]  // PUT: api/Warehouse/id --> Update Warehouse
-        public async Task<IActionResult> UpdateAsync(int id, [FromBody] UpdateWarehouseDto warehouseDto)
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Update(
+            int id,
+            [FromBody] UpdateWarehouseDto warehouseDto)
         {
-            var updatedWarehouse = await _warehouseService.UpdateAsync(id, warehouseDto);
-            return Ok(ApiResponse<WarehouseDto>.SuccessResponse(
-                updatedWarehouse,
-                $"Warehouse with ID {id} updated successfully",
-                200
-            ));
+            var updatedWarehouse =
+                await _warehouseService.UpdateAsync(
+                    id,
+                    warehouseDto);
+
+            return Ok(
+                ApiResponse<WarehouseDto>
+                    .SuccessResponse(
+                        updatedWarehouse,
+                        $"Warehouse with ID {id} updated successfully",
+                        200));
         }
 
-        [HttpDelete("{id}")] // DELETE: api/Warhouse --> Delete Warehouse 
+        [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var deletedWarehouse = await _warehouseService.DeleteAsync(id);
-            if (!deletedWarehouse)
-                return NotFound(ApiResponse<object>.NotFoundResponse($"Warehouse with ID {id} not found"));
+            await _warehouseService.DeleteAsync(id);
 
-            return Ok(ApiResponse<object>.SuccessResponse(
-                      null,
-                      $"Warehouse with ID {id} deleted successfully"
-                      ));
+            return Ok(
+                ApiResponse<object>.SuccessResponse(
+                    null,
+                    $"Warehouse with ID {id} deactivated successfully"));
         }
-
     }
 }
