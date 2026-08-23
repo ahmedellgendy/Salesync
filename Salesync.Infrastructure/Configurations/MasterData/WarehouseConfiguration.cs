@@ -23,7 +23,6 @@ namespace Salesync.Infrastructure.Configurations.MasterData
                 .HasMaxLength(100);
 
             builder.Property(w => w.Location)
-                .IsRequired()
                 .HasMaxLength(200);
 
             builder.Property(w => w.Latitude)

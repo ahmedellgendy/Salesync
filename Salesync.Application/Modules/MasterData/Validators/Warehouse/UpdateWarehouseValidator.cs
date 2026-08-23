@@ -14,7 +14,8 @@ namespace Salesync.Application.Modules.MasterData.Validators.Warehouse
 
             RuleFor(x => x.BranchId)
                 .GreaterThan(0)
-                .WithMessage("BranchId must be greater than 0.");
+                .WithMessage("BranchId must be greater than 0.")
+                .When(x => x.BranchId.HasValue);
         }
     }
 }
