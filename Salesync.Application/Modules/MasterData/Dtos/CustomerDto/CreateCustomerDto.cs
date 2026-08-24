@@ -36,12 +36,25 @@ namespace Salesync.Application.Modules.MasterData.Dtos.CustomerDto
 
         // Credit
         public decimal CreditLimit { get; set; }
+        public bool ForceCreditLimit { get; set; }
         public decimal OrderCeiling { get; set; }
 
+        // Business Rules
+        public bool ReturnWithoutInvoice { get; set; }
+        public bool MandatoryPhoto { get; set; }
+
+        // Head Office
+        public bool IsHeadOffice { get; set; }
+        public int? HeadOfficeId { get; set; }
+
+        // External References
         public string? AccountNumber { get; set; }
         public string? TaxId { get; set; }
         public string? PriceId { get; set; }
 
         public int? BranchId { get; set; }
+
+        public CustomerStatus Status { get; set; } =
+            CustomerStatus.Active;
     }
 }
