@@ -8,14 +8,17 @@ namespace Salesync.Application.Modules.MasterData.Validators.Product
         public UpdateProductValidator()
         {
             RuleFor(x => x.Id)
-                .NotEmpty();
+                .GreaterThan(0)
+                .WithMessage("Product id must be greater than 0.");
 
             RuleFor(x => x.ItemCode)
-            .MaximumLength(50)
-            .When(x => x.ItemCode != null);
+                .NotEmpty()
+                .MaximumLength(50)
+                .When(x => x.ItemCode != null);
 
             RuleFor(x => x.Name)
-                .MaximumLength(150)
+                .NotEmpty()
+                .MaximumLength(100)
                 .When(x => x.Name != null);
 
             RuleFor(x => x.Description)
@@ -31,12 +34,12 @@ namespace Salesync.Application.Modules.MasterData.Validators.Product
                 .When(x => x.Barcode != null);
 
             RuleFor(x => x.UnitPrice)
-               .GreaterThanOrEqualTo(0)
-               .WithMessage("Unit price must be 0 or more.");
+                .GreaterThan(0)
+                .When(x => x.UnitPrice.HasValue);
 
             RuleFor(x => x.CostPrice)
                 .GreaterThanOrEqualTo(0)
-                .WithMessage("Cost price must be 0 or more.");
+                .When(x => x.CostPrice.HasValue);
 
             RuleFor(x => x.DiscountPercentage)
                 .InclusiveBetween(0, 100)
@@ -46,10 +49,35 @@ namespace Salesync.Application.Modules.MasterData.Validators.Product
                 .MaximumLength(20)
                 .When(x => x.Unit != null);
 
+            RuleFor(x => x.SmallUnit)
+                .NotEmpty()
+                .MaximumLength(50)
+                .When(x => x.SmallUnit != null);
+
+            RuleFor(x => x.LargeUnit)
+                .NotEmpty()
+                .MaximumLength(50)
+                .When(x => x.LargeUnit != null);
+
+            RuleFor(x => x.UnitsPerLargeUnit)
+                .GreaterThan(0)
+                .When(x => x.UnitsPerLargeUnit.HasValue);
+
+            RuleFor(x => x.MinStockLevel)
+                .GreaterThanOrEqualTo(0)
+                .When(x => x.MinStockLevel.HasValue);
+
+            RuleFor(x => x.MaxStockLevel)
+                .GreaterThanOrEqualTo(0)
+                .When(x => x.MaxStockLevel.HasValue);
+
+            RuleFor(x => x.ReturnPeriod)
+                .GreaterThan(0)
+                .When(x => x.ReturnPeriod.HasValue);
+
             RuleFor(x => x.WarehouseId)
                 .GreaterThan(0)
                 .When(x => x.WarehouseId.HasValue);
-            ;
         }
     }
 }
