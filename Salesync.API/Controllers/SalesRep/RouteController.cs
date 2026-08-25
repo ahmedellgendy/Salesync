@@ -33,7 +33,7 @@ namespace Salesync.API.Controllers.SalesRep
             return Ok(ApiResponse<RouteDto>.SuccessResponse(result));
         }
 
-        [Authorize(Roles = "Supervisor")]
+        [Authorize(Roles = "Admin,Supervisor")]
         [HttpGet("by-salesrep/{salesRepId:int}")] // GET: api/routes/by-salesrep/{salesRepId}
         public async Task<IActionResult> GetBySalesRep(int salesRepId)
         {

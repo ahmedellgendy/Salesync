@@ -1,5 +1,6 @@
 ﻿using AutoMapper;
 using FluentValidation;
+using Microsoft.EntityFrameworkCore;
 using Salesync.Application.Interfaces.Repositories;
 using Salesync.Application.Modules.Identity.Dtos.User;
 using Salesync.Application.Modules.Identity.Interfaces;
@@ -40,6 +41,24 @@ namespace Salesync.Application.Modules.SalesRep.Services
                 throw new ValidationException(
                     validationResult.Errors);
             }
+
+            dto.SalesRep.SalesRepCode =dto.SalesRep.SalesRepCode.Trim();
+
+            dto.SalesRep.Name =dto.SalesRep.Name.Trim();
+
+            dto.SalesRep.Phone =dto.SalesRep.Phone.Trim();
+
+            dto.SalesRep.Mobile =string.IsNullOrWhiteSpace(dto.SalesRep.Mobile)
+                    ? null
+                    : dto.SalesRep.Mobile.Trim();
+
+            dto.SalesRep.Email =string.IsNullOrWhiteSpace(dto.SalesRep.Email)
+                    ? null
+                    : dto.SalesRep.Email.Trim().ToLowerInvariant();
+
+            dto.SalesRep.Address =string.IsNullOrWhiteSpace(dto.SalesRep.Address)
+                    ? null
+                    : dto.SalesRep.Address.Trim();
 
             await ValidateBusinessRulesAsync(dto);
 
@@ -85,12 +104,16 @@ namespace Salesync.Application.Modules.SalesRep.Services
 
                 await _unitOfWork.CommitTransactionAsync();
 
+                var createdSalesRep = await _unitOfWork.SalesReps
+                     .GetQueryable()
+                     .AsNoTracking()
+                     .Include(x => x.Branch)
+                     .Include(x => x.Supervisor)
+                     .FirstAsync(x => x.Id == salesRep.Id);
+
                 return new CreatedSalesRepWithAccountDto
                 {
-                    SalesRep =
-                        _mapper.Map<SalesRepResponseDto>(
-                            salesRep),
-
+                    SalesRep = _mapper.Map<SalesRepResponseDto>(createdSalesRep),
                     UserId = createdUser.Id,
                     UserName = createdUser.UserName,
                     Role = SalesRepRole

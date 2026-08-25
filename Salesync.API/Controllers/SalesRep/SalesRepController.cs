@@ -23,6 +23,7 @@ namespace Salesync.API.Controllers.SalesRep
         }
 
         [HttpGet] // GET: api/SalesRep
+        [Authorize(Roles = "Admin,Supervisor")]
         public async Task<IActionResult> GetAllAsync()
         {
             var salesReps = await _salesRepService.GetAllAsync();
@@ -49,6 +50,7 @@ namespace Salesync.API.Controllers.SalesRep
         }
 
         [HttpGet("{id:int}")] // GET: api/SalesRep/{id}
+        [Authorize(Roles = "Admin,Supervisor")]
         public async Task<IActionResult> GetByIdAsync(int id)
         {
             var salesRep = await _salesRepService.GetByIdAsync(id);
@@ -68,6 +70,7 @@ namespace Salesync.API.Controllers.SalesRep
         }
 
         [HttpPut("{id:int}")] // PUT: api/SalesRep/{id}
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> UpdateAsync(int id, [FromBody] UpdateSalesRepDto updateSalesRepDto)
         {
             var updatedSalesRep = await _salesRepService.UpdateAsync(id, updateSalesRepDto);
@@ -78,12 +81,13 @@ namespace Salesync.API.Controllers.SalesRep
         }
 
         [HttpDelete("{id:int}")] // DELETE: api/SalesRep/{id}
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> DeleteAsync(int id)
         {
             await _salesRepService.DeleteAsync(id);
             return Ok(ApiResponse<string>.SuccessResponse(
                 null,
-                "SalesRep deleted successfully"
+                "SalesRep deactivated successfully"
             ));
         }
     }
