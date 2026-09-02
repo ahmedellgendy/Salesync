@@ -20,6 +20,29 @@ namespace Salesync.API.Controllers.Sales
             _paymentService = paymentService;
         }
 
+        [HttpGet]
+        [Authorize(Roles = "Admin,Supervisor")]
+        public async Task<IActionResult> GetAllAsync()
+        {
+            var result =
+                await _paymentService.GetAllAsync();
+
+            return Ok(
+                ApiResponse<IEnumerable<PaymentDto>>
+                    .SuccessResponse(result));
+        }
+
+        [HttpGet("{id}")]
+        [Authorize(Roles = "Admin,Supervisor")]
+        public async Task<IActionResult> GetByIdAsync(int id)
+        {
+            var result =
+                await _paymentService.GetByIdAsync(id);
+
+            return Ok(
+                ApiResponse<PaymentDto>
+                    .SuccessResponse(result));
+        }
 
         [HttpGet("invoice/{invoiceId}")]
         public async Task<IActionResult> GetByInvoiceIdAsync(int invoiceId)
