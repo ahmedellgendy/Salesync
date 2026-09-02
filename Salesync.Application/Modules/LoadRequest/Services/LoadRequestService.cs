@@ -87,9 +87,43 @@ namespace Salesync.Application.Modules.LoadRequest.Services
         public async Task<LoadRequestDto> GetByIdAsync(int id)
         {
             var request = await GetRequestWithDetailsAsync(id);
-            return _mapper.Map<LoadRequestDto>(request);
-        }
 
+            var dto = _mapper.Map<LoadRequestDto>(request);
+
+            var productIds = request.Items
+                .Select(x => x.ProductId)
+                .Distinct()
+                .ToList();
+
+            var balances = await _unitOfWork.StockBalances
+                .GetQueryable()
+                .AsNoTracking()
+                .Where(x =>
+                    x.WarehouseId == request.WarehouseId &&
+                    productIds.Contains(x.ProductId) &&
+                    x.IsActive)
+                .ToListAsync();
+
+            foreach (var item in dto.Items)
+            {
+                var balance = balances
+                    .FirstOrDefault(x =>
+                        x.ProductId == item.ProductId);
+
+                var availableQuantity =
+                    balance?.Quantity ?? 0;
+
+                item.AvailableWarehouseQuantity =
+                    availableQuantity;
+
+                item.AvailableWarehouseLargeQuantity =
+                    item.UnitsPerLargeUnit > 0
+                        ? availableQuantity / item.UnitsPerLargeUnit
+                        : 0;
+            }
+
+            return dto;
+        }
         public async Task<IEnumerable<LoadRequestDto>> GetBySalesRepAsync(int salesRepId)
         {
             var requests = await _unitOfWork.LoadRequests
@@ -589,20 +623,29 @@ namespace Salesync.Application.Modules.LoadRequest.Services
 
         private async Task EnsureWarehouseStockAvailableAsync(int warehouseId, IEnumerable<LoadRequestItem> requestItems, IEnumerable<ConfirmLoadRequestItemDto> confirmedItems)
         {
+            var requestItemsList =
+                requestItems.ToList();
+
             var requiredStock = confirmedItems
                 .Where(x => x.ConfirmedLargeQuantity > 0)
                 .Select(x =>
                 {
-                    var requestItem = requestItems.First(i => i.Id == x.LoadRequestItemId);
+                    var requestItem =
+                        requestItemsList.First(i =>
+                            i.Id == x.LoadRequestItemId);
 
                     var confirmedSmallQuantity =
-                        x.ConfirmedLargeQuantity * requestItem.UnitsPerLargeUnit;
+                        x.ConfirmedLargeQuantity *
+                        requestItem.UnitsPerLargeUnit;
 
                     return new
                     {
                         ProductId = requestItem.ProductId,
                         ProductName = requestItem.ProductName,
-                        Quantity = confirmedSmallQuantity
+                        LargeUnit = requestItem.LargeUnit,
+                        SmallUnit = requestItem.SmallUnit,
+                        UnitsPerLargeUnit = requestItem.UnitsPerLargeUnit,
+                        RequiredQuantity = confirmedSmallQuantity
                     };
                 })
                 .GroupBy(x => x.ProductId)
@@ -610,25 +653,69 @@ namespace Salesync.Application.Modules.LoadRequest.Services
                 {
                     ProductId = g.Key,
                     ProductName = g.First().ProductName,
-                    Quantity = g.Sum(x => x.Quantity)
+                    LargeUnit = g.First().LargeUnit,
+                    SmallUnit = g.First().SmallUnit,
+                    UnitsPerLargeUnit = g.First().UnitsPerLargeUnit,
+                    RequiredQuantity = g.Sum(x => x.RequiredQuantity)
                 })
                 .ToList();
 
+            var productIds =
+                requiredStock
+                    .Select(x => x.ProductId)
+                    .ToList();
+
+            var balances =
+                await _unitOfWork.StockBalances
+                    .GetQueryable()
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.WarehouseId == warehouseId &&
+                        productIds.Contains(x.ProductId) &&
+                        x.IsActive)
+                    .ToListAsync();
+
+            var shortages =
+                new List<string>();
+
             foreach (var item in requiredStock)
             {
-                var balance = await _unitOfWork.StockBalances
-                    .GetQueryable()
-                    .FirstOrDefaultAsync(x =>
-                        x.ProductId == item.ProductId &&
-                        x.WarehouseId == warehouseId &&
-                        x.IsActive);
+                var balance =
+                    balances.FirstOrDefault(x =>
+                        x.ProductId == item.ProductId);
 
-                if (balance == null)
-                    throw new InvalidOperationException($"No stock balance found for product {item.ProductName}.");
+                var availableQuantity =
+                    balance?.Quantity ?? 0;
 
-                if (balance.Quantity < item.Quantity)
-                    throw new InvalidOperationException(
-                        $"Insufficient stock for product {item.ProductName}. Available: {balance.Quantity}, Required: {item.Quantity}.");
+                if (availableQuantity >= item.RequiredQuantity)
+                    continue;
+
+                var availableLargeQuantity =
+                    item.UnitsPerLargeUnit > 0
+                        ? availableQuantity / item.UnitsPerLargeUnit
+                        : 0;
+
+                var requiredLargeQuantity =
+                    item.UnitsPerLargeUnit > 0
+                        ? item.RequiredQuantity / item.UnitsPerLargeUnit
+                        : 0;
+
+                shortages.Add(
+                    $"{item.ProductName}: " +
+                    $"Available {availableLargeQuantity} {item.LargeUnit} " +
+                    $"({availableQuantity} {item.SmallUnit}), " +
+                    $"Required {requiredLargeQuantity} {item.LargeUnit} " +
+                    $"({item.RequiredQuantity} {item.SmallUnit}).");
+            }
+
+            if (shortages.Count > 0)
+            {
+                throw new InvalidOperationException(
+                    "Insufficient warehouse stock:" +
+                    Environment.NewLine +
+                    string.Join(
+                        Environment.NewLine,
+                        shortages));
             }
         }
 
