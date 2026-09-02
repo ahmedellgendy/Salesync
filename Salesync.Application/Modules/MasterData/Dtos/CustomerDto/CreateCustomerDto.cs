@@ -35,8 +35,8 @@ namespace Salesync.Application.Modules.MasterData.Dtos.CustomerDto
         public string? PaymentTermsCode { get; set; }
 
         // Credit
-        public decimal CreditLimit { get; set; }
-        public decimal OrderCeiling { get; set; }
+        public decimal? CreditLimit { get; set; }
+        public decimal? OrderCeiling { get; set; }
 
         public string? AccountNumber { get; set; }
         public string? TaxId { get; set; }

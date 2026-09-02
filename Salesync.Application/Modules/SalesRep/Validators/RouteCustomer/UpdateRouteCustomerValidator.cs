@@ -3,16 +3,14 @@ using Salesync.Application.Modules.SalesRep.Dtos.RouteCustomerDto;
 
 namespace Salesync.Application.Modules.SalesRep.Validators.RouteCustomer
 {
-    public class CreateRouteCustomerValidator
-        : AbstractValidator<CreateRouteCustomerDto>
+    public class UpdateRouteCustomerValidator
+        : AbstractValidator<UpdateRouteCustomerDto>
     {
-        public CreateRouteCustomerValidator()
+        public UpdateRouteCustomerValidator()
         {
-            RuleFor(x => x.RouteId)
-                .GreaterThan(0);
-
-            RuleFor(x => x.CustomerId)
-                .GreaterThan(0);
+            RuleFor(x => x.VisitSequence)
+                .GreaterThan(0)
+                .When(x => x.VisitSequence.HasValue);
 
             RuleFor(x => x.VisitDays)
                 .MaximumLength(100)

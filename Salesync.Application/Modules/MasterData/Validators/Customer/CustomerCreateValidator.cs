@@ -28,16 +28,23 @@ namespace Salesync.Application.Modules.MasterData.Validators.Customer
                 .WithMessage("Address is required.")
                 .MaximumLength(200)
                 .WithMessage("Address cannot exceed 200 characters.");
-           
+
             RuleFor(x => x.CreditLimit)
-                 .GreaterThanOrEqualTo(0)
-                 .WithMessage("Credit limit cannot be negative.");
-           
+             .GreaterThanOrEqualTo(0)
+             .WithMessage("Credit limit cannot be negative.")
+             .When(x => x.CreditLimit.HasValue);
+
             RuleFor(x => x.OrderCeiling)
                 .GreaterThan(0)
                 .WithMessage("Order ceiling must be greater than 0.")
+                .When(x => x.OrderCeiling.HasValue);
+
+            RuleFor(x => x.OrderCeiling)
                 .GreaterThanOrEqualTo(x => x.CreditLimit)
-                .WithMessage("Order ceiling must be >= credit limit.");
+                .WithMessage("Order ceiling must be >= credit limit.")
+                .When(x =>
+                    x.OrderCeiling.HasValue &&
+                    x.CreditLimit.HasValue);
         }
     }
 }

@@ -57,13 +57,26 @@ namespace Salesync.Application.Mappings
 
             #region SalesRep
 
-            CreateMap<SalesRep, SalesRepDto>();
+            CreateMap<SalesRep, SalesRepDto>()
+                .ForMember(dest => dest.BranchName, opt => opt.MapFrom(src => src.Branch != null ? src.Branch.Name : null))
+                .ForMember(dest => dest.SupervisorName, opt => opt.MapFrom(src => src.Supervisor != null ? src.Supervisor.Name : null));
             CreateMap<CreateSalesRepDto, SalesRep>();
-            CreateMap<UpdateSalesRepDto, SalesRep>().ForAllMembers(o => o.Condition((src, dest, srcMember) => srcMember != null));
+            CreateMap<UpdateSalesRepDto, SalesRep>()
+                .ForAllMembers(o => o.Condition((src, dest, srcMember) => srcMember != null));
 
-            CreateMap<Route, RouteDto>();
+            CreateMap<Route, RouteDto>()
+                .ForMember(dest => dest.BranchName,opt => opt.MapFrom(src => src.Branch != null? src.Branch.Name: null))
+                .ForMember(dest => dest.AssignedSalesRepName,opt => opt.MapFrom(src => src.AssignedSalesRep != null? src.AssignedSalesRep.Name: null));
             CreateMap<CreateRouteDto, Route>();
-            CreateMap<UpdateRouteDto, Route>().ForAllMembers(o => o.Condition((src, dest, srcMember) => srcMember != null));
+            CreateMap<UpdateRouteDto, Route>()
+                .ForMember(
+                    dest => dest.BranchId,
+                    opt =>
+                    {
+                        opt.PreCondition(src => src.BranchId.HasValue);
+                        opt.MapFrom(src => src.BranchId!.Value);
+                    })
+                .ForAllMembers(opt =>opt.Condition((src, dest, srcMember) =>srcMember != null));
 
             CreateMap<RouteCustomer, RouteCustomerDto>();
             CreateMap<CreateRouteCustomerDto, RouteCustomer>();

@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Salesync.Infrastructure.Data;
 
@@ -11,9 +12,11 @@ using Salesync.Infrastructure.Data;
 namespace Salesync.Infrastructure.Migrations
 {
     [DbContext(typeof(SalesyncDbContext))]
-    partial class SalesyncDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260824232755_ImproveRouteManagement")]
+    partial class ImproveRouteManagement
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -730,9 +733,11 @@ namespace Salesync.Infrastructure.Migrations
                     b.Property<string>("CreatedBy")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<decimal?>("CreditLimit")
+                    b.Property<decimal>("CreditLimit")
+                        .ValueGeneratedOnAdd()
                         .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
+                        .HasColumnType("decimal(18,2)")
+                        .HasDefaultValue(0m);
 
                     b.Property<decimal>("CurrentBalance")
                         .ValueGeneratedOnAdd()
@@ -781,7 +786,7 @@ namespace Salesync.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
-                    b.Property<decimal?>("OrderCeiling")
+                    b.Property<decimal>("OrderCeiling")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 

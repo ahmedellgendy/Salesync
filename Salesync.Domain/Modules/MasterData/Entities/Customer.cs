@@ -36,10 +36,10 @@ namespace Salesync.Domain.Modules.MasterData.Entities
         public string? PaymentTermsCode { get; set; }           
 
         // Credit Management
-        public decimal CreditLimit { get; set; }               
+        public decimal? CreditLimit { get; set; }               
         public decimal CurrentBalance { get; set; }            
         public bool ForceCreditLimit { get; set; }              
-        public decimal OrderCeiling { get; set; }               
+        public decimal? OrderCeiling { get; set; }               
 
         // Business Rules
         public bool ReturnWithoutInvoice { get; set; }          

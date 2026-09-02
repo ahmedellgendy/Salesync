@@ -1,4 +1,5 @@
 ﻿using AutoMapper;
+using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Salesync.Application.Common.Exceptions;
 using Salesync.Application.Interfaces.Repositories;
@@ -14,26 +15,59 @@ namespace Salesync.Application.Modules.SalesRep.Services
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
+        private readonly IValidator<CreateRouteCustomerDto> _createValidator;
+        private readonly IValidator<UpdateRouteCustomerDto> _updateValidator;
 
-        public RouteCustomerService(IUnitOfWork unitOfWork, IMapper mapper)
+        public RouteCustomerService(
+            IUnitOfWork unitOfWork,
+            IMapper mapper,
+            IValidator<CreateRouteCustomerDto> createValidator,
+            IValidator<UpdateRouteCustomerDto> updateValidator)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
+            _createValidator = createValidator;
+            _updateValidator = updateValidator;
         }
 
         public async Task<IEnumerable<RouteCustomerDto>> GetByRouteIdAsync(int routeId)
         {
-            var routeCustomers = await _unitOfWork.RouteCustomers.FindAsync(rc => rc.RouteId == routeId);
+            if (routeId <= 0)
+                throw new ArgumentException("Invalid route id.");
+
+            var routeExists = await _unitOfWork.Routes
+                .ExistsAsync(x =>
+                    x.Id == routeId &&
+                    x.IsActive);
+
+            if (!routeExists)
+            {
+                throw new KeyNotFoundException(
+                    $"Active route with id {routeId} not found.");
+            }
+
+            var routeCustomers = await _unitOfWork.RouteCustomers
+                .GetQueryable()
+                .AsNoTracking()
+                .Where(x => x.RouteId == routeId)
+                .OrderBy(x => x.VisitSequence)
+                .ToListAsync();
+
             return _mapper.Map<IEnumerable<RouteCustomerDto>>(routeCustomers);
         }
-        public async Task<IEnumerable<RouteCustomerDetailsDto>> GetRouteCustomersAsync(int routeId, string userId)
+
+        public async Task<IEnumerable<RouteCustomerDetailsDto>> GetRouteCustomersAsync(
+            int routeId,
+            string userId)
         {
             if (routeId <= 0)
                 throw new ArgumentException("Invalid route id.");
 
             if (string.IsNullOrWhiteSpace(userId))
+            {
                 throw new UnauthorizedAccessException(
                     "Authenticated user was not found.");
+            }
 
             var supervisor = await _unitOfWork.SalesReps
                 .GetQueryable()
@@ -55,27 +89,35 @@ namespace Salesync.Application.Modules.SalesRep.Services
             if (route is null)
                 throw new KeyNotFoundException($"Route with id {routeId} not found.");
 
-            if (route.AssignedSalesRepId is null)
-                throw new ForbiddenException("You are not allowed to access this route.");
+            if (!route.AssignedSalesRepId.HasValue)
+            {
+                throw new ForbiddenException(
+                    "You are not allowed to access this route.");
+            }
 
-            var salesRep = await _unitOfWork.SalesReps
+            var assignedSalesRep = await _unitOfWork.SalesReps
                 .GetQueryable()
                 .AsNoTracking()
                 .FirstOrDefaultAsync(x =>
                     x.Id == route.AssignedSalesRepId.Value &&
                     x.IsActive);
 
-            if (salesRep is null)
+            if (assignedSalesRep is null)
                 throw new KeyNotFoundException("Assigned sales rep was not found.");
 
-            if (salesRep.SupervisorId != supervisor.Id)
-                throw new ForbiddenException("You are not allowed to access this route.");
+            if (assignedSalesRep.SupervisorId != supervisor.Id)
+            {
+                throw new ForbiddenException(
+                    "You are not allowed to access this route.");
+            }
 
             var routeCustomers = await _unitOfWork.RouteCustomers
                 .GetQueryable()
                 .AsNoTracking()
                 .Include(x => x.Customer)
-                .Where(x => x.RouteId == routeId)
+                .Where(x =>
+                    x.RouteId == routeId &&
+                    x.Customer.IsActive)
                 .OrderBy(x => x.VisitSequence)
                 .ToListAsync();
 
@@ -90,10 +132,14 @@ namespace Salesync.Application.Modules.SalesRep.Services
                 Customer = _mapper.Map<CustomerDto>(x.Customer)
             });
         }
+
         public async Task<IEnumerable<CustomerDto>> GetMyTeamCustomersAsync(string userId)
         {
             if (string.IsNullOrWhiteSpace(userId))
-                throw new UnauthorizedAccessException("Authenticated user was not found.");
+            {
+                throw new UnauthorizedAccessException(
+                    "Authenticated user was not found.");
+            }
 
             var supervisor = await _unitOfWork.SalesReps
                 .GetQueryable()
@@ -130,60 +176,151 @@ namespace Salesync.Application.Modules.SalesRep.Services
             if (routeIds.Count == 0)
                 return Enumerable.Empty<CustomerDto>();
 
-            var customers = await _unitOfWork.RouteCustomers
+            var customerIds = await _unitOfWork.RouteCustomers
                 .GetQueryable()
                 .AsNoTracking()
-                .Where(x => routeIds.Contains(x.RouteId) && x.Customer.Status == CustomerStatus.Active)
-                .Include(x => x.Customer)
-                .Select(x => x.Customer)
+                .Where(x =>
+                    routeIds.Contains(x.RouteId) &&
+                    x.Customer.IsActive &&
+                    x.Customer.Status == CustomerStatus.Active)
+                .Select(x => x.CustomerId)
+                .Distinct()
+                .ToListAsync();
+
+            if (customerIds.Count == 0)
+                return Enumerable.Empty<CustomerDto>();
+
+            var customers = await _unitOfWork.Customers
+                .GetQueryable()
+                .AsNoTracking()
+                .Where(x =>
+                    customerIds.Contains(x.Id) &&
+                    x.IsActive &&
+                    x.Status == CustomerStatus.Active)
+                .OrderBy(x => x.Name)
                 .ToListAsync();
 
             return _mapper.Map<IEnumerable<CustomerDto>>(customers);
         }
+
         public async Task<RouteCustomerDto> CreateAsync(CreateRouteCustomerDto dto)
         {
-            // Validate route existence
-            var routeExists = await _unitOfWork.Routes.ExistsAsync(r => r.Id == dto.RouteId);
+            var validationResult = await _createValidator.ValidateAsync(dto);
+
+            if (!validationResult.IsValid)
+                throw new ValidationException(validationResult.Errors);
+
+            var routeExists = await _unitOfWork.Routes
+                .ExistsAsync(x =>
+                    x.Id == dto.RouteId &&
+                    x.IsActive);
+
             if (!routeExists)
-                throw new KeyNotFoundException($"Route with id {dto.RouteId} not found.");
+            {
+                throw new KeyNotFoundException(
+                    $"Active route with id {dto.RouteId} not found.");
+            }
 
-            // Validate customer existence
-            var customerExists = await _unitOfWork.Customers.ExistsAsync(c => c.Id == dto.CustomerId);
+            var customerExists = await _unitOfWork.Customers
+                .ExistsAsync(x =>
+                    x.Id == dto.CustomerId &&
+                    x.IsActive);
+
             if (!customerExists)
-                throw new KeyNotFoundException($"Customer with id {dto.CustomerId} not found.");
+            {
+                throw new KeyNotFoundException(
+                    $"Active customer with id {dto.CustomerId} not found.");
+            }
 
-            // visit sequence 
-            var routeCustomers = await _unitOfWork.RouteCustomers.FindAsync(rc => rc.RouteId == dto.RouteId);
-            int maxSequence = routeCustomers.Any()
-                ? routeCustomers.Max(rc => rc.VisitSequence) : 0;
-            int newSequence = maxSequence + 1;
+            var alreadyAssigned = await _unitOfWork.RouteCustomers
+                .ExistsAsync(x =>
+                    x.RouteId == dto.RouteId &&
+                    x.CustomerId == dto.CustomerId);
+
+            if (alreadyAssigned)
+            {
+                throw new InvalidOperationException(
+                    "The customer is already assigned to this route.");
+            }
+
+            var maxSequence = await _unitOfWork.RouteCustomers
+                .GetQueryable()
+                .AsNoTracking()
+                .Where(x => x.RouteId == dto.RouteId)
+                .Select(x => (int?)x.VisitSequence)
+                .MaxAsync() ?? 0;
 
             var routeCustomer = _mapper.Map<RouteCustomer>(dto);
-            routeCustomer.VisitSequence = newSequence;
+
+            routeCustomer.VisitSequence = maxSequence + 1;
+            routeCustomer.VisitDays = NormalizeOptional(dto.VisitDays);
+            routeCustomer.Notes = NormalizeOptional(dto.Notes);
+
+            routeCustomer.IsActive = true;
+            routeCustomer.CreatedAt = DateTime.UtcNow;
 
             await _unitOfWork.RouteCustomers.AddAsync(routeCustomer);
             await _unitOfWork.CompleteAsync();
 
             return _mapper.Map<RouteCustomerDto>(routeCustomer);
         }
-        public async Task<RouteCustomerDto> UpdateAsync(int id, UpdateRouteCustomerDto dto)
+
+        public async Task<RouteCustomerDto> UpdateAsync(
+            int id,
+            UpdateRouteCustomerDto dto)
         {
-            var routeCustomer = await _unitOfWork.RouteCustomers.GetByIdAsync(id)
-               ?? throw new KeyNotFoundException($"RouteCustomer with id {id} not found.");
+            if (id <= 0)
+                throw new ArgumentException("Invalid route customer id.");
+
+            var validationResult = await _updateValidator.ValidateAsync(dto);
+
+            if (!validationResult.IsValid)
+                throw new ValidationException(validationResult.Errors);
+
+            var routeCustomer = await _unitOfWork.RouteCustomers
+                .GetQueryable()
+                .FirstOrDefaultAsync(x => x.Id == id);
+
+            if (routeCustomer is null)
+            {
+                throw new KeyNotFoundException(
+                    $"RouteCustomer with id {id} not found.");
+            }
+
+            dto.VisitDays = NormalizeOptional(dto.VisitDays);
+            dto.Notes = NormalizeOptional(dto.Notes);
 
             _mapper.Map(dto, routeCustomer);
+
+            routeCustomer.UpdatedAt = DateTime.UtcNow;
+
             _unitOfWork.RouteCustomers.Update(routeCustomer);
+
             await _unitOfWork.CompleteAsync();
+
             return _mapper.Map<RouteCustomerDto>(routeCustomer);
         }
+
         public async Task DeleteAsync(int id)
         {
-            var routeCustomer = await _unitOfWork.RouteCustomers.GetByIdAsync(id)
-                 ?? throw new KeyNotFoundException($"RouteCustomer with id {id} not found.");
+            if (id <= 0)
+                throw new ArgumentException("Invalid route customer id.");
+
+            var routeCustomer = await _unitOfWork.RouteCustomers
+                .GetByIdAsync(id)
+                ?? throw new KeyNotFoundException(
+                    $"RouteCustomer with id {id} not found.");
 
             _unitOfWork.RouteCustomers.Delete(routeCustomer);
+
             await _unitOfWork.CompleteAsync();
         }
 
+        private static string? NormalizeOptional(string? value)
+        {
+            return string.IsNullOrWhiteSpace(value)
+                ? null
+                : value.Trim();
+        }
     }
 }

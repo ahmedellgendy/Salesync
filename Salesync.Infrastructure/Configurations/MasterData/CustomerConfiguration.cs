@@ -50,14 +50,15 @@ namespace Salesync.Infrastructure.Configurations.MasterData
             builder.Property(c => c.Type)
                 .IsRequired();
 
-            builder.Property(c => c.CreditLimit)
+            builder.Property(x => x.CreditLimit)
                 .HasPrecision(18, 2)
-                .HasDefaultValue(0);
+                .IsRequired(false);
             builder.Property(c => c.CurrentBalance)
                 .HasPrecision(18, 2)
                 .HasDefaultValue(0);
-            builder.Property(c => c.OrderCeiling)
-               .HasPrecision(18, 2);
+            builder.Property(x => x.OrderCeiling)
+                 .HasPrecision(18, 2)
+                 .IsRequired(false);
             builder.Property(c => c.TotalPurchaseAmount)
                 .HasPrecision(18, 2)
                 .HasDefaultValue(0);
