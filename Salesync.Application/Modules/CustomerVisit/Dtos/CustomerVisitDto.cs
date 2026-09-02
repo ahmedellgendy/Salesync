@@ -23,5 +23,11 @@ namespace Salesync.Application.Modules.CustomerVisit.Dtos
         public decimal? Latitude { get; set; }
         public decimal? Longitude { get; set; }
         public string? Notes { get; set; }
+
+        public string? InvoiceNumber { get; set; }
+
+        public string? PaymentNumber { get; set; }
+
+        public string? InvoiceReturnNumber { get; set; }
     }
 }

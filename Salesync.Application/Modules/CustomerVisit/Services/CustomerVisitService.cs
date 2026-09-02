@@ -258,6 +258,9 @@ namespace Salesync.Application.Modules.CustomerVisit.Services
                 .Include(x => x.SalesRep)
                 .Include(x => x.Customer)
                 .Include(x => x.Route)
+                .Include(x => x.Invoice)
+                .Include(x => x.Payment)
+                .Include(x => x.InvoiceReturn)
                 .Where(x => x.IsActive);
         }
 
