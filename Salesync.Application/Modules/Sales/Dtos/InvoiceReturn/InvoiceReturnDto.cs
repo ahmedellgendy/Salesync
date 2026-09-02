@@ -15,7 +15,8 @@ namespace Salesync.Application.Modules.Sales.Dtos.InvoiceReturn
         public string? CustomerName { get; set; }
 
         public int? SalesRepId { get; set; }
-
+        public string? SalesRepCode { get; set; }
+        public string? SalesRepName { get; set; }
         public int? SalesRepSessionId { get; set; }
 
         public ReturnStatus Status { get; set; }

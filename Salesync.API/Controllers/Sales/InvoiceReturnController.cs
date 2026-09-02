@@ -19,7 +19,27 @@ namespace Salesync.API.Controllers.Sales
         {
             _returnService = returnService;
         }
+        [HttpGet]
+        [Authorize(Roles = "Admin,Supervisor")]
+        public async Task<IActionResult> GetAllAsync()
+        {
+            var result = await _returnService.GetAllAsync();
 
+            return Ok(
+                ApiResponse<IEnumerable<InvoiceReturnDto>>
+                    .SuccessResponse(result));
+        }
+
+        [HttpGet("{id}")]
+        [Authorize(Roles = "Admin,Supervisor")]
+        public async Task<IActionResult> GetByIdAsync(int id)
+        {
+            var result = await _returnService.GetByIdAsync(id);
+
+            return Ok(
+                ApiResponse<InvoiceReturnDto>
+                    .SuccessResponse(result));
+        }
         [HttpGet("invoice/{invoiceId}")]
         public async Task<IActionResult> GetByInvoiceIdAsync(int invoiceId)
         {
