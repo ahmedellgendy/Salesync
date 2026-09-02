@@ -35,19 +35,35 @@ namespace Salesync.Application.Modules.MasterData.Services
 
         public async Task<CustomerDto> CreateAsync(CreateCustomerDto createCustomerDto)
         {
-            // FluentValidation - Validate data format
-            var validationResult = await _createValidator.ValidateAsync(createCustomerDto);
+            var validationResult =
+                await _createValidator.ValidateAsync(createCustomerDto);
+
             if (!validationResult.IsValid)
                 throw new ValidationException(validationResult.Errors);
 
-            // Check if a customer with the same email already exists
-            var allCustomers = await _unitOfWork.Customers.GetAllAsync();
-            if (allCustomers.Any(c => c.Email == createCustomerDto.Email))
-                throw new ArgumentException($"A customer with the email '{createCustomerDto.Email}' already exists.");
+            var allCustomers =
+                await _unitOfWork.Customers.GetAllAsync();
 
-            // Map from Dto to Customer to save at db
-            var customer = _mapper.Map<Customer>(createCustomerDto);
+            if (!string.IsNullOrWhiteSpace(createCustomerDto.Email))
+            {
+                var emailExists = allCustomers.Any(c =>
+                    !string.IsNullOrWhiteSpace(c.Email) &&
+                    c.Email.Equals(
+                        createCustomerDto.Email,
+                        StringComparison.OrdinalIgnoreCase));
+
+                if (emailExists)
+                {
+                    throw new ArgumentException(
+                        $"A customer with the email '{createCustomerDto.Email}' already exists.");
+                }
+            }
+
+            var customer =
+                _mapper.Map<Customer>(createCustomerDto);
+
             await _unitOfWork.Customers.AddAsync(customer);
+
             await _unitOfWork.CompleteAsync();
 
             return _mapper.Map<CustomerDto>(customer);
