@@ -16,6 +16,8 @@ using Salesync.Application.Modules.UnloadRequest.Dtos;
 using Salesync.Application.Modules.UnloadRequest.Interfaces;
 using Salesync.Domain.Common.Enums.CustomerVisit;
 using Salesync.Domain.Common.Enums.Sales;
+using Salesync.Domain.Common.Enums.Sales.SalesRepDayClosing;
+using Salesync.Domain.Common.Enums.UnloadRequest;
 using Salesync.Domain.Modules.Sales.Entities;
 using SalesRepEntity = Salesync.Domain.Modules.SalesRep.Entities.SalesRep;
 
@@ -32,6 +34,7 @@ namespace Salesync.Application.Modules.SalesRep.Services
         private readonly IInvoiceService _invoiceService;
         private readonly ISalesRepUnloadRequestService _unloadRequestService;
         private readonly IInvoiceReturnService _invoiceReturnService;
+        private readonly ISalesRepDayClosingService _dayClosingService;
 
         public SalesRepMobileService(
             IUnitOfWork unitOfWork,
@@ -40,9 +43,11 @@ namespace Salesync.Application.Modules.SalesRep.Services
             ISalesRepSessionService salesRepSessionService,
             ICustomerVisitService customerVisitService,
             IPaymentService paymentService,
-            IInvoiceService invoiceService ,
+            IInvoiceService invoiceService,
             ISalesRepUnloadRequestService unloadRequestService,
-            IInvoiceReturnService invoiceReturnService)
+            IInvoiceReturnService invoiceReturnService,
+                ISalesRepDayClosingService dayClosingService)
+
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
@@ -53,6 +58,7 @@ namespace Salesync.Application.Modules.SalesRep.Services
             _invoiceService = invoiceService;
             _unloadRequestService = unloadRequestService;
             _invoiceReturnService = invoiceReturnService;
+            _dayClosingService = dayClosingService;
         }
 
         public async Task<SalesRepMobileProfileDto> GetProfileAsync()
@@ -197,9 +203,55 @@ namespace Salesync.Application.Modules.SalesRep.Services
             if (sessionId <= 0)
                 throw new ArgumentException("Invalid session id.");
 
-            await GetCurrentSalesRepAsync();
+            var salesRep =
+                await GetCurrentSalesRepAsync();
 
-            return await _salesRepSessionService.CloseSessionAsync(sessionId);
+            var session =
+                await EnsureSessionBelongsToSalesRepAsync(
+                    sessionId,
+                    salesRep.Id);
+
+            var warehouseId =
+                await GetDayClosingWarehouseIdAsync(
+                    session.Id,
+                    salesRep.Id);
+
+            // 1. Close working session first.
+            var closedSession =
+                await _salesRepSessionService
+                    .CloseSessionAsync(sessionId);
+
+            // 2. Avoid duplicate day closing if this operation
+            //    is retried after the session was already processed.
+            var closingExists =
+                await _unitOfWork.SalesRepDayClosings
+                    .GetQueryable()
+                    .AsNoTracking()
+                    .AnyAsync(x =>
+                        x.SalesRepSessionId == sessionId &&
+                        x.IsActive &&
+                        x.Status != SalesRepDayClosingStatus.Cancelled);
+
+            if (!closingExists)
+            {
+                var closingDto =
+                    new CreateSalesRepDayClosingDto
+                    {
+                        SalesRepSessionId =
+                            sessionId,
+
+                        WarehouseId =
+                            warehouseId,
+
+                        Notes =
+                            "Created automatically when sales rep closed the day."
+                    };
+
+                await _dayClosingService
+                    .CreateAsync(closingDto);
+            }
+
+            return closedSession;
         }
         public async Task<IEnumerable<SalesRepMobileCustomerDto>> GetCustomersAsync(int sessionId)
         {
@@ -595,7 +647,7 @@ namespace Salesync.Application.Modules.SalesRep.Services
 
             var salesRep = await GetCurrentSalesRepAsync();
 
-            var currentSession =await GetCurrentOpenSessionAsync(salesRep.Id);
+            var currentSession = await GetCurrentOpenSessionAsync(salesRep.Id);
 
             var invoice = await _unitOfWork.Invoices
                 .GetQueryable()
@@ -632,7 +684,7 @@ namespace Salesync.Application.Modules.SalesRep.Services
                 .CancelAsync(id);
         }
 
-        public async Task<IEnumerable<MobileReturnableInvoiceDto>>GetReturnableInvoicesAsync(int customerId)
+        public async Task<IEnumerable<MobileReturnableInvoiceDto>> GetReturnableInvoicesAsync(int customerId)
         {
             if (customerId <= 0)
                 throw new ArgumentException("Invalid customer id.");
@@ -645,7 +697,7 @@ namespace Salesync.Application.Modules.SalesRep.Services
                     customerId);
         }
 
-        public async Task<MobileReturnableInvoiceDetailsDto>GetReturnableInvoiceDetailsAsync(int invoiceId)
+        public async Task<MobileReturnableInvoiceDetailsDto> GetReturnableInvoiceDetailsAsync(int invoiceId)
         {
             if (invoiceId <= 0)
                 throw new ArgumentException("Invalid invoice id.");
@@ -787,7 +839,6 @@ namespace Salesync.Application.Modules.SalesRep.Services
 
             return session;
         }
-
         private async Task<List<CustomerVisitMobileProjection>> GetSessionVisitsAsync(int sessionId, int salesRepId)
         {
             return await _unitOfWork.CustomerVisits
@@ -807,7 +858,6 @@ namespace Salesync.Application.Modules.SalesRep.Services
                 })
                 .ToListAsync();
         }
-
         private static IEnumerable<SalesRepMobileCustomerDto> BuildMobileCustomers(List<RouteCustomerMobileProjection> routeCustomers, List<CustomerVisitMobileProjection> visits)
         {
             var latestVisitByCustomer = visits
@@ -878,7 +928,6 @@ namespace Salesync.Application.Modules.SalesRep.Services
 
             return BuildMobileCustomers(selectedRouteCustomers, visits);
         }
-
         private async Task EnsureInvoiceItemsAvailableAsync(int salesRepId, List<CreateSalesRepMobileInvoiceItemDto> items)
         {
             foreach (var item in items)
@@ -974,6 +1023,38 @@ namespace Salesync.Application.Modules.SalesRep.Services
                         $"Available: {inventory.Quantity} {smallUnit}.");
                 }
             }
+        }
+        private async Task<int> GetDayClosingWarehouseIdAsync(int salesRepSessionId,int salesRepId)
+        {
+            var warehouseIds =
+                await _unitOfWork.SalesRepUnloadRequests
+                    .GetQueryable()
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.SalesRepSessionId == salesRepSessionId &&
+                        x.SalesRepId == salesRepId &&
+                        x.IsActive &&
+                        (
+                            x.Status == UnloadRequestStatus.Confirmed ||
+                            x.Status == UnloadRequestStatus.PartiallyConfirmed
+                        ))
+                    .Select(x => x.WarehouseId)
+                    .Distinct()
+                    .ToListAsync();
+
+            if (warehouseIds.Count == 0)
+            {
+                throw new InvalidOperationException(
+                    "Cannot close day because no confirmed unload request was found for this session.");
+            }
+
+            if (warehouseIds.Count > 1)
+            {
+                throw new InvalidOperationException(
+                    "Cannot create day closing because stock was unloaded to multiple warehouses.");
+            }
+
+            return warehouseIds[0];
         }
 
         #endregion

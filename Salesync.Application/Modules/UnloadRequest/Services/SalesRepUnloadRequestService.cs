@@ -428,8 +428,20 @@ namespace Salesync.Application.Modules.UnloadRequest.Services
                 request.ConfirmedByUserId = _currentUser.UserId;
                 request.UpdatedAt = DateTime.UtcNow;
 
-                session.IsStockSettled = true;
-                session.StockSettledAt = DateTime.UtcNow;
+                var isFullyConfirmed =
+                     request.TotalVarianceQuantity == 0;
+
+                session.IsStockSettled =
+                    isFullyConfirmed;
+
+                session.StockSettledAt =
+                    isFullyConfirmed
+                        ? DateTime.UtcNow
+                        : null;
+
+                session.UpdatedAt =
+                    DateTime.UtcNow;
+
                 session.UpdatedAt = DateTime.UtcNow;
 
                 _unitOfWork.SalesRepUnloadRequests.Update(request);

@@ -17,7 +17,15 @@ namespace Salesync.Domain.Modules.Sales.Entities
 
         // Sales Summary
         public decimal TotalSalesAmount { get; set; }
+
         public decimal TotalCollectionAmount { get; set; }
+
+        public decimal CashCollectionAmount { get; set; }
+
+        public decimal NonCashCollectionAmount { get; set; }
+
+        public decimal OutstandingAmount { get; set; }
+
         public decimal TotalReturnAmount { get; set; }
 
         // Cash Settlement

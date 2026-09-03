@@ -8,6 +8,5 @@
 
         public string? Notes { get; set; }
 
-        public List<CreateSalesRepDayClosingItemDto> Items { get; set; } = new();
     }
 }
