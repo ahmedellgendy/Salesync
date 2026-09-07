@@ -103,123 +103,259 @@ namespace Salesync.Application.Modules.Treasury.Services
             return _mapper.Map<CashBoxDto>(cashBox);
         }
 
-        public async Task<CashReceiptDto> ReceiveDayClosingCashAsync(int dayClosingId,ReceiveDayClosingCashDto dto)
+        public async Task<CashReceiptDto> ReceiveDayClosingCashAsync(
+                     int dayClosingId,
+                     ReceiveDayClosingCashDto dto)
         {
             if (dayClosingId <= 0)
-                throw new ArgumentException("Invalid day closing id.");
+                throw new ArgumentException(
+                    "Invalid day closing id.");
 
-            var validationResult = await _receiveCashValidator.ValidateAsync(dto);
+            var validationResult =
+                await _receiveCashValidator.ValidateAsync(dto);
 
             if (!validationResult.IsValid)
-                throw new ValidationException(validationResult.Errors);
+                throw new ValidationException(
+                    validationResult.Errors);
 
-            var userId = _currentUser.UserId;
+            var userId =
+                _currentUser.UserId;
 
             if (string.IsNullOrWhiteSpace(userId))
-                throw new UnauthorizedAccessException("User is not authenticated.");
+                throw new UnauthorizedAccessException(
+                    "User is not authenticated.");
 
-            var closing = await _unitOfWork.SalesRepDayClosings
-                .GetQueryable()
-                .Include(x => x.SalesRepSession)
-                .FirstOrDefaultAsync(x => x.Id == dayClosingId && x.IsActive);
+            var closing =
+                await _unitOfWork.SalesRepDayClosings
+                    .GetQueryable()
+                    .Include(x => x.SalesRepSession)
+                    .FirstOrDefaultAsync(x =>
+                        x.Id == dayClosingId &&
+                        x.IsActive);
 
             if (closing == null)
-                throw new KeyNotFoundException($"Day closing with id {dayClosingId} not found.");
+                throw new KeyNotFoundException(
+                    $"Day closing with id {dayClosingId} not found.");
 
-            if (closing.Status != SalesRepDayClosingStatus.Submitted)
-                throw new InvalidOperationException("Cash can only be received for submitted day closing.");
+            if (closing.Status !=
+                SalesRepDayClosingStatus.Submitted)
+            {
+                throw new InvalidOperationException(
+                    "Cash can only be received for submitted day closing.");
+            }
+
             if (closing.IsCashReceived)
-                throw new InvalidOperationException("Cash has already been received for this day closing.");
+                throw new InvalidOperationException(
+                    "Cash has already been received for this day closing.");
 
-            var cashBox = await _unitOfWork.CashBoxes
-                .GetQueryable()
-                .FirstOrDefaultAsync(x => x.Id == dto.CashBoxId && x.IsActive);
+            if (!closing.IsStockReceived)
+                throw new InvalidOperationException(
+                    "Stock settlement must be completed before treasury settlement.");
+
+            if (closing.SalesRepSession == null)
+                throw new InvalidOperationException(
+                    "Sales rep session was not found for this day closing.");
+
+            if (!closing.SalesRepSession.IsStockSettled)
+                throw new InvalidOperationException(
+                    "Sales rep session stock must be settled before treasury settlement.");
+
+            if (closing.SalesRepSession.IsTreasurySettled)
+                throw new InvalidOperationException(
+                    "Treasury settlement has already been completed for this session.");
+
+            var cashBox =
+                await _unitOfWork.CashBoxes
+                    .GetQueryable()
+                    .FirstOrDefaultAsync(x =>
+                        x.Id == dto.CashBoxId &&
+                        x.IsActive);
 
             if (cashBox == null)
-                throw new KeyNotFoundException($"Cash box with id {dto.CashBoxId} not found.");
+                throw new KeyNotFoundException(
+                    $"Cash box with id {dto.CashBoxId} not found.");
 
-            var hasReceipt = await _unitOfWork.CashReceipts
-                .GetQueryable()
-                .AnyAsync(x => x.SalesRepDayClosingId == dayClosingId && x.IsActive);
+            var hasReceipt =
+                await _unitOfWork.CashReceipts
+                    .GetQueryable()
+                    .AnyAsync(x =>
+                        x.SalesRepDayClosingId == dayClosingId &&
+                        x.IsActive);
 
             if (hasReceipt)
-                throw new InvalidOperationException("Cash receipt already exists for this day closing.");
+                throw new InvalidOperationException(
+                    "Cash receipt already exists for this day closing.");
 
-            var expectedAmount = closing.ExpectedCashAmount;
-            var receivedAmount = dto.ReceivedAmount;
-            var varianceAmount = receivedAmount - expectedAmount;
+            var expectedAmount =
+                closing.ExpectedCashAmount;
+
+            var receivedAmount =
+                dto.ReceivedAmount;
+
+            var varianceAmount =
+                receivedAmount - expectedAmount;
+
+            var now =
+                DateTime.UtcNow;
 
             await _unitOfWork.BeginTransactionAsync();
 
             try
             {
-                var receipt = new CashReceipt
-                {
-                    ReceiptNumber = GenerateReceiptNumber(),
-                    CashBoxId = cashBox.Id,
-                    SalesRepId = closing.SalesRepId,
-                    SalesRepSessionId = closing.SalesRepSessionId,
-                    SalesRepDayClosingId = closing.Id,
-                    ExpectedAmount = expectedAmount,
-                    ReceivedAmount = receivedAmount,
-                    VarianceAmount = varianceAmount,
-                    ReceivedByUserId = userId,
-                    ReceivedAt = DateTime.UtcNow,
-                    Notes = dto.Notes,
-                    IsActive = true,
-                    CreatedAt = DateTime.UtcNow
-                };
-
-                await _unitOfWork.CashReceipts.AddAsync(receipt);
-
-                cashBox.CurrentBalance += receivedAmount;
-                cashBox.UpdatedAt = DateTime.UtcNow;
-
-                _unitOfWork.CashBoxes.Update(cashBox);
-
-                await _unitOfWork.CompleteAsync();
-
-                if (varianceAmount != 0)
-                {
-                    var currentSalesRepCashBalance = await GetCurrentSalesRepCashBalanceAsync(closing.SalesRepId);
-
-                    var ledger = new SalesRepCashLedger
+                // 1. Create official treasury receipt
+                var receipt =
+                    new CashReceipt
                     {
-                        SalesRepId = closing.SalesRepId,
-                        EntryDate = DateTime.UtcNow,
-                        Amount = varianceAmount,
-                        BalanceAfter = currentSalesRepCashBalance + varianceAmount,
-                        Source = SalesRepCashLedgerSource.CashReceipt,
-                        CashReceiptId = receipt.Id,
-                        ReferenceNumber = receipt.ReceiptNumber,
-                        Notes = BuildVarianceNotes(expectedAmount, receivedAmount, varianceAmount),
+                        ReceiptNumber =
+                            GenerateReceiptNumber(),
+
+                        CashBoxId =
+                            cashBox.Id,
+
+                        SalesRepId =
+                            closing.SalesRepId,
+
+                        SalesRepSessionId =
+                            closing.SalesRepSessionId,
+
+                        SalesRepDayClosingId =
+                            closing.Id,
+
+                        ExpectedAmount =
+                            expectedAmount,
+
+                        ReceivedAmount =
+                            receivedAmount,
+
+                        VarianceAmount =
+                            varianceAmount,
+
+                        ReceivedByUserId =
+                            userId,
+
+                        ReceivedAt =
+                            now,
+
+                        Notes =
+                            string.IsNullOrWhiteSpace(dto.Notes)
+                                ? null
+                                : dto.Notes.Trim(),
+
                         IsActive = true,
-                        CreatedAt = DateTime.UtcNow
+                        CreatedAt = now
                     };
 
-                    await _unitOfWork.SalesRepCashLedgers.AddAsync(ledger);
-                }
+                await _unitOfWork.CashReceipts
+                    .AddAsync(receipt);
 
-                closing.ActualCashAmount = receivedAmount;
-                closing.CashVariance = varianceAmount;
-                closing.IsCashReceived = true;
-                closing.CashReceivedByUserId = userId;
-                closing.CashReceivedAt = DateTime.UtcNow;
-                closing.CashNotes = dto.Notes;
+                // 2. Increase cash box balance
+                cashBox.CurrentBalance +=
+                    receivedAmount;
 
-                if (closing.IsStockReceived)
+                cashBox.UpdatedAt =
+                    now;
+
+                _unitOfWork.CashBoxes
+                    .Update(cashBox);
+
+                // Save first so receipt.Id is generated
+                await _unitOfWork.CompleteAsync();
+
+                // 3. Record sales rep variance if any
+                if (varianceAmount != 0)
                 {
-                    closing.Status = SalesRepDayClosingStatus.Completed;
+                    var currentSalesRepCashBalance =
+                        await GetCurrentSalesRepCashBalanceAsync(
+                            closing.SalesRepId);
+
+                    var ledger =
+                        new SalesRepCashLedger
+                        {
+                            SalesRepId =
+                                closing.SalesRepId,
+
+                            EntryDate =
+                                now,
+
+                            Amount =
+                                varianceAmount,
+
+                            BalanceAfter =
+                                currentSalesRepCashBalance +
+                                varianceAmount,
+
+                            Source =
+                                SalesRepCashLedgerSource.CashReceipt,
+
+                            CashReceiptId =
+                                receipt.Id,
+
+                            ReferenceNumber =
+                                receipt.ReceiptNumber,
+
+                            Notes =
+                                BuildVarianceNotes(
+                                    expectedAmount,
+                                    receivedAmount,
+                                    varianceAmount),
+
+                            IsActive = true,
+                            CreatedAt = now
+                        };
+
+                    await _unitOfWork.SalesRepCashLedgers
+                        .AddAsync(ledger);
                 }
 
-                closing.UpdatedAt = DateTime.UtcNow;
+                // 4. Complete Day Closing cash settlement
+                closing.ActualCashAmount =
+                    receivedAmount;
 
-                _unitOfWork.SalesRepDayClosings.Update(closing);
+                closing.CashVariance =
+                    varianceAmount;
+
+                closing.IsCashReceived =
+                    true;
+
+                closing.CashReceivedByUserId =
+                    userId;
+
+                closing.CashReceivedAt =
+                    now;
+
+                closing.CashNotes =
+                    string.IsNullOrWhiteSpace(dto.Notes)
+                        ? null
+                        : dto.Notes.Trim();
+
+                closing.Status =
+                    SalesRepDayClosingStatus.Completed;
+
+                closing.UpdatedAt =
+                    now;
+
+                _unitOfWork.SalesRepDayClosings
+                    .Update(closing);
+
+                // 5. Complete session treasury settlement
+                closing.SalesRepSession.IsTreasurySettled =
+                    true;
+
+                closing.SalesRepSession.TreasurySettledAt =
+                    now;
+
+                closing.SalesRepSession.UpdatedAt =
+                    now;
+
+                _unitOfWork.SalesRepSessions
+                    .Update(closing.SalesRepSession);
 
                 await _unitOfWork.CompleteAsync();
+
                 await _unitOfWork.CommitTransactionAsync();
 
-                return _mapper.Map<CashReceiptDto>(receipt);
+                return _mapper.Map<CashReceiptDto>(
+                    receipt);
             }
             catch
             {
