@@ -18,19 +18,22 @@ namespace Salesync.Application.Modules.Treasury.Services
         private readonly ICurrentUserService _currentUser;
         private readonly IValidator<CreateCashBoxDto> _createCashBoxValidator;
         private readonly IValidator<ReceiveDayClosingCashDto> _receiveCashValidator;
+        private readonly IValidator<CreateTreasuryCashOutDto> _createCashOutValidator;
 
         public TreasuryService(
             IUnitOfWork unitOfWork,
             IMapper mapper,
             ICurrentUserService currentUser,
             IValidator<CreateCashBoxDto> createCashBoxValidator,
-            IValidator<ReceiveDayClosingCashDto> receiveCashValidator)
+            IValidator<ReceiveDayClosingCashDto> receiveCashValidator,
+            IValidator<CreateTreasuryCashOutDto> createCashOutValidator)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
             _currentUser = currentUser;
             _createCashBoxValidator = createCashBoxValidator;
             _receiveCashValidator = receiveCashValidator;
+            _createCashOutValidator = createCashOutValidator;
         }
 
         public async Task<IEnumerable<CashBoxDto>> GetCashBoxesAsync()
@@ -486,6 +489,151 @@ namespace Salesync.Application.Modules.Treasury.Services
                     transactions);
         }
 
+        public async Task<TreasuryCashOutDto> CreateCashOutAsync(CreateTreasuryCashOutDto dto)
+        {
+            var validationResult =
+                await _createCashOutValidator.ValidateAsync(dto);
+
+            if (!validationResult.IsValid)
+                throw new ValidationException(validationResult.Errors);
+
+            var userId = _currentUser.UserId;
+
+            if (string.IsNullOrWhiteSpace(userId))
+                throw new UnauthorizedAccessException(
+                    "User is not authenticated.");
+
+            var cashBox =
+                await _unitOfWork.CashBoxes
+                    .GetQueryable()
+                    .FirstOrDefaultAsync(x =>
+                        x.Id == dto.CashBoxId &&
+                        x.IsActive);
+
+            if (cashBox == null)
+                throw new KeyNotFoundException(
+                    $"Cash box with id {dto.CashBoxId} not found.");
+
+            if (cashBox.CurrentBalance < dto.Amount)
+            {
+                throw new InvalidOperationException(
+                    $"Insufficient cash box balance. " +
+                    $"Available: {cashBox.CurrentBalance:N2}, " +
+                    $"Requested: {dto.Amount:N2}.");
+            }
+
+            var now = DateTime.UtcNow;
+
+            var balanceBefore =
+                cashBox.CurrentBalance;
+
+            var balanceAfter =
+                balanceBefore - dto.Amount;
+
+            await _unitOfWork.BeginTransactionAsync();
+
+            try
+            {
+                var transaction =
+                    new TreasuryTransaction
+                    {
+                        CashBoxId =
+                            cashBox.Id,
+
+                        Type =
+                            TreasuryTransactionType.CashOut,
+
+                        Source =
+                            dto.Source,
+
+                        Amount =
+                            dto.Amount,
+
+                        BalanceBefore =
+                            balanceBefore,
+
+                        BalanceAfter =
+                            balanceAfter,
+
+                        TransactionDate =
+                            now,
+
+                        ReferenceNumber =
+                            string.IsNullOrWhiteSpace(dto.ReferenceNumber)
+                                ? null
+                                : dto.ReferenceNumber.Trim(),
+
+                        Notes =
+                            string.IsNullOrWhiteSpace(dto.Notes)
+                                ? null
+                                : dto.Notes.Trim(),
+
+                        CreatedByUserId =
+                            userId,
+
+                        IsActive =
+                            true,
+
+                        CreatedAt =
+                            now
+                    };
+
+                await _unitOfWork.TreasuryTransactions
+                    .AddAsync(transaction);
+
+                cashBox.CurrentBalance =
+                    balanceAfter;
+
+                cashBox.UpdatedAt =
+                    now;
+
+                _unitOfWork.CashBoxes
+                    .Update(cashBox);
+
+                await _unitOfWork.CompleteAsync();
+
+                await _unitOfWork.CommitTransactionAsync();
+
+                return new TreasuryCashOutDto
+                {
+                    TreasuryTransactionId =
+                        transaction.Id,
+
+                    CashBoxId =
+                        transaction.CashBoxId,
+
+                    Amount =
+                        transaction.Amount,
+
+                    BalanceBefore =
+                        transaction.BalanceBefore,
+
+                    BalanceAfter =
+                        transaction.BalanceAfter,
+
+                    Source =
+                        (int)transaction.Source,
+
+                    ReferenceNumber =
+                        transaction.ReferenceNumber,
+
+                    Notes =
+                        transaction.Notes,
+
+                    CreatedByUserId =
+                        transaction.CreatedByUserId,
+
+                    TransactionDate =
+                        transaction.TransactionDate
+                };
+            }
+            catch
+            {
+                await _unitOfWork.RollbackTransactionAsync();
+                throw;
+            }
+        }
+
 
         #region Helper Methods
 
@@ -510,7 +658,7 @@ namespace Salesync.Application.Modules.Treasury.Services
             }
 
             return $"Cash surplus. Expected: {expectedAmount}, Received: {receivedAmount}, Variance: {varianceAmount}.";
-        } 
+        }
 
         #endregion
 

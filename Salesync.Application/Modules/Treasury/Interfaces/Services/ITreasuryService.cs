@@ -17,5 +17,7 @@ namespace Salesync.Application.Modules.Treasury.Interfaces.Services
         Task<decimal> GetSalesRepCashBalanceAsync(int salesRepId);
 
         Task<IEnumerable<TreasuryTransactionDto>> GetTransactionsAsync(int? cashBoxId = null, DateTime? fromDate = null, DateTime? toDate = null);
+
+        Task<TreasuryCashOutDto> CreateCashOutAsync(CreateTreasuryCashOutDto dto);
     }
 }

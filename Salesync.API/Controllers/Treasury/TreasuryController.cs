@@ -86,5 +86,20 @@ namespace Salesync.API.Controllers.Treasury
                         result,
                         "Treasury transactions retrieved successfully."));
         }
+
+        [HttpPost("cash-out")]  // POST: api/treasury/cash-out
+        [Authorize(Roles = "Admin,Treasury")]
+        public async Task<IActionResult> CreateCashOut([FromBody] CreateTreasuryCashOutDto dto)
+        {
+            var result =
+                await _treasuryService
+                    .CreateCashOutAsync(dto);
+
+            return Ok(
+                ApiResponse<TreasuryCashOutDto>
+                    .SuccessResponse(
+                        result,
+                        "Cash out transaction created successfully."));
+        }
     }
 }
