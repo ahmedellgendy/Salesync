@@ -103,9 +103,7 @@ namespace Salesync.Application.Modules.Treasury.Services
             return _mapper.Map<CashBoxDto>(cashBox);
         }
 
-        public async Task<CashReceiptDto> ReceiveDayClosingCashAsync(
-                     int dayClosingId,
-                     ReceiveDayClosingCashDto dto)
+        public async Task<CashReceiptDto> ReceiveDayClosingCashAsync(int dayClosingId, ReceiveDayClosingCashDto dto)
         {
             if (dayClosingId <= 0)
                 throw new ArgumentException(
@@ -198,11 +196,17 @@ namespace Salesync.Application.Modules.Treasury.Services
             var now =
                 DateTime.UtcNow;
 
+            var balanceBefore =
+                cashBox.CurrentBalance;
+
+            var balanceAfter =
+                balanceBefore + receivedAmount;
+
             await _unitOfWork.BeginTransactionAsync();
 
             try
             {
-                // 1. Create official treasury receipt
+                // 1. Create official cash receipt
                 var receipt =
                     new CashReceipt
                     {
@@ -248,9 +252,9 @@ namespace Salesync.Application.Modules.Treasury.Services
                 await _unitOfWork.CashReceipts
                     .AddAsync(receipt);
 
-                // 2. Increase cash box balance
-                cashBox.CurrentBalance +=
-                    receivedAmount;
+                // 2. Update cash box balance
+                cashBox.CurrentBalance =
+                    balanceAfter;
 
                 cashBox.UpdatedAt =
                     now;
@@ -258,10 +262,59 @@ namespace Salesync.Application.Modules.Treasury.Services
                 _unitOfWork.CashBoxes
                     .Update(cashBox);
 
-                // Save first so receipt.Id is generated
+                // Save receipt first to generate receipt.Id
                 await _unitOfWork.CompleteAsync();
 
-                // 3. Record sales rep variance if any
+                // 3. Create treasury transaction audit entry
+                var treasuryTransaction =
+                    new TreasuryTransaction
+                    {
+                        CashBoxId =
+                            cashBox.Id,
+
+                        Type =
+                            TreasuryTransactionType.CashIn,
+
+                        Source =
+                            TreasuryTransactionSource.SalesRepSettlement,
+
+                        Amount =
+                            receivedAmount,
+
+                        BalanceBefore =
+                            balanceBefore,
+
+                        BalanceAfter =
+                            balanceAfter,
+
+                        TransactionDate =
+                            now,
+
+                        ReferenceNumber =
+                            receipt.ReceiptNumber,
+
+                        CashReceiptId =
+                            receipt.Id,
+
+                        Notes =
+                            string.IsNullOrWhiteSpace(dto.Notes)
+                                ? $"Sales rep cash settlement for day closing {closing.ClosingNumber}."
+                                : dto.Notes.Trim(),
+
+                        CreatedByUserId =
+                            userId,
+
+                        IsActive =
+                            true,
+
+                        CreatedAt =
+                            now
+                    };
+
+                await _unitOfWork.TreasuryTransactions
+                    .AddAsync(treasuryTransaction);
+
+                // 4. Record sales rep variance if any
                 if (varianceAmount != 0)
                 {
                     var currentSalesRepCashBalance =
@@ -299,15 +352,18 @@ namespace Salesync.Application.Modules.Treasury.Services
                                     receivedAmount,
                                     varianceAmount),
 
-                            IsActive = true,
-                            CreatedAt = now
+                            IsActive =
+                                true,
+
+                            CreatedAt =
+                                now
                         };
 
                     await _unitOfWork.SalesRepCashLedgers
                         .AddAsync(ledger);
                 }
 
-                // 4. Complete Day Closing cash settlement
+                // 5. Complete Day Closing
                 closing.ActualCashAmount =
                     receivedAmount;
 
@@ -337,7 +393,7 @@ namespace Salesync.Application.Modules.Treasury.Services
                 _unitOfWork.SalesRepDayClosings
                     .Update(closing);
 
-                // 5. Complete session treasury settlement
+                // 6. Complete session treasury settlement
                 closing.SalesRepSession.IsTreasurySettled =
                     true;
 
@@ -350,6 +406,7 @@ namespace Salesync.Application.Modules.Treasury.Services
                 _unitOfWork.SalesRepSessions
                     .Update(closing.SalesRepSession);
 
+                // 7. Save everything atomically
                 await _unitOfWork.CompleteAsync();
 
                 await _unitOfWork.CommitTransactionAsync();
@@ -387,6 +444,51 @@ namespace Salesync.Application.Modules.Treasury.Services
             return await GetCurrentSalesRepCashBalanceAsync(salesRepId);
         }
 
+        public async Task<IEnumerable<TreasuryTransactionDto>> GetTransactionsAsync(int? cashBoxId = null, DateTime? fromDate = null, DateTime? toDate = null)
+        {
+            var query =
+                _unitOfWork.TreasuryTransactions
+                    .GetQueryable()
+                    .AsNoTracking()
+                    .Where(x => x.IsActive);
+
+            if (cashBoxId.HasValue)
+            {
+                query =
+                    query.Where(x =>
+                        x.CashBoxId == cashBoxId.Value);
+            }
+
+            if (fromDate.HasValue)
+            {
+                query =
+                    query.Where(x =>
+                        x.TransactionDate >= fromDate.Value);
+            }
+
+            if (toDate.HasValue)
+            {
+                query =
+                    query.Where(x =>
+                        x.TransactionDate <= toDate.Value);
+            }
+
+            var transactions =
+                await query
+                    .OrderByDescending(x =>
+                        x.TransactionDate)
+                    .ThenByDescending(x =>
+                        x.Id)
+                    .ToListAsync();
+
+            return _mapper.Map<
+                IEnumerable<TreasuryTransactionDto>>(
+                    transactions);
+        }
+
+
+        #region Helper Methods
+
         private async Task<decimal> GetCurrentSalesRepCashBalanceAsync(int salesRepId)
         {
             return await _unitOfWork.SalesRepCashLedgers
@@ -400,7 +502,7 @@ namespace Salesync.Application.Modules.Treasury.Services
             return $"CR-{DateTime.UtcNow:yyyyMMddHHmmssfff}";
         }
 
-        private static string BuildVarianceNotes(decimal expectedAmount,decimal receivedAmount,decimal varianceAmount)
+        private static string BuildVarianceNotes(decimal expectedAmount, decimal receivedAmount, decimal varianceAmount)
         {
             if (varianceAmount < 0)
             {
@@ -408,7 +510,9 @@ namespace Salesync.Application.Modules.Treasury.Services
             }
 
             return $"Cash surplus. Expected: {expectedAmount}, Received: {receivedAmount}, Variance: {varianceAmount}.";
-        }
+        } 
+
+        #endregion
 
     }
 }

@@ -361,7 +361,14 @@ namespace Salesync.Application.Modules.LoadRequest.Services
                     }
                 }
 
-                request.Status = LoadRequestStatus.WarehouseConfirmed;
+                var isFullyConfirmed =
+                    request.Items.All(x =>
+                        x.ConfirmedQuantity == x.ApprovedQuantity);
+
+                request.Status =
+                    isFullyConfirmed
+                                     ? LoadRequestStatus.WarehouseConfirmed
+                     : LoadRequestStatus.PartiallyConfirmed;
                 request.ConfirmedByUserId = _currentUser.UserId;
                 request.ConfirmedAt = DateTime.UtcNow;
                 request.Notes = dto.Notes ?? request.Notes;
@@ -387,6 +394,10 @@ namespace Salesync.Application.Modules.LoadRequest.Services
 
             if (request.Status == LoadRequestStatus.WarehouseConfirmed)
                 throw new InvalidOperationException("Cannot cancel warehouse confirmed load request.");
+
+            if (request.Status == LoadRequestStatus.WarehouseConfirmed || request.Status == LoadRequestStatus.PartiallyConfirmed)
+                throw new InvalidOperationException("Cannot cancel a warehouse processed load request.");
+
 
             if (request.Status == LoadRequestStatus.Rejected)
                 throw new InvalidOperationException("Cannot cancel rejected load request.");

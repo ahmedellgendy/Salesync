@@ -65,5 +65,26 @@ namespace Salesync.API.Controllers.Treasury
             var result = await _treasuryService.GetSalesRepCashBalanceAsync(salesRepId);
             return Ok(ApiResponse<decimal>.SuccessResponse(result, "Sales rep cash balance retrieved successfully."));
         }
+
+        [HttpGet("transactions")] // GET: api/treasury/transactions?cashBoxId={cashBoxId}&fromDate={fromDate}&toDate={toDate}
+        [Authorize(Roles = "Admin,Treasury")]
+        public async Task<IActionResult> GetTransactions(
+                 [FromQuery] int? cashBoxId = null,
+                 [FromQuery] DateTime? fromDate = null,
+                 [FromQuery] DateTime? toDate = null)
+        {
+            var result =
+                await _treasuryService
+                    .GetTransactionsAsync(
+                        cashBoxId,
+                        fromDate,
+                        toDate);
+
+            return Ok(
+                ApiResponse<IEnumerable<TreasuryTransactionDto>>
+                    .SuccessResponse(
+                        result,
+                        "Treasury transactions retrieved successfully."));
+        }
     }
 }

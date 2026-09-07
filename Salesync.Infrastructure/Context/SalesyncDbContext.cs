@@ -82,7 +82,7 @@ namespace Salesync.Infrastructure.Data
         public DbSet<CashBox> CashBoxes { get; set; }
         public DbSet<CashReceipt> CashReceipts { get; set; }
         public DbSet<SalesRepCashLedger> SalesRepCashLedgers { get; set; }
-
+        public DbSet<TreasuryTransaction> TreasuryTransactions { get; set; }
 
         #endregion
 

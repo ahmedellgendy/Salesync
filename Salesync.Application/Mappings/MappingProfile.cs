@@ -218,6 +218,8 @@ namespace Salesync.Application.Mappings
 
             CreateMap<SalesRepCashLedger, SalesRepCashLedgerDto>();
 
+            CreateMap<TreasuryTransaction, TreasuryTransactionDto>();
+
             #endregion
 
             #region UnloadRequest 
