@@ -19,5 +19,13 @@ namespace Salesync.Application.Modules.Treasury.Interfaces.Services
         Task<IEnumerable<TreasuryTransactionDto>> GetTransactionsAsync(int? cashBoxId = null, DateTime? fromDate = null, DateTime? toDate = null);
 
         Task<TreasuryCashOutDto> CreateCashOutAsync(CreateTreasuryCashOutDto dto);
+
+        Task<IEnumerable<ExpenseCategoryDto>> GetExpenseCategoriesAsync();
+
+        Task<ExpenseCategoryDto> GetExpenseCategoryByIdAsync(int id);
+
+        Task<ExpenseCategoryDto> CreateExpenseCategoryAsync(CreateExpenseCategoryDto dto);
+
+        Task<ExpenseCategoryDto> UpdateExpenseCategoryAsync(int id, UpdateExpenseCategoryDto dto);
     }
 }

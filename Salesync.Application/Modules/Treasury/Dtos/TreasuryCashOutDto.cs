@@ -21,5 +21,8 @@
         public string? CreatedByUserId { get; set; }
 
         public DateTime TransactionDate { get; set; }
+        public int? ExpenseCategoryId { get; set; }
+
+        public string? ExpenseCategoryName { get; set; }
     }
 }

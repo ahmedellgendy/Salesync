@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Salesync.Infrastructure.Data;
 
@@ -11,9 +12,11 @@ using Salesync.Infrastructure.Data;
 namespace Salesync.Infrastructure.Migrations
 {
     [DbContext(typeof(SalesyncDbContext))]
-    partial class SalesyncDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260907105514_AddExpenseCategories")]
+    partial class AddExpenseCategories
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -2335,9 +2338,6 @@ namespace Salesync.Infrastructure.Migrations
                         .HasMaxLength(450)
                         .HasColumnType("nvarchar(450)");
 
-                    b.Property<int?>("ExpenseCategoryId")
-                        .HasColumnType("int");
-
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
@@ -2369,8 +2369,6 @@ namespace Salesync.Infrastructure.Migrations
                     b.HasIndex("CashBoxId");
 
                     b.HasIndex("CashReceiptId");
-
-                    b.HasIndex("ExpenseCategoryId");
 
                     b.HasIndex("ReferenceNumber");
 
@@ -3314,16 +3312,9 @@ namespace Salesync.Infrastructure.Migrations
                         .HasForeignKey("CashReceiptId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("Salesync.Domain.Modules.Treasury.Entities.ExpenseCategory", "ExpenseCategory")
-                        .WithMany("TreasuryTransactions")
-                        .HasForeignKey("ExpenseCategoryId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.Navigation("CashBox");
 
                     b.Navigation("CashReceipt");
-
-                    b.Navigation("ExpenseCategory");
                 });
 
             modelBuilder.Entity("Salesync.Domain.Modules.UnloadRequest.Entities.SalesRepUnloadRequestItem", b =>
@@ -3408,11 +3399,6 @@ namespace Salesync.Infrastructure.Migrations
                     b.Navigation("CashReceipts");
 
                     b.Navigation("Transactions");
-                });
-
-            modelBuilder.Entity("Salesync.Domain.Modules.Treasury.Entities.ExpenseCategory", b =>
-                {
-                    b.Navigation("TreasuryTransactions");
                 });
 
             modelBuilder.Entity("Salesync.Domain.Modules.UnloadRequest.Entities.SalesRepUnloadRequest", b =>

@@ -30,5 +30,8 @@ namespace Salesync.Domain.Modules.Treasury.Entities
         public CashBox CashBox { get; set; } = null!;
 
         public CashReceipt? CashReceipt { get; set; }
+        public int? ExpenseCategoryId { get; set; }
+
+        public ExpenseCategory? ExpenseCategory { get; set; }
     }
 }

@@ -220,6 +220,8 @@ namespace Salesync.Application.Mappings
 
             CreateMap<TreasuryTransaction, TreasuryTransactionDto>();
 
+            CreateMap<ExpenseCategory, ExpenseCategoryDto>();
+
             #endregion
 
             #region UnloadRequest 

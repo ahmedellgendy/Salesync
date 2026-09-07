@@ -49,8 +49,8 @@ namespace Salesync.Infrastructure.Repositories.Common
         public IGenericRepository<CashBox> CashBoxes { get; }
         public IGenericRepository<CashReceipt> CashReceipts { get; }
         public IGenericRepository<SalesRepCashLedger> SalesRepCashLedgers { get; }
-        public IGenericRepository<TreasuryTransaction> TreasuryTransactions { get; } 
-
+        public IGenericRepository<TreasuryTransaction> TreasuryTransactions { get; }
+        public IGenericRepository<ExpenseCategory> ExpenseCategories { get; }
         public IGenericRepository<SalesRepUnloadRequest> SalesRepUnloadRequests { get; }
         public IGenericRepository<SalesRepUnloadRequestItem> SalesRepUnloadRequestItems { get; }
 
@@ -90,6 +90,7 @@ namespace Salesync.Infrastructure.Repositories.Common
             CashReceipts = new GenericRepository<CashReceipt>(_context);
             SalesRepCashLedgers = new GenericRepository<SalesRepCashLedger>(_context);
             TreasuryTransactions = new GenericRepository<TreasuryTransaction>(_context);
+            ExpenseCategories = new GenericRepository<ExpenseCategory>(_context);
 
             SalesRepUnloadRequests = new GenericRepository<SalesRepUnloadRequest>(_context);
             SalesRepUnloadRequestItems = new GenericRepository<SalesRepUnloadRequestItem>(_context);

@@ -11,6 +11,7 @@ namespace Salesync.Application.Modules.Treasury.Dtos
         public TreasuryTransactionSource Source { get; set; }
 
         public string? ReferenceNumber { get; set; }
+        public int? ExpenseCategoryId { get; set; }
 
         public string? Notes { get; set; }
     }

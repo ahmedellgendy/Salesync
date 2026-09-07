@@ -83,6 +83,7 @@ namespace Salesync.Infrastructure.Data
         public DbSet<CashReceipt> CashReceipts { get; set; }
         public DbSet<SalesRepCashLedger> SalesRepCashLedgers { get; set; }
         public DbSet<TreasuryTransaction> TreasuryTransactions { get; set; }
+        public DbSet<ExpenseCategory> ExpenseCategories { get; set; }
 
         #endregion
 

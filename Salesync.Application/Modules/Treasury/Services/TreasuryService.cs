@@ -19,6 +19,8 @@ namespace Salesync.Application.Modules.Treasury.Services
         private readonly IValidator<CreateCashBoxDto> _createCashBoxValidator;
         private readonly IValidator<ReceiveDayClosingCashDto> _receiveCashValidator;
         private readonly IValidator<CreateTreasuryCashOutDto> _createCashOutValidator;
+        private readonly IValidator<CreateExpenseCategoryDto> _createExpenseCategoryValidator;
+        private readonly IValidator<UpdateExpenseCategoryDto> _updateExpenseCategoryValidator;
 
         public TreasuryService(
             IUnitOfWork unitOfWork,
@@ -26,7 +28,9 @@ namespace Salesync.Application.Modules.Treasury.Services
             ICurrentUserService currentUser,
             IValidator<CreateCashBoxDto> createCashBoxValidator,
             IValidator<ReceiveDayClosingCashDto> receiveCashValidator,
-            IValidator<CreateTreasuryCashOutDto> createCashOutValidator)
+            IValidator<CreateTreasuryCashOutDto> createCashOutValidator,
+            IValidator<CreateExpenseCategoryDto> createExpenseCategoryValidator,
+            IValidator<UpdateExpenseCategoryDto> updateExpenseCategoryValidator)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
@@ -34,6 +38,8 @@ namespace Salesync.Application.Modules.Treasury.Services
             _createCashBoxValidator = createCashBoxValidator;
             _receiveCashValidator = receiveCashValidator;
             _createCashOutValidator = createCashOutValidator;
+            _createExpenseCategoryValidator = createExpenseCategoryValidator;
+            _updateExpenseCategoryValidator = updateExpenseCategoryValidator;
         }
 
         public async Task<IEnumerable<CashBoxDto>> GetCashBoxesAsync()
@@ -447,12 +453,13 @@ namespace Salesync.Application.Modules.Treasury.Services
             return await GetCurrentSalesRepCashBalanceAsync(salesRepId);
         }
 
-        public async Task<IEnumerable<TreasuryTransactionDto>> GetTransactionsAsync(int? cashBoxId = null, DateTime? fromDate = null, DateTime? toDate = null)
+        public async Task<IEnumerable<TreasuryTransactionDto>> GetTransactionsAsync(int? cashBoxId = null,DateTime? fromDate = null,DateTime? toDate = null)
         {
             var query =
                 _unitOfWork.TreasuryTransactions
                     .GetQueryable()
                     .AsNoTracking()
+                    .Include(x => x.ExpenseCategory)
                     .Where(x => x.IsActive);
 
             if (cashBoxId.HasValue)
@@ -478,15 +485,43 @@ namespace Salesync.Application.Modules.Treasury.Services
 
             var transactions =
                 await query
-                    .OrderByDescending(x =>
-                        x.TransactionDate)
-                    .ThenByDescending(x =>
-                        x.Id)
+                    .OrderByDescending(x => x.TransactionDate)
+                    .ThenByDescending(x => x.Id)
                     .ToListAsync();
 
-            return _mapper.Map<
-                IEnumerable<TreasuryTransactionDto>>(
-                    transactions);
+            return transactions.Select(x =>
+                new TreasuryTransactionDto
+                {
+                    Id = x.Id,
+
+                    CashBoxId = x.CashBoxId,
+
+                    Type = (int)x.Type,
+
+                    Source = (int)x.Source,
+
+                    Amount = x.Amount,
+
+                    BalanceBefore = x.BalanceBefore,
+
+                    BalanceAfter = x.BalanceAfter,
+
+                    TransactionDate = x.TransactionDate,
+
+                    ReferenceNumber = x.ReferenceNumber,
+
+                    CashReceiptId = x.CashReceiptId,
+
+                    ExpenseCategoryId = x.ExpenseCategoryId,
+
+                    ExpenseCategoryName =
+                        x.ExpenseCategory?.Name,
+
+                    Notes = x.Notes,
+
+                    CreatedByUserId = x.CreatedByUserId
+                })
+                .ToList();
         }
 
         public async Task<TreasuryCashOutDto> CreateCashOutAsync(CreateTreasuryCashOutDto dto)
@@ -495,9 +530,11 @@ namespace Salesync.Application.Modules.Treasury.Services
                 await _createCashOutValidator.ValidateAsync(dto);
 
             if (!validationResult.IsValid)
-                throw new ValidationException(validationResult.Errors);
+                throw new ValidationException(
+                    validationResult.Errors);
 
-            var userId = _currentUser.UserId;
+            var userId =
+                _currentUser.UserId;
 
             if (string.IsNullOrWhiteSpace(userId))
                 throw new UnauthorizedAccessException(
@@ -522,7 +559,34 @@ namespace Salesync.Application.Modules.Treasury.Services
                     $"Requested: {dto.Amount:N2}.");
             }
 
-            var now = DateTime.UtcNow;
+            ExpenseCategory? expenseCategory = null;
+
+            if (dto.Source ==
+                TreasuryTransactionSource.Expense)
+            {
+                if (!dto.ExpenseCategoryId.HasValue)
+                {
+                    throw new InvalidOperationException(
+                        "Expense category is required.");
+                }
+
+                expenseCategory =
+                    await _unitOfWork.ExpenseCategories
+                        .GetQueryable()
+                        .FirstOrDefaultAsync(x =>
+                            x.Id == dto.ExpenseCategoryId.Value &&
+                            x.IsActive);
+
+                if (expenseCategory == null)
+                {
+                    throw new KeyNotFoundException(
+                        $"Expense category with id " +
+                        $"{dto.ExpenseCategoryId.Value} not found.");
+                }
+            }
+
+            var now =
+                DateTime.UtcNow;
 
             var balanceBefore =
                 cashBox.CurrentBalance;
@@ -546,6 +610,9 @@ namespace Salesync.Application.Modules.Treasury.Services
                         Source =
                             dto.Source,
 
+                        ExpenseCategoryId =
+                            expenseCategory?.Id,
+
                         Amount =
                             dto.Amount,
 
@@ -559,12 +626,14 @@ namespace Salesync.Application.Modules.Treasury.Services
                             now,
 
                         ReferenceNumber =
-                            string.IsNullOrWhiteSpace(dto.ReferenceNumber)
+                            string.IsNullOrWhiteSpace(
+                                dto.ReferenceNumber)
                                 ? null
                                 : dto.ReferenceNumber.Trim(),
 
                         Notes =
-                            string.IsNullOrWhiteSpace(dto.Notes)
+                            string.IsNullOrWhiteSpace(
+                                dto.Notes)
                                 ? null
                                 : dto.Notes.Trim(),
 
@@ -614,6 +683,12 @@ namespace Salesync.Application.Modules.Treasury.Services
                     Source =
                         (int)transaction.Source,
 
+                    ExpenseCategoryId =
+                        transaction.ExpenseCategoryId,
+
+                    ExpenseCategoryName =
+                        expenseCategory?.Name,
+
                     ReferenceNumber =
                         transaction.ReferenceNumber,
 
@@ -632,6 +707,158 @@ namespace Salesync.Application.Modules.Treasury.Services
                 await _unitOfWork.RollbackTransactionAsync();
                 throw;
             }
+        }
+
+        public async Task<IEnumerable<ExpenseCategoryDto>>GetExpenseCategoriesAsync()
+        {
+            var categories =
+                await _unitOfWork.ExpenseCategories
+                    .GetQueryable()
+                    .AsNoTracking()
+                    .Where(x => x.IsActive)
+                    .OrderBy(x => x.Name)
+                    .ToListAsync();
+
+            return _mapper.Map<IEnumerable<ExpenseCategoryDto>>(categories);
+        }
+
+        public async Task<ExpenseCategoryDto>GetExpenseCategoryByIdAsync(int id)
+        {
+            if (id <= 0)
+                throw new ArgumentException(
+                    "Invalid expense category id.");
+
+            var category =
+                await _unitOfWork.ExpenseCategories
+                    .GetQueryable()
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(x =>
+                        x.Id == id &&
+                        x.IsActive);
+
+            if (category == null)
+                throw new KeyNotFoundException(
+                    $"Expense category with id {id} not found.");
+
+            return _mapper.Map<ExpenseCategoryDto>(
+                category);
+        }
+
+        public async Task<ExpenseCategoryDto>CreateExpenseCategoryAsync(CreateExpenseCategoryDto dto)
+        {
+            var validationResult =
+                await _createExpenseCategoryValidator
+                    .ValidateAsync(dto);
+
+            if (!validationResult.IsValid)
+                throw new ValidationException(
+                    validationResult.Errors);
+
+            var code =
+                dto.Code.Trim();
+
+            var name =
+                dto.Name.Trim();
+
+            var codeExists =
+                await _unitOfWork.ExpenseCategories
+                    .GetQueryable()
+                    .AnyAsync(x =>
+                        x.Code == code);
+
+            if (codeExists)
+                throw new InvalidOperationException(
+                    "Expense category code already exists.");
+
+            var category =
+                new ExpenseCategory
+                {
+                    Code = code,
+
+                    Name = name,
+
+                    Description =
+                        string.IsNullOrWhiteSpace(dto.Description)
+                            ? null
+                            : dto.Description.Trim(),
+
+                    IsActive = true,
+
+                    CreatedAt =
+                        DateTime.UtcNow
+                };
+
+            await _unitOfWork.ExpenseCategories
+                .AddAsync(category);
+
+            await _unitOfWork.CompleteAsync();
+
+            return _mapper.Map<ExpenseCategoryDto>(
+                category);
+        }
+
+        public async Task<ExpenseCategoryDto>UpdateExpenseCategoryAsync(int id,UpdateExpenseCategoryDto dto)
+        {
+            if (id <= 0)
+                throw new ArgumentException(
+                    "Invalid expense category id.");
+
+            var validationResult =
+                await _updateExpenseCategoryValidator
+                    .ValidateAsync(dto);
+
+            if (!validationResult.IsValid)
+                throw new ValidationException(
+                    validationResult.Errors);
+
+            var category =
+                await _unitOfWork.ExpenseCategories
+                    .GetQueryable()
+                    .FirstOrDefaultAsync(x =>
+                        x.Id == id);
+
+            if (category == null)
+                throw new KeyNotFoundException(
+                    $"Expense category with id {id} not found.");
+
+            var code =
+                dto.Code.Trim();
+
+            var codeExists =
+                await _unitOfWork.ExpenseCategories
+                    .GetQueryable()
+                    .AnyAsync(x =>
+                        x.Id != id &&
+                        x.Code == code);
+
+            if (codeExists)
+                throw new InvalidOperationException(
+                    "Expense category code already exists.");
+
+            category.Code =
+                code;
+
+            category.Name =
+                dto.Name.Trim();
+
+            category.Description =
+                string.IsNullOrWhiteSpace(dto.Description)
+                    ? null
+                    : dto.Description.Trim();
+
+            category.IsActive =
+                dto.IsActive;
+
+            category.UpdatedAt =
+                DateTime.UtcNow;
+
+            _unitOfWork.ExpenseCategories
+                .Update(category);
+
+            await _unitOfWork.CompleteAsync();
+
+            return _mapper.Map<ExpenseCategoryDto>(
+                category);
         }
 
 

@@ -48,6 +48,12 @@ namespace Salesync.Infrastructure.Configurations.Treasury
                 .HasForeignKey(x => x.CashReceiptId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            builder.HasOne(x => x.ExpenseCategory)
+                 .WithMany(x => x.TreasuryTransactions)
+                 .HasForeignKey(x => x.ExpenseCategoryId)
+                 .OnDelete(DeleteBehavior.Restrict);
+
+            builder.HasIndex(x => x.ExpenseCategoryId);
             builder.HasIndex(x => x.CashBoxId);
 
             builder.HasIndex(x => x.TransactionDate);

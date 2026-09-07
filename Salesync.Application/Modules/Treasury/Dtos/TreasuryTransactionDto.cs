@@ -25,5 +25,8 @@
         public string? Notes { get; set; }
 
         public string? CreatedByUserId { get; set; }
+        public int? ExpenseCategoryId { get; set; }
+
+        public string? ExpenseCategoryName { get; set; }
     }
 }

@@ -24,6 +24,32 @@ namespace Salesync.Application.Modules.Treasury.Validators
                 .WithMessage(
                     "Invalid source for cash out transaction.");
 
+            When(
+                x => x.Source == TreasuryTransactionSource.Expense,
+                () =>
+                {
+                    RuleFor(x => x.ExpenseCategoryId)
+                        .NotNull()
+                        .WithMessage(
+                            "Expense category is required for expense transactions.");
+
+                    RuleFor(x => x.ExpenseCategoryId)
+                        .GreaterThan(0)
+                        .When(x => x.ExpenseCategoryId.HasValue)
+                        .WithMessage(
+                            "Expense category id must be greater than zero.");
+                });
+
+            When(
+                x => x.Source != TreasuryTransactionSource.Expense,
+                () =>
+                {
+                    RuleFor(x => x.ExpenseCategoryId)
+                        .Null()
+                        .WithMessage(
+                            "Expense category can only be used for expense transactions.");
+                });
+
             RuleFor(x => x.ReferenceNumber)
                 .MaximumLength(100);
 

@@ -101,5 +101,67 @@ namespace Salesync.API.Controllers.Treasury
                         result,
                         "Cash out transaction created successfully."));
         }
+
+        [HttpGet("expense-categories")] // GET: api/treasury/expense-categories
+        [Authorize(Roles = "Admin,Treasury")]
+        public async Task<IActionResult> GetExpenseCategories()
+        {
+            var result =
+                await _treasuryService
+                    .GetExpenseCategoriesAsync();
+
+            return Ok(
+                ApiResponse<IEnumerable<ExpenseCategoryDto>>
+                    .SuccessResponse(
+                        result,
+                        "Expense categories retrieved successfully."));
+        }
+
+        [HttpGet("expense-categories/{id}")] // GET: api/treasury/expense-categories/{id}
+        [Authorize(Roles = "Admin,Treasury")]
+        public async Task<IActionResult> GetExpenseCategoryById(int id)
+        {
+            var result =
+                await _treasuryService
+                    .GetExpenseCategoryByIdAsync(id);
+
+            return Ok(
+                ApiResponse<ExpenseCategoryDto>
+                    .SuccessResponse(
+                        result,
+                        "Expense category retrieved successfully."));
+        }
+
+        [HttpPost("expense-categories")] // POST: api/treasury/expense-categories
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> CreateExpenseCategory([FromBody] CreateExpenseCategoryDto dto)
+        {
+            var result =
+                await _treasuryService
+                    .CreateExpenseCategoryAsync(dto);
+
+            return Ok(
+                ApiResponse<ExpenseCategoryDto>
+                    .SuccessResponse(
+                        result,
+                        "Expense category created successfully."));
+        }
+
+        [HttpPut("expense-categories/{id}")] // PUT: api/treasury/expense-categories/{id}
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> UpdateExpenseCategory(int id, [FromBody] UpdateExpenseCategoryDto dto)
+        {
+            var result =
+                await _treasuryService
+                    .UpdateExpenseCategoryAsync(
+                        id,
+                        dto);
+
+            return Ok(
+                ApiResponse<ExpenseCategoryDto>
+                    .SuccessResponse(
+                        result,
+                        "Expense category updated successfully."));
+        }
     }
 }
