@@ -244,9 +244,9 @@ namespace Salesync.Application.Modules.LoadRequest.Services
             {
                 var item = request.Items.First(x => x.Id == itemDto.LoadRequestItemId);
 
-                if (itemDto.ApprovedLargeQuantity > item.RequestedLargeQuantity)
-                    throw new InvalidOperationException(
-                        $"Approved quantity cannot exceed requested quantity for product {item.ProductName}.");
+                //if (itemDto.ApprovedLargeQuantity > item.RequestedLargeQuantity)
+                //    throw new InvalidOperationException(
+                //        $"Approved quantity cannot exceed requested quantity for product {item.ProductName}.");
 
                 var approvedSmallQuantity = itemDto.ApprovedLargeQuantity * item.UnitsPerLargeUnit;
 
@@ -311,14 +311,14 @@ namespace Salesync.Application.Modules.LoadRequest.Services
                 request.Items.Select(x => x.Id),
                 dto.Items.Select(x => x.LoadRequestItemId));
 
-            foreach (var itemDto in dto.Items)
-            {
-                var item = request.Items.First(x => x.Id == itemDto.LoadRequestItemId);
+            //foreach (var itemDto in dto.Items)
+            //{
+            //    var item = request.Items.First(x => x.Id == itemDto.LoadRequestItemId);
 
-                if (itemDto.ConfirmedLargeQuantity > item.ApprovedLargeQuantity)
-                    throw new InvalidOperationException(
-                        $"Confirmed quantity cannot exceed approved quantity for product {item.ProductName}.");
-            }
+            //    if (itemDto.ConfirmedLargeQuantity > item.ApprovedLargeQuantity)
+            //        throw new InvalidOperationException(
+            //            $"Confirmed quantity cannot exceed approved quantity for product {item.ProductName}.");
+            //}
 
             if (dto.Items.Sum(x => x.ConfirmedLargeQuantity) <= 0)
                 throw new InvalidOperationException("At least one item must have confirmed quantity greater than zero.");
@@ -362,8 +362,8 @@ namespace Salesync.Application.Modules.LoadRequest.Services
                 }
 
                 var isFullyConfirmed =
-                    request.Items.All(x =>
-                        x.ConfirmedQuantity == x.ApprovedQuantity);
+                      request.Items.All(x =>
+                          x.ConfirmedQuantity >= x.ApprovedQuantity);
 
                 request.Status =
                     isFullyConfirmed
