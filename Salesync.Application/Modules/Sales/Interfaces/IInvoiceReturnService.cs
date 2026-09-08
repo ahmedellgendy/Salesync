@@ -5,6 +5,7 @@ namespace Salesync.Application.Modules.Sales.Interfaces
     public interface IInvoiceReturnService
     {
         Task<IEnumerable<InvoiceReturnDto>> GetByInvoiceIdAsync(int invoiceId);
+        Task<IEnumerable<InvoiceReturnDto>> GetAllAsync();
         Task<InvoiceReturnDto> GetByIdAsync(int id);
         Task<IEnumerable<InvoiceReturnDto>> GetBySalesRepIdAsync(int salesRepId);
         Task<IEnumerable<MobileReturnableInvoiceDto>> GetReturnableInvoicesAsync(int salesRepId, int customerId);

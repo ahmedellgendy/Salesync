@@ -6,6 +6,8 @@
         Approved = 2,
         Rejected = 3,
         WarehouseConfirmed = 4,
-        Cancelled = 5
+        Cancelled = 5,
+        PartiallyConfirmed = 6
+
     }
 }

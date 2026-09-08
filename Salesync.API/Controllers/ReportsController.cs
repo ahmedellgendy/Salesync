@@ -17,6 +17,7 @@ namespace Salesync.API.Controllers
         private readonly IAdminReportService _adminReportService;
         private readonly IManagementReportService _managementReportService;
 
+
         public ReportsController(ISupervisorReportService supervisorReportService, IAdminReportService adminReportService, IManagementReportService managementReportService)
         {
             _supervisorReportService = supervisorReportService;
@@ -142,7 +143,7 @@ namespace Salesync.API.Controllers
         #region Management Endpoints
 
         [HttpGet("management/summary")] // GET: api/reports/management/summary
-        [Authorize(Roles = "Management")]
+        [Authorize(Roles = "Admin,Management")]
         public async Task<IActionResult> GetManagementSummary([FromQuery] ReportFilter filter, CancellationToken cancellationToken)
         {
             var result = await _managementReportService.GetSummaryAsync(filter, cancellationToken);
@@ -151,7 +152,7 @@ namespace Salesync.API.Controllers
         }
 
         [HttpGet("management/sales-trend")] // GET: api/reports/management/sales-trend
-        [Authorize(Roles = "Management")]
+        [Authorize(Roles = "Admin,Management")]
         public async Task<IActionResult> GetManagementSalesTrend([FromQuery] ReportFilter filter, CancellationToken cancellationToken)
         {
             var result = await _managementReportService.GetSalesTrendAsync(filter, cancellationToken);
@@ -159,7 +160,7 @@ namespace Salesync.API.Controllers
         }
 
         [HttpGet("management/branch-performance")] // GET: api/reports/management/branch-performance
-        [Authorize(Roles = "Management")]
+        [Authorize(Roles = "Admin,Management")]
         public async Task<IActionResult> GetManagementBranchPerformance([FromQuery] ReportFilter filter, CancellationToken cancellationToken)
         {
             var result = await _managementReportService.GetBranchPerformanceAsync(filter, cancellationToken);
@@ -167,7 +168,7 @@ namespace Salesync.API.Controllers
         }
 
         [HttpGet("management/salesrep-ranking")] // GET: api/reports/management/salesrep-ranking
-        [Authorize(Roles = "Management")]
+        [Authorize(Roles = "Admin,Management")]
         public async Task<IActionResult> GetManagementSalesRepRanking([FromQuery] ReportFilter filter, CancellationToken cancellationToken)
         {
             var result = await _managementReportService.GetSalesRepRankingAsync(filter, cancellationToken);
@@ -176,7 +177,7 @@ namespace Salesync.API.Controllers
         }
 
         [HttpGet("management/top-customers")] // GET: api/reports/management/top-customers
-        [Authorize(Roles = "Management")]
+        [Authorize(Roles = "Admin,Management")]
         public async Task<IActionResult> GetManagementTopCustomers([FromQuery] ReportFilter filter, CancellationToken cancellationToken)
         {
             var result = await _managementReportService.GetTopCustomersAsync(filter, cancellationToken);
@@ -185,7 +186,7 @@ namespace Salesync.API.Controllers
         }
 
         [HttpGet("management/top-products")] // GET: api/reports/management/top-products
-        [Authorize(Roles = "Management")]
+        [Authorize(Roles = "Admin,Management")]
         public async Task<IActionResult> GetManagementTopProducts([FromQuery] ReportFilter filter,CancellationToken cancellationToken)
         {
             var result = await _managementReportService.GetTopProductsAsync(filter,cancellationToken);

@@ -6,6 +6,12 @@
 
         public decimal TotalCollectionAmount { get; set; }
 
+        public decimal CashCollectionAmount { get; set; }
+
+        public decimal NonCashCollectionAmount { get; set; }
+
+        public decimal OutstandingAmount { get; set; }
+
         public decimal TotalReturnAmount { get; set; }
 
         public decimal ExpectedCashAmount { get; set; }

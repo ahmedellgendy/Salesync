@@ -1494,6 +1494,10 @@ namespace Salesync.Infrastructure.Migrations
                         .HasMaxLength(450)
                         .HasColumnType("nvarchar(450)");
 
+                    b.Property<decimal>("CashCollectionAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<string>("CashNotes")
                         .HasColumnType("nvarchar(max)");
 
@@ -1537,9 +1541,17 @@ namespace Salesync.Infrastructure.Migrations
                     b.Property<bool>("IsStockReceived")
                         .HasColumnType("bit");
 
+                    b.Property<decimal>("NonCashCollectionAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<string>("Notes")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
+
+                    b.Property<decimal>("OutstandingAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<DateTime?>("RejectedAt")
                         .HasColumnType("datetime2");
@@ -2188,6 +2200,45 @@ namespace Salesync.Infrastructure.Migrations
                     b.ToTable("CashReceipts", (string)null);
                 });
 
+            modelBuilder.Entity("Salesync.Domain.Modules.Treasury.Entities.ExpenseCategory", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ExpenseCategories");
+                });
+
             modelBuilder.Entity("Salesync.Domain.Modules.Treasury.Entities.SalesRepCashLedger", b =>
                 {
                     b.Property<int>("Id")
@@ -2246,6 +2297,86 @@ namespace Salesync.Infrastructure.Migrations
                     b.HasIndex("SalesRepId");
 
                     b.ToTable("SalesRepCashLedgers", (string)null);
+                });
+
+            modelBuilder.Entity("Salesync.Domain.Modules.Treasury.Entities.TreasuryTransaction", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("BalanceAfter")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("BalanceBefore")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("CashBoxId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("CashReceiptId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CreatedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<int?>("ExpenseCategoryId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("ReferenceNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("Source")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("TransactionDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CashBoxId");
+
+                    b.HasIndex("CashReceiptId");
+
+                    b.HasIndex("ExpenseCategoryId");
+
+                    b.HasIndex("ReferenceNumber");
+
+                    b.HasIndex("TransactionDate");
+
+                    b.ToTable("TreasuryTransactions", (string)null);
                 });
 
             modelBuilder.Entity("Salesync.Domain.Modules.UnloadRequest.Entities.SalesRepUnloadRequest", b =>
@@ -3170,6 +3301,31 @@ namespace Salesync.Infrastructure.Migrations
                     b.Navigation("SalesRep");
                 });
 
+            modelBuilder.Entity("Salesync.Domain.Modules.Treasury.Entities.TreasuryTransaction", b =>
+                {
+                    b.HasOne("Salesync.Domain.Modules.Treasury.Entities.CashBox", "CashBox")
+                        .WithMany("Transactions")
+                        .HasForeignKey("CashBoxId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Salesync.Domain.Modules.Treasury.Entities.CashReceipt", "CashReceipt")
+                        .WithMany()
+                        .HasForeignKey("CashReceiptId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Salesync.Domain.Modules.Treasury.Entities.ExpenseCategory", "ExpenseCategory")
+                        .WithMany("TreasuryTransactions")
+                        .HasForeignKey("ExpenseCategoryId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("CashBox");
+
+                    b.Navigation("CashReceipt");
+
+                    b.Navigation("ExpenseCategory");
+                });
+
             modelBuilder.Entity("Salesync.Domain.Modules.UnloadRequest.Entities.SalesRepUnloadRequestItem", b =>
                 {
                     b.HasOne("Salesync.Domain.Modules.UnloadRequest.Entities.SalesRepUnloadRequest", "SalesRepUnloadRequest")
@@ -3250,6 +3406,13 @@ namespace Salesync.Infrastructure.Migrations
             modelBuilder.Entity("Salesync.Domain.Modules.Treasury.Entities.CashBox", b =>
                 {
                     b.Navigation("CashReceipts");
+
+                    b.Navigation("Transactions");
+                });
+
+            modelBuilder.Entity("Salesync.Domain.Modules.Treasury.Entities.ExpenseCategory", b =>
+                {
+                    b.Navigation("TreasuryTransactions");
                 });
 
             modelBuilder.Entity("Salesync.Domain.Modules.UnloadRequest.Entities.SalesRepUnloadRequest", b =>

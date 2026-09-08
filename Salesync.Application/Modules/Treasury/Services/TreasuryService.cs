@@ -18,19 +18,28 @@ namespace Salesync.Application.Modules.Treasury.Services
         private readonly ICurrentUserService _currentUser;
         private readonly IValidator<CreateCashBoxDto> _createCashBoxValidator;
         private readonly IValidator<ReceiveDayClosingCashDto> _receiveCashValidator;
+        private readonly IValidator<CreateTreasuryCashOutDto> _createCashOutValidator;
+        private readonly IValidator<CreateExpenseCategoryDto> _createExpenseCategoryValidator;
+        private readonly IValidator<UpdateExpenseCategoryDto> _updateExpenseCategoryValidator;
 
         public TreasuryService(
             IUnitOfWork unitOfWork,
             IMapper mapper,
             ICurrentUserService currentUser,
             IValidator<CreateCashBoxDto> createCashBoxValidator,
-            IValidator<ReceiveDayClosingCashDto> receiveCashValidator)
+            IValidator<ReceiveDayClosingCashDto> receiveCashValidator,
+            IValidator<CreateTreasuryCashOutDto> createCashOutValidator,
+            IValidator<CreateExpenseCategoryDto> createExpenseCategoryValidator,
+            IValidator<UpdateExpenseCategoryDto> updateExpenseCategoryValidator)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
             _currentUser = currentUser;
             _createCashBoxValidator = createCashBoxValidator;
             _receiveCashValidator = receiveCashValidator;
+            _createCashOutValidator = createCashOutValidator;
+            _createExpenseCategoryValidator = createExpenseCategoryValidator;
+            _updateExpenseCategoryValidator = updateExpenseCategoryValidator;
         }
 
         public async Task<IEnumerable<CashBoxDto>> GetCashBoxesAsync()
@@ -103,123 +112,316 @@ namespace Salesync.Application.Modules.Treasury.Services
             return _mapper.Map<CashBoxDto>(cashBox);
         }
 
-        public async Task<CashReceiptDto> ReceiveDayClosingCashAsync(int dayClosingId,ReceiveDayClosingCashDto dto)
+        public async Task<CashReceiptDto> ReceiveDayClosingCashAsync(int dayClosingId, ReceiveDayClosingCashDto dto)
         {
             if (dayClosingId <= 0)
-                throw new ArgumentException("Invalid day closing id.");
+                throw new ArgumentException(
+                    "Invalid day closing id.");
 
-            var validationResult = await _receiveCashValidator.ValidateAsync(dto);
+            var validationResult =
+                await _receiveCashValidator.ValidateAsync(dto);
 
             if (!validationResult.IsValid)
-                throw new ValidationException(validationResult.Errors);
+                throw new ValidationException(
+                    validationResult.Errors);
 
-            var userId = _currentUser.UserId;
+            var userId =
+                _currentUser.UserId;
 
             if (string.IsNullOrWhiteSpace(userId))
-                throw new UnauthorizedAccessException("User is not authenticated.");
+                throw new UnauthorizedAccessException(
+                    "User is not authenticated.");
 
-            var closing = await _unitOfWork.SalesRepDayClosings
-                .GetQueryable()
-                .Include(x => x.SalesRepSession)
-                .FirstOrDefaultAsync(x => x.Id == dayClosingId && x.IsActive);
+            var closing =
+                await _unitOfWork.SalesRepDayClosings
+                    .GetQueryable()
+                    .Include(x => x.SalesRepSession)
+                    .FirstOrDefaultAsync(x =>
+                        x.Id == dayClosingId &&
+                        x.IsActive);
 
             if (closing == null)
-                throw new KeyNotFoundException($"Day closing with id {dayClosingId} not found.");
+                throw new KeyNotFoundException(
+                    $"Day closing with id {dayClosingId} not found.");
 
-            if (closing.Status != SalesRepDayClosingStatus.Submitted)
-                throw new InvalidOperationException("Cash can only be received for submitted day closing.");
+            if (closing.Status !=
+                SalesRepDayClosingStatus.Submitted)
+            {
+                throw new InvalidOperationException(
+                    "Cash can only be received for submitted day closing.");
+            }
+
             if (closing.IsCashReceived)
-                throw new InvalidOperationException("Cash has already been received for this day closing.");
+                throw new InvalidOperationException(
+                    "Cash has already been received for this day closing.");
 
-            var cashBox = await _unitOfWork.CashBoxes
-                .GetQueryable()
-                .FirstOrDefaultAsync(x => x.Id == dto.CashBoxId && x.IsActive);
+            if (!closing.IsStockReceived)
+                throw new InvalidOperationException(
+                    "Stock settlement must be completed before treasury settlement.");
+
+            if (closing.SalesRepSession == null)
+                throw new InvalidOperationException(
+                    "Sales rep session was not found for this day closing.");
+
+            if (!closing.SalesRepSession.IsStockSettled)
+                throw new InvalidOperationException(
+                    "Sales rep session stock must be settled before treasury settlement.");
+
+            if (closing.SalesRepSession.IsTreasurySettled)
+                throw new InvalidOperationException(
+                    "Treasury settlement has already been completed for this session.");
+
+            var cashBox =
+                await _unitOfWork.CashBoxes
+                    .GetQueryable()
+                    .FirstOrDefaultAsync(x =>
+                        x.Id == dto.CashBoxId &&
+                        x.IsActive);
 
             if (cashBox == null)
-                throw new KeyNotFoundException($"Cash box with id {dto.CashBoxId} not found.");
+                throw new KeyNotFoundException(
+                    $"Cash box with id {dto.CashBoxId} not found.");
 
-            var hasReceipt = await _unitOfWork.CashReceipts
-                .GetQueryable()
-                .AnyAsync(x => x.SalesRepDayClosingId == dayClosingId && x.IsActive);
+            var hasReceipt =
+                await _unitOfWork.CashReceipts
+                    .GetQueryable()
+                    .AnyAsync(x =>
+                        x.SalesRepDayClosingId == dayClosingId &&
+                        x.IsActive);
 
             if (hasReceipt)
-                throw new InvalidOperationException("Cash receipt already exists for this day closing.");
+                throw new InvalidOperationException(
+                    "Cash receipt already exists for this day closing.");
 
-            var expectedAmount = closing.ExpectedCashAmount;
-            var receivedAmount = dto.ReceivedAmount;
-            var varianceAmount = receivedAmount - expectedAmount;
+            var expectedAmount =
+                closing.ExpectedCashAmount;
+
+            var receivedAmount =
+                dto.ReceivedAmount;
+
+            var varianceAmount =
+                receivedAmount - expectedAmount;
+
+            var now =
+                DateTime.UtcNow;
+
+            var balanceBefore =
+                cashBox.CurrentBalance;
+
+            var balanceAfter =
+                balanceBefore + receivedAmount;
 
             await _unitOfWork.BeginTransactionAsync();
 
             try
             {
-                var receipt = new CashReceipt
-                {
-                    ReceiptNumber = GenerateReceiptNumber(),
-                    CashBoxId = cashBox.Id,
-                    SalesRepId = closing.SalesRepId,
-                    SalesRepSessionId = closing.SalesRepSessionId,
-                    SalesRepDayClosingId = closing.Id,
-                    ExpectedAmount = expectedAmount,
-                    ReceivedAmount = receivedAmount,
-                    VarianceAmount = varianceAmount,
-                    ReceivedByUserId = userId,
-                    ReceivedAt = DateTime.UtcNow,
-                    Notes = dto.Notes,
-                    IsActive = true,
-                    CreatedAt = DateTime.UtcNow
-                };
-
-                await _unitOfWork.CashReceipts.AddAsync(receipt);
-
-                cashBox.CurrentBalance += receivedAmount;
-                cashBox.UpdatedAt = DateTime.UtcNow;
-
-                _unitOfWork.CashBoxes.Update(cashBox);
-
-                await _unitOfWork.CompleteAsync();
-
-                if (varianceAmount != 0)
-                {
-                    var currentSalesRepCashBalance = await GetCurrentSalesRepCashBalanceAsync(closing.SalesRepId);
-
-                    var ledger = new SalesRepCashLedger
+                // 1. Create official cash receipt
+                var receipt =
+                    new CashReceipt
                     {
-                        SalesRepId = closing.SalesRepId,
-                        EntryDate = DateTime.UtcNow,
-                        Amount = varianceAmount,
-                        BalanceAfter = currentSalesRepCashBalance + varianceAmount,
-                        Source = SalesRepCashLedgerSource.CashReceipt,
-                        CashReceiptId = receipt.Id,
-                        ReferenceNumber = receipt.ReceiptNumber,
-                        Notes = BuildVarianceNotes(expectedAmount, receivedAmount, varianceAmount),
+                        ReceiptNumber =
+                            GenerateReceiptNumber(),
+
+                        CashBoxId =
+                            cashBox.Id,
+
+                        SalesRepId =
+                            closing.SalesRepId,
+
+                        SalesRepSessionId =
+                            closing.SalesRepSessionId,
+
+                        SalesRepDayClosingId =
+                            closing.Id,
+
+                        ExpectedAmount =
+                            expectedAmount,
+
+                        ReceivedAmount =
+                            receivedAmount,
+
+                        VarianceAmount =
+                            varianceAmount,
+
+                        ReceivedByUserId =
+                            userId,
+
+                        ReceivedAt =
+                            now,
+
+                        Notes =
+                            string.IsNullOrWhiteSpace(dto.Notes)
+                                ? null
+                                : dto.Notes.Trim(),
+
                         IsActive = true,
-                        CreatedAt = DateTime.UtcNow
+                        CreatedAt = now
                     };
 
-                    await _unitOfWork.SalesRepCashLedgers.AddAsync(ledger);
-                }
+                await _unitOfWork.CashReceipts
+                    .AddAsync(receipt);
 
-                closing.ActualCashAmount = receivedAmount;
-                closing.CashVariance = varianceAmount;
-                closing.IsCashReceived = true;
-                closing.CashReceivedByUserId = userId;
-                closing.CashReceivedAt = DateTime.UtcNow;
-                closing.CashNotes = dto.Notes;
+                // 2. Update cash box balance
+                cashBox.CurrentBalance =
+                    balanceAfter;
 
-                if (closing.IsStockReceived)
-                {
-                    closing.Status = SalesRepDayClosingStatus.Completed;
-                }
+                cashBox.UpdatedAt =
+                    now;
 
-                closing.UpdatedAt = DateTime.UtcNow;
+                _unitOfWork.CashBoxes
+                    .Update(cashBox);
 
-                _unitOfWork.SalesRepDayClosings.Update(closing);
-
+                // Save receipt first to generate receipt.Id
                 await _unitOfWork.CompleteAsync();
+
+                // 3. Create treasury transaction audit entry
+                var treasuryTransaction =
+                    new TreasuryTransaction
+                    {
+                        CashBoxId =
+                            cashBox.Id,
+
+                        Type =
+                            TreasuryTransactionType.CashIn,
+
+                        Source =
+                            TreasuryTransactionSource.SalesRepSettlement,
+
+                        Amount =
+                            receivedAmount,
+
+                        BalanceBefore =
+                            balanceBefore,
+
+                        BalanceAfter =
+                            balanceAfter,
+
+                        TransactionDate =
+                            now,
+
+                        ReferenceNumber =
+                            receipt.ReceiptNumber,
+
+                        CashReceiptId =
+                            receipt.Id,
+
+                        Notes =
+                            string.IsNullOrWhiteSpace(dto.Notes)
+                                ? $"Sales rep cash settlement for day closing {closing.ClosingNumber}."
+                                : dto.Notes.Trim(),
+
+                        CreatedByUserId =
+                            userId,
+
+                        IsActive =
+                            true,
+
+                        CreatedAt =
+                            now
+                    };
+
+                await _unitOfWork.TreasuryTransactions
+                    .AddAsync(treasuryTransaction);
+
+                // 4. Record sales rep variance if any
+                if (varianceAmount != 0)
+                {
+                    var currentSalesRepCashBalance =
+                        await GetCurrentSalesRepCashBalanceAsync(
+                            closing.SalesRepId);
+
+                    var ledger =
+                        new SalesRepCashLedger
+                        {
+                            SalesRepId =
+                                closing.SalesRepId,
+
+                            EntryDate =
+                                now,
+
+                            Amount =
+                                varianceAmount,
+
+                            BalanceAfter =
+                                currentSalesRepCashBalance +
+                                varianceAmount,
+
+                            Source =
+                                SalesRepCashLedgerSource.CashReceipt,
+
+                            CashReceiptId =
+                                receipt.Id,
+
+                            ReferenceNumber =
+                                receipt.ReceiptNumber,
+
+                            Notes =
+                                BuildVarianceNotes(
+                                    expectedAmount,
+                                    receivedAmount,
+                                    varianceAmount),
+
+                            IsActive =
+                                true,
+
+                            CreatedAt =
+                                now
+                        };
+
+                    await _unitOfWork.SalesRepCashLedgers
+                        .AddAsync(ledger);
+                }
+
+                // 5. Complete Day Closing
+                closing.ActualCashAmount =
+                    receivedAmount;
+
+                closing.CashVariance =
+                    varianceAmount;
+
+                closing.IsCashReceived =
+                    true;
+
+                closing.CashReceivedByUserId =
+                    userId;
+
+                closing.CashReceivedAt =
+                    now;
+
+                closing.CashNotes =
+                    string.IsNullOrWhiteSpace(dto.Notes)
+                        ? null
+                        : dto.Notes.Trim();
+
+                closing.Status =
+                    SalesRepDayClosingStatus.Completed;
+
+                closing.UpdatedAt =
+                    now;
+
+                _unitOfWork.SalesRepDayClosings
+                    .Update(closing);
+
+                // 6. Complete session treasury settlement
+                closing.SalesRepSession.IsTreasurySettled =
+                    true;
+
+                closing.SalesRepSession.TreasurySettledAt =
+                    now;
+
+                closing.SalesRepSession.UpdatedAt =
+                    now;
+
+                _unitOfWork.SalesRepSessions
+                    .Update(closing.SalesRepSession);
+
+                // 7. Save everything atomically
+                await _unitOfWork.CompleteAsync();
+
                 await _unitOfWork.CommitTransactionAsync();
 
-                return _mapper.Map<CashReceiptDto>(receipt);
+                return _mapper.Map<CashReceiptDto>(
+                    receipt);
             }
             catch
             {
@@ -251,6 +453,417 @@ namespace Salesync.Application.Modules.Treasury.Services
             return await GetCurrentSalesRepCashBalanceAsync(salesRepId);
         }
 
+        public async Task<IEnumerable<TreasuryTransactionDto>> GetTransactionsAsync(int? cashBoxId = null,DateTime? fromDate = null,DateTime? toDate = null)
+        {
+            var query =
+                _unitOfWork.TreasuryTransactions
+                    .GetQueryable()
+                    .AsNoTracking()
+                    .Include(x => x.ExpenseCategory)
+                    .Where(x => x.IsActive);
+
+            if (cashBoxId.HasValue)
+            {
+                query =
+                    query.Where(x =>
+                        x.CashBoxId == cashBoxId.Value);
+            }
+
+            if (fromDate.HasValue)
+            {
+                query =
+                    query.Where(x =>
+                        x.TransactionDate >= fromDate.Value);
+            }
+
+            if (toDate.HasValue)
+            {
+                query =
+                    query.Where(x =>
+                        x.TransactionDate <= toDate.Value);
+            }
+
+            var transactions =
+                await query
+                    .OrderByDescending(x => x.TransactionDate)
+                    .ThenByDescending(x => x.Id)
+                    .ToListAsync();
+
+            return transactions.Select(x =>
+                new TreasuryTransactionDto
+                {
+                    Id = x.Id,
+
+                    CashBoxId = x.CashBoxId,
+
+                    Type = (int)x.Type,
+
+                    Source = (int)x.Source,
+
+                    Amount = x.Amount,
+
+                    BalanceBefore = x.BalanceBefore,
+
+                    BalanceAfter = x.BalanceAfter,
+
+                    TransactionDate = x.TransactionDate,
+
+                    ReferenceNumber = x.ReferenceNumber,
+
+                    CashReceiptId = x.CashReceiptId,
+
+                    ExpenseCategoryId = x.ExpenseCategoryId,
+
+                    ExpenseCategoryName =
+                        x.ExpenseCategory?.Name,
+
+                    Notes = x.Notes,
+
+                    CreatedByUserId = x.CreatedByUserId
+                })
+                .ToList();
+        }
+
+        public async Task<TreasuryCashOutDto> CreateCashOutAsync(CreateTreasuryCashOutDto dto)
+        {
+            var validationResult =
+                await _createCashOutValidator.ValidateAsync(dto);
+
+            if (!validationResult.IsValid)
+                throw new ValidationException(
+                    validationResult.Errors);
+
+            var userId =
+                _currentUser.UserId;
+
+            if (string.IsNullOrWhiteSpace(userId))
+                throw new UnauthorizedAccessException(
+                    "User is not authenticated.");
+
+            var cashBox =
+                await _unitOfWork.CashBoxes
+                    .GetQueryable()
+                    .FirstOrDefaultAsync(x =>
+                        x.Id == dto.CashBoxId &&
+                        x.IsActive);
+
+            if (cashBox == null)
+                throw new KeyNotFoundException(
+                    $"Cash box with id {dto.CashBoxId} not found.");
+
+            if (cashBox.CurrentBalance < dto.Amount)
+            {
+                throw new InvalidOperationException(
+                    $"Insufficient cash box balance. " +
+                    $"Available: {cashBox.CurrentBalance:N2}, " +
+                    $"Requested: {dto.Amount:N2}.");
+            }
+
+            ExpenseCategory? expenseCategory = null;
+
+            if (dto.Source ==
+                TreasuryTransactionSource.Expense)
+            {
+                if (!dto.ExpenseCategoryId.HasValue)
+                {
+                    throw new InvalidOperationException(
+                        "Expense category is required.");
+                }
+
+                expenseCategory =
+                    await _unitOfWork.ExpenseCategories
+                        .GetQueryable()
+                        .FirstOrDefaultAsync(x =>
+                            x.Id == dto.ExpenseCategoryId.Value &&
+                            x.IsActive);
+
+                if (expenseCategory == null)
+                {
+                    throw new KeyNotFoundException(
+                        $"Expense category with id " +
+                        $"{dto.ExpenseCategoryId.Value} not found.");
+                }
+            }
+
+            var now =
+                DateTime.UtcNow;
+
+            var balanceBefore =
+                cashBox.CurrentBalance;
+
+            var balanceAfter =
+                balanceBefore - dto.Amount;
+
+            await _unitOfWork.BeginTransactionAsync();
+
+            try
+            {
+                var transaction =
+                    new TreasuryTransaction
+                    {
+                        CashBoxId =
+                            cashBox.Id,
+
+                        Type =
+                            TreasuryTransactionType.CashOut,
+
+                        Source =
+                            dto.Source,
+
+                        ExpenseCategoryId =
+                            expenseCategory?.Id,
+
+                        Amount =
+                            dto.Amount,
+
+                        BalanceBefore =
+                            balanceBefore,
+
+                        BalanceAfter =
+                            balanceAfter,
+
+                        TransactionDate =
+                            now,
+
+                        ReferenceNumber =
+                            string.IsNullOrWhiteSpace(
+                                dto.ReferenceNumber)
+                                ? null
+                                : dto.ReferenceNumber.Trim(),
+
+                        Notes =
+                            string.IsNullOrWhiteSpace(
+                                dto.Notes)
+                                ? null
+                                : dto.Notes.Trim(),
+
+                        CreatedByUserId =
+                            userId,
+
+                        IsActive =
+                            true,
+
+                        CreatedAt =
+                            now
+                    };
+
+                await _unitOfWork.TreasuryTransactions
+                    .AddAsync(transaction);
+
+                cashBox.CurrentBalance =
+                    balanceAfter;
+
+                cashBox.UpdatedAt =
+                    now;
+
+                _unitOfWork.CashBoxes
+                    .Update(cashBox);
+
+                await _unitOfWork.CompleteAsync();
+
+                await _unitOfWork.CommitTransactionAsync();
+
+                return new TreasuryCashOutDto
+                {
+                    TreasuryTransactionId =
+                        transaction.Id,
+
+                    CashBoxId =
+                        transaction.CashBoxId,
+
+                    Amount =
+                        transaction.Amount,
+
+                    BalanceBefore =
+                        transaction.BalanceBefore,
+
+                    BalanceAfter =
+                        transaction.BalanceAfter,
+
+                    Source =
+                        (int)transaction.Source,
+
+                    ExpenseCategoryId =
+                        transaction.ExpenseCategoryId,
+
+                    ExpenseCategoryName =
+                        expenseCategory?.Name,
+
+                    ReferenceNumber =
+                        transaction.ReferenceNumber,
+
+                    Notes =
+                        transaction.Notes,
+
+                    CreatedByUserId =
+                        transaction.CreatedByUserId,
+
+                    TransactionDate =
+                        transaction.TransactionDate
+                };
+            }
+            catch
+            {
+                await _unitOfWork.RollbackTransactionAsync();
+                throw;
+            }
+        }
+
+        public async Task<IEnumerable<ExpenseCategoryDto>>GetExpenseCategoriesAsync()
+        {
+            var categories =
+                await _unitOfWork.ExpenseCategories
+                    .GetQueryable()
+                    .AsNoTracking()
+                    .Where(x => x.IsActive)
+                    .OrderBy(x => x.Name)
+                    .ToListAsync();
+
+            return _mapper.Map<IEnumerable<ExpenseCategoryDto>>(categories);
+        }
+
+        public async Task<ExpenseCategoryDto>GetExpenseCategoryByIdAsync(int id)
+        {
+            if (id <= 0)
+                throw new ArgumentException(
+                    "Invalid expense category id.");
+
+            var category =
+                await _unitOfWork.ExpenseCategories
+                    .GetQueryable()
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(x =>
+                        x.Id == id &&
+                        x.IsActive);
+
+            if (category == null)
+                throw new KeyNotFoundException(
+                    $"Expense category with id {id} not found.");
+
+            return _mapper.Map<ExpenseCategoryDto>(
+                category);
+        }
+
+        public async Task<ExpenseCategoryDto>CreateExpenseCategoryAsync(CreateExpenseCategoryDto dto)
+        {
+            var validationResult =
+                await _createExpenseCategoryValidator
+                    .ValidateAsync(dto);
+
+            if (!validationResult.IsValid)
+                throw new ValidationException(
+                    validationResult.Errors);
+
+            var code =
+                dto.Code.Trim();
+
+            var name =
+                dto.Name.Trim();
+
+            var codeExists =
+                await _unitOfWork.ExpenseCategories
+                    .GetQueryable()
+                    .AnyAsync(x =>
+                        x.Code == code);
+
+            if (codeExists)
+                throw new InvalidOperationException(
+                    "Expense category code already exists.");
+
+            var category =
+                new ExpenseCategory
+                {
+                    Code = code,
+
+                    Name = name,
+
+                    Description =
+                        string.IsNullOrWhiteSpace(dto.Description)
+                            ? null
+                            : dto.Description.Trim(),
+
+                    IsActive = true,
+
+                    CreatedAt =
+                        DateTime.UtcNow
+                };
+
+            await _unitOfWork.ExpenseCategories
+                .AddAsync(category);
+
+            await _unitOfWork.CompleteAsync();
+
+            return _mapper.Map<ExpenseCategoryDto>(
+                category);
+        }
+
+        public async Task<ExpenseCategoryDto>UpdateExpenseCategoryAsync(int id,UpdateExpenseCategoryDto dto)
+        {
+            if (id <= 0)
+                throw new ArgumentException(
+                    "Invalid expense category id.");
+
+            var validationResult =
+                await _updateExpenseCategoryValidator
+                    .ValidateAsync(dto);
+
+            if (!validationResult.IsValid)
+                throw new ValidationException(
+                    validationResult.Errors);
+
+            var category =
+                await _unitOfWork.ExpenseCategories
+                    .GetQueryable()
+                    .FirstOrDefaultAsync(x =>
+                        x.Id == id);
+
+            if (category == null)
+                throw new KeyNotFoundException(
+                    $"Expense category with id {id} not found.");
+
+            var code =
+                dto.Code.Trim();
+
+            var codeExists =
+                await _unitOfWork.ExpenseCategories
+                    .GetQueryable()
+                    .AnyAsync(x =>
+                        x.Id != id &&
+                        x.Code == code);
+
+            if (codeExists)
+                throw new InvalidOperationException(
+                    "Expense category code already exists.");
+
+            category.Code =
+                code;
+
+            category.Name =
+                dto.Name.Trim();
+
+            category.Description =
+                string.IsNullOrWhiteSpace(dto.Description)
+                    ? null
+                    : dto.Description.Trim();
+
+            category.IsActive =
+                dto.IsActive;
+
+            category.UpdatedAt =
+                DateTime.UtcNow;
+
+            _unitOfWork.ExpenseCategories
+                .Update(category);
+
+            await _unitOfWork.CompleteAsync();
+
+            return _mapper.Map<ExpenseCategoryDto>(
+                category);
+        }
+
+
+        #region Helper Methods
+
         private async Task<decimal> GetCurrentSalesRepCashBalanceAsync(int salesRepId)
         {
             return await _unitOfWork.SalesRepCashLedgers
@@ -264,7 +877,7 @@ namespace Salesync.Application.Modules.Treasury.Services
             return $"CR-{DateTime.UtcNow:yyyyMMddHHmmssfff}";
         }
 
-        private static string BuildVarianceNotes(decimal expectedAmount,decimal receivedAmount,decimal varianceAmount)
+        private static string BuildVarianceNotes(decimal expectedAmount, decimal receivedAmount, decimal varianceAmount)
         {
             if (varianceAmount < 0)
             {
@@ -273,6 +886,8 @@ namespace Salesync.Application.Modules.Treasury.Services
 
             return $"Cash surplus. Expected: {expectedAmount}, Received: {receivedAmount}, Variance: {varianceAmount}.";
         }
+
+        #endregion
 
     }
 }

@@ -52,6 +52,38 @@ namespace Salesync.API.Controllers.Identity
                 user, "User updated successfully"));
         }
 
+        [HttpPatch("{id}/status")]
+        public async Task<IActionResult> SetStatusAsync(
+          string id,
+          [FromBody] bool isActive)
+        {
+            var user = await _userService
+                .SetUserActiveStatusAsync(id, isActive);
+
+            return Ok(
+                ApiResponse<UserDto>.SuccessResponse(
+                    user,
+                    isActive
+                        ? "User activated successfully"
+                        : "User deactivated successfully"));
+        }
+
+        [HttpPost("{id}/reset-password")]
+        public async Task<IActionResult> ResetPasswordAsync(
+             string id,
+             [FromBody] ResetUserPasswordDto dto)
+        {
+            await _userService
+                .ResetUserPasswordAsync(
+                    id,
+                    dto.NewPassword);
+
+            return Ok(
+                ApiResponse<object>.SuccessResponse(
+                    null!,
+                    "Password reset successfully"));
+        }
+
         [HttpDelete("{id}")] // DELETE: api/users/{id}
         public async Task<IActionResult> DeleteAsync(string id)
         {

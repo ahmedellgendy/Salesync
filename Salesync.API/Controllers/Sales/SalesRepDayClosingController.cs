@@ -21,7 +21,7 @@ namespace Salesync.API.Controllers.Sales
         }
 
         [HttpGet] // GET: api/SalesRepDayClosing
-        [Authorize(Roles = "Admin,Supervisor,Warehouse,SalesRep")]
+        [Authorize(Roles = "Admin,Supervisor,Warehouse,Treasury,SalesRep")]
         public async Task<IActionResult> GetAll([FromQuery] SalesRepDayClosingFilterDto filter)
         {
             var result = await _dayClosingService.GetAllAsync(filter);
@@ -29,7 +29,7 @@ namespace Salesync.API.Controllers.Sales
         }
 
         [HttpGet("{id}")] // GET: api/SalesRepDayClosing/5
-        [Authorize(Roles = "Admin,Supervisor,Warehouse,SalesRep")]
+        [Authorize(Roles = "Admin,Supervisor,Warehouse,Treasury,SalesRep")]
         public async Task<IActionResult> GetById(int id)
         {
             var result = await _dayClosingService.GetByIdAsync(id);
@@ -37,7 +37,7 @@ namespace Salesync.API.Controllers.Sales
         }
 
         [HttpGet("salesrep/{salesRepId}")] // GET: api/SalesRepDayClosing/salesrep/5
-        [Authorize(Roles = "Admin,Supervisor,Warehouse,SalesRep")]
+        [Authorize(Roles = "Admin,Supervisor,Warehouse,Treasury,SalesRep")]
         public async Task<IActionResult> GetBySalesRep(int salesRepId)
         {
             var result = await _dayClosingService.GetBySalesRepAsync(salesRepId);
@@ -52,14 +52,22 @@ namespace Salesync.API.Controllers.Sales
             return Ok(ApiResponse<SalesRepDayClosingDto>.SuccessResponse(result, "Sales rep day closing submitted successfully."));
         }
 
-        [HttpPut("{id}/receive-returned-stock")] // PUT: api/SalesRepDayClosing/5/receive-returned-stock
-        [Authorize(Roles = "Admin,Supervisor,Warehouse")]
-        public async Task<IActionResult> ReceiveReturnedStock(int id)
+        
+        [HttpPut("{id}/receive-cash")]
+        [Authorize(Roles = "Admin,Treasury")]
+        public async Task<IActionResult> ReceiveCash(
+    int id,
+    [FromBody] ReceiveSalesRepDayClosingCashDto dto)
         {
-            var result = await _dayClosingService.ReceiveReturnedStockAsync(id);
-            return Ok(ApiResponse<SalesRepDayClosingDto>.SuccessResponse(result, "Returned stock received successfully."));
-        }
+            var result =
+                await _dayClosingService.ReceiveCashAsync(id, dto);
 
+            return Ok(
+                ApiResponse<SalesRepDayClosingDto>
+                    .SuccessResponse(
+                        result,
+                        "Closing cash received successfully."));
+        }
 
         [HttpPut("{id}/cancel")]  // PUT: api/SalesRepDayClosing/5/cancel
         [Authorize(Roles = "Admin,Supervisor,SalesRep")]

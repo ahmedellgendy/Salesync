@@ -70,7 +70,8 @@ namespace Salesync.Application.Interfaces.Repositories
         IGenericRepository<CashBox> CashBoxes { get; }
         IGenericRepository<CashReceipt> CashReceipts { get; }
         IGenericRepository<SalesRepCashLedger> SalesRepCashLedgers { get; }
-
+        IGenericRepository<TreasuryTransaction> TreasuryTransactions { get; }
+        IGenericRepository<ExpenseCategory> ExpenseCategories { get; }
         #endregion
 
         #region UnLoadRequest

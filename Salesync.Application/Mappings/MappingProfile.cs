@@ -65,8 +65,8 @@ namespace Salesync.Application.Mappings
                 .ForAllMembers(o => o.Condition((src, dest, srcMember) => srcMember != null));
 
             CreateMap<Route, RouteDto>()
-                .ForMember(dest => dest.BranchName,opt => opt.MapFrom(src => src.Branch != null? src.Branch.Name: null))
-                .ForMember(dest => dest.AssignedSalesRepName,opt => opt.MapFrom(src => src.AssignedSalesRep != null? src.AssignedSalesRep.Name: null));
+                .ForMember(dest => dest.BranchName, opt => opt.MapFrom(src => src.Branch != null ? src.Branch.Name : null))
+                .ForMember(dest => dest.AssignedSalesRepName, opt => opt.MapFrom(src => src.AssignedSalesRep != null ? src.AssignedSalesRep.Name : null));
             CreateMap<CreateRouteDto, Route>();
             CreateMap<UpdateRouteDto, Route>()
                 .ForMember(
@@ -76,7 +76,7 @@ namespace Salesync.Application.Mappings
                         opt.PreCondition(src => src.BranchId.HasValue);
                         opt.MapFrom(src => src.BranchId!.Value);
                     })
-                .ForAllMembers(opt =>opt.Condition((src, dest, srcMember) =>srcMember != null));
+                .ForAllMembers(opt => opt.Condition((src, dest, srcMember) => srcMember != null));
 
             CreateMap<RouteCustomer, RouteCustomerDto>();
             CreateMap<CreateRouteCustomerDto, RouteCustomer>();
@@ -167,17 +167,46 @@ namespace Salesync.Application.Mappings
 
             #region CustomerVisit
 
-            CreateMap<CustomerVisit, CustomerVisitDto>()
-                .ForMember(dest => dest.SalesRepName, opt => opt.MapFrom(src => src.SalesRep.Name))
-                .ForMember(dest => dest.CustomerName, opt => opt.MapFrom(src => src.Customer.Name))
-                .ForMember(dest => dest.RouteName, opt => opt.MapFrom(src => src.Route != null ? src.Route.Name : null));
 
             CreateMap<StartCustomerVisitDto, CustomerVisit>();
 
             CreateMap<CustomerVisit, CustomerVisitDto>()
-                .ForMember(dest => dest.SalesRepName, opt => opt.MapFrom(src => src.SalesRep.Name))
-                .ForMember(dest => dest.CustomerName, opt => opt.MapFrom(src => src.Customer.Name))
-                .ForMember(dest => dest.RouteName, opt => opt.MapFrom(src => src.Route != null ? src.Route.Name : null));
+                .ForMember(
+                    dest => dest.SalesRepName,
+                    opt => opt.MapFrom(src =>
+                        src.SalesRep != null
+                            ? src.SalesRep.Name
+                            : null))
+                .ForMember(
+                    dest => dest.CustomerName,
+                    opt => opt.MapFrom(src =>
+                        src.Customer != null
+                            ? src.Customer.Name
+                            : null))
+                .ForMember(
+                    dest => dest.RouteName,
+                    opt => opt.MapFrom(src =>
+                        src.Route != null
+                            ? src.Route.Name
+                            : null))
+                .ForMember(
+                    dest => dest.InvoiceNumber,
+                    opt => opt.MapFrom(src =>
+                        src.Invoice != null
+                            ? src.Invoice.InvoiceNumber
+                            : null))
+                .ForMember(
+                    dest => dest.PaymentNumber,
+                    opt => opt.MapFrom(src =>
+                        src.Payment != null
+                            ? src.Payment.PaymentNumber
+                            : null))
+                .ForMember(
+                    dest => dest.InvoiceReturnNumber,
+                    opt => opt.MapFrom(src =>
+                        src.InvoiceReturn != null
+                            ? src.InvoiceReturn.ReturnNumber
+                            : null));
 
             #endregion
 
@@ -188,6 +217,10 @@ namespace Salesync.Application.Mappings
             CreateMap<CashReceipt, CashReceiptDto>();
 
             CreateMap<SalesRepCashLedger, SalesRepCashLedgerDto>();
+
+            CreateMap<TreasuryTransaction, TreasuryTransactionDto>();
+
+            CreateMap<ExpenseCategory, ExpenseCategoryDto>();
 
             #endregion
 

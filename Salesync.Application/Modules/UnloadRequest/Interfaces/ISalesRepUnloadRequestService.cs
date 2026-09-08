@@ -9,7 +9,7 @@ namespace Salesync.Application.Modules.UnloadRequest.Interfaces
         Task<IEnumerable<SalesRepUnloadRequestDto>> GetMyRequestsAsync();
         Task<SalesRepUnloadRequestDto> GetMyRequestByIdAsync(int id);
         Task<SalesRepUnloadRequestDto> GetByIdAsync(int id);
-
+        Task<IEnumerable<SalesRepUnloadRequestDto>> GetAllAsync();
         Task<IEnumerable<SalesRepUnloadRequestDto>> GetPendingWarehouseRequestsAsync();
 
         Task<SalesRepUnloadRequestDto> ConfirmWarehouseAsync(int id,ConfirmSalesRepUnloadRequestDto dto);

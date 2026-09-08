@@ -25,5 +25,9 @@
         public string LargeUnit { get; set; } = "كرتونة";
         public int UnitsPerLargeUnit { get; set; } = 1;
         public string? Notes { get; set; }
+
+        public int AvailableWarehouseQuantity { get; set; }
+
+        public int AvailableWarehouseLargeQuantity { get; set; }
     }
 }

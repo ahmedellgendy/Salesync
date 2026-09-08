@@ -34,8 +34,40 @@ namespace Salesync.Application.Modules.Sales.Services
         }
         public async Task<IEnumerable<InvoiceDto>> GetAllAsync()
         {
-            var invoices = await _unitOfWork.Invoices.GetAllAsync();
-            return _mapper.Map<IEnumerable<InvoiceDto>>(invoices);
+            var invoices = await _unitOfWork.Invoices
+                .GetQueryable()
+                .AsNoTracking()
+                .Include(x => x.Customer)
+                .Include(x => x.SalesRep)
+                .Include(x => x.InvoiceItems)
+                .Include(x => x.Payments)
+                .Where(x => x.IsActive)
+                .OrderByDescending(x => x.CreatedAt)
+                .ToListAsync();
+
+            var result = _mapper.Map<List<InvoiceDto>>(invoices);
+
+            for (var i = 0; i < invoices.Count; i++)
+            {
+                var invoice = invoices[i];
+                var dto = result[i];
+
+                if (invoice.Customer is not null)
+                {
+                    dto.CustomerName = invoice.Customer.Name;
+                    dto.CustomerAddress = invoice.Customer.Address;
+                    dto.CustomerPhone = invoice.Customer.Phone;
+                }
+
+                if (invoice.SalesRep is not null)
+                {
+                    dto.SalesRepCode = invoice.SalesRep.SalesRepCode;
+                    dto.SalesRepName = invoice.SalesRep.Name;
+                    dto.SalesRepPhone = invoice.SalesRep.Phone;
+                }
+            }
+
+            return result;
         }
         public async Task<InvoiceDto> GetByIdAsync(int id)
         {
@@ -43,39 +75,34 @@ namespace Salesync.Application.Modules.Sales.Services
                 throw new ArgumentException("Invalid invoice id.");
 
             var invoice = await _unitOfWork.Invoices
-                 .GetQueryable()
-                 .AsNoTracking()
-                 .Include(i => i.Customer)
-                 .Include(i => i.SalesRep)
-                 .Include(i => i.InvoiceItems)
-                 .Include(i => i.Payments)
-                 .FirstOrDefaultAsync(i => i.Id == id && i.IsActive);
+                .GetQueryable()
+                .AsNoTracking()
+                .Include(x => x.Customer)
+                .Include(x => x.SalesRep)
+                .Include(x => x.InvoiceItems)
+                .Include(x => x.Payments)
+                .FirstOrDefaultAsync(x =>
+                    x.Id == id &&
+                    x.IsActive);
 
             if (invoice == null)
-                throw new KeyNotFoundException($"Invoice with id {id} not found.");
+                throw new KeyNotFoundException(
+                    $"Invoice with id {id} not found.");
 
             var dto = _mapper.Map<InvoiceDto>(invoice);
 
-            dto.CustomerCode = invoice.CustomerId.ToString();
-
-            if (invoice.SalesRepId.HasValue)
+            if (invoice.Customer is not null)
             {
-                var salesRep = invoice.SalesRep;
+                dto.CustomerName = invoice.Customer.Name;
+                dto.CustomerAddress = invoice.Customer.Address;
+                dto.CustomerPhone = invoice.Customer.Phone;
+            }
 
-                if (salesRep == null)
-                {
-                    salesRep = await _unitOfWork.SalesReps
-                        .GetQueryable()
-                        .AsNoTracking()
-                        .FirstOrDefaultAsync(x => x.Id == invoice.SalesRepId.Value && x.IsActive);
-                }
-
-                if (salesRep != null)
-                {
-                    dto.SalesRepCode = salesRep.SalesRepCode;
-                    dto.SalesRepName = salesRep.Name;
-                    dto.SalesRepPhone = salesRep.Phone;
-                }
+            if (invoice.SalesRep is not null)
+            {
+                dto.SalesRepCode = invoice.SalesRep.SalesRepCode;
+                dto.SalesRepName = invoice.SalesRep.Name;
+                dto.SalesRepPhone = invoice.SalesRep.Phone;
             }
 
             return dto;
@@ -179,8 +206,8 @@ namespace Salesync.Application.Modules.Sales.Services
                         $"Bonus quantity cannot be negative for product {product.Name}.");
 
 
-                // UnitPrice is price of LARGE unit
-                var grossAmount = product.UnitPrice * itemDto.SaleLargeQuantity;
+                // UnitPrice is price of SMALL unit
+                var grossAmount = product.UnitPrice * saleSmallQuantity;
 
                 var itemDiscountAmount = itemDto.DiscountAmount;
 

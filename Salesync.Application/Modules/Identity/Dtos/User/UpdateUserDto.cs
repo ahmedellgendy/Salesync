@@ -3,9 +3,15 @@
     public class UpdateUserDto
     {
         public string? FullName { get; set; }
+
         public string? Role { get; set; }
+
         public int? BranchId { get; set; }
+
+        public bool ClearBranch { get; set; }
+
         public int? BusinessUnitId { get; set; }
+
         public bool? IsActive { get; set; }
     }
 }

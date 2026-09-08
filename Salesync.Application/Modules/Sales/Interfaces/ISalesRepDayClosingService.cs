@@ -12,7 +12,7 @@ namespace Salesync.Application.Modules.Sales.Interfaces
 
         Task<SalesRepDayClosingDto> CreateAsync(CreateSalesRepDayClosingDto dto);
 
-        Task<SalesRepDayClosingDto> ReceiveReturnedStockAsync(int id);
+        Task<SalesRepDayClosingDto> ReceiveCashAsync(int id,ReceiveSalesRepDayClosingCashDto dto);
 
         Task CancelAsync(int id);
     }

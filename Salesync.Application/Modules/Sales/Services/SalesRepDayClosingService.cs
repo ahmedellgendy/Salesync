@@ -6,6 +6,7 @@ using Salesync.Application.Interfaces.Services;
 using Salesync.Application.Modules.Sales.Interfaces;
 using Salesync.Domain.Common.Enums.Sales;
 using Salesync.Domain.Common.Enums.Sales.SalesRepDayClosing;
+using Salesync.Domain.Common.Enums.UnloadRequest;
 using ClosingEntity = Salesync.Domain.Modules.Sales.Entities.SalesRepDayClosing;
 using ClosingItemEntity = Salesync.Domain.Modules.Sales.Entities.SalesRepDayClosingItem;
 
@@ -16,27 +17,21 @@ namespace Salesync.Application.Modules.Sales.Services
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
         private readonly IValidator<CreateSalesRepDayClosingDto> _createValidator;
-        private readonly IValidator<RejectSalesRepDayClosingDto> _rejectValidator;
         private readonly ICurrentUserService _currentUser;
         private readonly ISalesRepDayClosingCalculator _calculator;
-        private readonly ISalesRepDayClosingSettlementService _settlementService;
 
         public SalesRepDayClosingService(
             IUnitOfWork unitOfWork,
             IMapper mapper,
             IValidator<CreateSalesRepDayClosingDto> createValidator,
-            IValidator<RejectSalesRepDayClosingDto> rejectValidator,
             ICurrentUserService currentUser,
-            ISalesRepDayClosingCalculator calculator,
-            ISalesRepDayClosingSettlementService settlementService)
+            ISalesRepDayClosingCalculator calculator)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
             _createValidator = createValidator;
-            _rejectValidator = rejectValidator;
             _currentUser = currentUser;
             _calculator = calculator;
-            _settlementService = settlementService;
         }
 
         public async Task<IEnumerable<SalesRepDayClosingDto>> GetAllAsync(SalesRepDayClosingFilterDto filter)
@@ -71,7 +66,6 @@ namespace Salesync.Application.Modules.Sales.Services
 
             return _mapper.Map<IEnumerable<SalesRepDayClosingDto>>(closings);
         }
-
         public async Task<SalesRepDayClosingDto> GetByIdAsync(int id)
         {
             if (id <= 0)
@@ -87,7 +81,6 @@ namespace Salesync.Application.Modules.Sales.Services
 
             return _mapper.Map<SalesRepDayClosingDto>(closing);
         }
-
         public async Task<IEnumerable<SalesRepDayClosingDto>> GetBySalesRepAsync(int salesRepId)
         {
             if (salesRepId <= 0)
@@ -102,111 +95,226 @@ namespace Salesync.Application.Modules.Sales.Services
 
             return _mapper.Map<IEnumerable<SalesRepDayClosingDto>>(closings);
         }
-
         public async Task<SalesRepDayClosingDto> CreateAsync(CreateSalesRepDayClosingDto dto)
         {
-            var validationResult = await _createValidator.ValidateAsync(dto);
+            var validationResult =
+                await _createValidator.ValidateAsync(dto);
+
             if (!validationResult.IsValid)
                 throw new ValidationException(validationResult.Errors);
 
-            var session = await GetSessionForClosingAsync(dto.SalesRepSessionId);
+            var session =
+                await GetSessionForClosingAsync(
+                    dto.SalesRepSessionId);
 
-            await EnsureSalesRepCanAccessClosingAsync(session.SalesRepId);
+            await EnsureSalesRepCanAccessClosingAsync(
+                session.SalesRepId);
 
             if (session.Status != DayStatus.Closed)
-                throw new InvalidOperationException("Sales rep session must be closed before submitting day closing.");
+                throw new InvalidOperationException(
+                    "Sales rep session must be closed before submitting day closing.");
+
+            if (!session.IsStockSettled)
+                throw new InvalidOperationException(
+                    "Stock must be fully settled before submitting day closing.");
 
             await EnsureWarehouseExistsAsync(dto.WarehouseId);
 
-            await EnsureNoClosingExistsForSessionAsync(dto.SalesRepSessionId);
+            await EnsureWarehouseMatchesUnloadAsync(session.Id,dto.WarehouseId);
 
-            await EnsureProductsExistAsync(dto.Items.Select(x => x.ProductId).ToList());
+            await EnsureNoClosingExistsForSessionAsync(
+                dto.SalesRepSessionId);
 
-            await EnsureAllCurrentInventoryProductsProvidedAsync(session.SalesRepId, dto);
+            var calculation =
+                await _calculator.CalculateAsync(dto, session);
 
-            await EnsureActualReturnedDoesNotExceedCurrentInventoryAsync(session.SalesRepId, dto);
+            var requiresCashSettlement =
+                calculation.ExpectedCashAmount > 0;
 
-            var calculation = await _calculator.CalculateAsync(dto, session);
-
-            var closing = new ClosingEntity
-            {
-                ClosingNumber = await GenerateClosingNumberAsync(),
-                SalesRepId = session.SalesRepId,
-                SalesRepSessionId = session.Id,
-                WarehouseId = dto.WarehouseId,
-                ClosingDate = DateTime.UtcNow,
-                Status = SalesRepDayClosingStatus.Submitted,
-
-                TotalSalesAmount = calculation.TotalSalesAmount,
-                TotalCollectionAmount = calculation.TotalCollectionAmount,
-                TotalReturnAmount = calculation.TotalReturnAmount,
-
-                ExpectedCashAmount = calculation.ExpectedCashAmount,
-                ActualCashAmount = calculation.ActualCashAmount,
-                CashVariance = calculation.CashVariance,
-
-                ExpectedTotalRemainingQuantity = calculation.ExpectedTotalRemainingQuantity,
-                ActualTotalReturnedQuantity = calculation.ActualTotalReturnedQuantity,
-                TotalVarianceQuantity = calculation.TotalVarianceQuantity,
-
-                SubmittedByUserId = _currentUser.UserId,
-                SubmittedAt = DateTime.UtcNow,
-                Notes = dto.Notes,
-
-                Items = calculation.Items.Select(item => new ClosingItemEntity
+            var closing =
+                new ClosingEntity
                 {
-                    ProductId = item.ProductId,
-                    ExpectedRemainingQuantity = item.ExpectedRemainingQuantity,
-                    ActualReturnedQuantity = item.ActualReturnedQuantity,
-                    VarianceQuantity = item.VarianceQuantity,
-                    Notes = item.Notes
-                }).ToList()
-            };
+                    ClosingNumber = await GenerateClosingNumberAsync(),
+                    SalesRepId = session.SalesRepId,
+                    SalesRepSessionId = session.Id,
+                    WarehouseId = dto.WarehouseId,
+                    ClosingDate = DateTime.UtcNow,
+                    Status = requiresCashSettlement ? SalesRepDayClosingStatus.Submitted : SalesRepDayClosingStatus.Completed,
 
-            await _unitOfWork.SalesRepDayClosings.AddAsync(closing);
-            await _unitOfWork.CompleteAsync();
+                    // Sales Summary
+                    TotalSalesAmount = calculation.TotalSalesAmount,
+                    TotalCollectionAmount = calculation.TotalCollectionAmount,
+                    CashCollectionAmount = calculation.CashCollectionAmount,
+                    NonCashCollectionAmount = calculation.NonCashCollectionAmount,
+                    OutstandingAmount = calculation.OutstandingAmount,
+                    TotalReturnAmount = calculation.TotalReturnAmount,
 
-            return await GetByIdAsync(closing.Id);
-        }
+                    // Cash Settlement
+                    ExpectedCashAmount = calculation.ExpectedCashAmount,
+                    ActualCashAmount = 0,
+                    CashVariance = 0,
+                    IsCashReceived = false,
 
-        public async Task<SalesRepDayClosingDto> ReceiveReturnedStockAsync(int id)
-        {
-            if (id <= 0)
-                throw new ArgumentException("Invalid closing id.");
+                    // Stock was already settled through Unload
+                    IsStockReceived = true,
+                    StockReceivedAt = session.StockSettledAt,
 
-            if (_currentUser.Role == "SalesRep")
-                throw new UnauthorizedAccessException("Sales reps are not allowed to approve day closings.");
+                    // Stock Summary
+                    ExpectedTotalRemainingQuantity = calculation.ExpectedTotalRemainingQuantity,
+                    ActualTotalReturnedQuantity = calculation.ActualTotalReturnedQuantity,
+                    TotalVarianceQuantity = calculation.TotalVarianceQuantity,
 
-            var closing = await GetClosingForUpdateAsync(id);
+                    // Workflow
+                    SubmittedByUserId = _currentUser.UserId,
+                    SubmittedAt = DateTime.UtcNow,
+                    Notes = dto.Notes,
+                    Items =
+                        calculation.Items
+                            .Select(item =>
+                                new ClosingItemEntity
+                                {
+                                    ProductId =
+                                        item.ProductId,
 
-            if (closing.Status != SalesRepDayClosingStatus.Submitted)
-                throw new InvalidOperationException("Returned stock can only be received for submitted day closing.");
+                                    ExpectedRemainingQuantity =
+                                        item.ExpectedRemainingQuantity,
 
-            if (closing.IsStockReceived)
-                throw new InvalidOperationException("Returned stock has already been received for this day closing.");
+                                    ActualReturnedQuantity =
+                                        item.ActualReturnedQuantity,
+
+                                    VarianceQuantity =
+                                        item.VarianceQuantity,
+
+                                    Notes =
+                                        item.Notes
+                                })
+                            .ToList()
+                };
 
             await _unitOfWork.BeginTransactionAsync();
 
             try
             {
-                await _settlementService.ApplyApprovalSettlementAsync(closing);
+                await _unitOfWork.SalesRepDayClosings
+                    .AddAsync(closing);
 
-                closing.IsStockReceived = true;
-                closing.StockReceivedByUserId = _currentUser.UserId;
-                closing.StockReceivedAt = DateTime.UtcNow;
-
-                var cashReceived = closing.ExpectedCashAmount <= 0 || closing.IsCashReceived;
-
-                if (cashReceived)
+                if (!requiresCashSettlement)
                 {
-                    closing.Status = SalesRepDayClosingStatus.Completed;
+                    session.IsTreasurySettled = true;
+                    session.TreasurySettledAt = DateTime.UtcNow;
+                    session.UpdatedAt = DateTime.UtcNow;
+
+                    _unitOfWork.SalesRepSessions.Update(session);
                 }
 
-                closing.UpdatedAt = DateTime.UtcNow;
+                await _unitOfWork.CompleteAsync();
 
-                _unitOfWork.SalesRepDayClosings.Update(closing);
+                await _unitOfWork.CommitTransactionAsync();
+            }
+            catch
+            {
+                await _unitOfWork.RollbackTransactionAsync();
+                throw;
+            }
+
+            return await GetByIdAsync(closing.Id);
+        }
+        public async Task<SalesRepDayClosingDto> ReceiveCashAsync(int id, ReceiveSalesRepDayClosingCashDto dto)
+        {
+            if (id <= 0)
+                throw new ArgumentException(
+                    "Invalid closing id.");
+
+            if (dto.ActualCashAmount < 0)
+                throw new ArgumentException(
+                    "Actual cash amount cannot be negative.");
+
+            if (_currentUser.Role != "Admin" &&
+                 _currentUser.Role != "Treasury")
+            {
+                throw new UnauthorizedAccessException(
+                    "Only Admin or Treasury users can receive closing cash.");
+            }
+
+            var closing =
+                await GetClosingForUpdateAsync(id);
+
+            if (closing.Status !=
+                SalesRepDayClosingStatus.Submitted)
+            {
+                throw new InvalidOperationException(
+                    "Cash can only be received for submitted day closing.");
+            }
+
+            if (closing.IsCashReceived)
+                throw new InvalidOperationException(
+                    "Cash has already been received for this day closing.");
+
+            if (closing.ExpectedCashAmount <= 0)
+                throw new InvalidOperationException(
+                    "This day closing has no expected cash amount to receive.");
+
+            var session =
+                await _unitOfWork.SalesRepSessions
+                    .GetQueryable()
+                    .FirstOrDefaultAsync(x =>
+                        x.Id == closing.SalesRepSessionId &&
+                        x.IsActive);
+
+            if (session == null)
+                throw new KeyNotFoundException(
+                    "Sales rep session not found.");
+
+            if (!session.IsStockSettled)
+                throw new InvalidOperationException(
+                    "Stock settlement must be completed before cash settlement.");
+
+            await _unitOfWork.BeginTransactionAsync();
+
+            try
+            {
+                closing.ActualCashAmount =
+                    dto.ActualCashAmount;
+
+                closing.CashVariance =
+                    dto.ActualCashAmount -
+                    closing.ExpectedCashAmount;
+
+                closing.CashNotes =
+                    string.IsNullOrWhiteSpace(dto.Notes)
+                        ? null
+                        : dto.Notes.Trim();
+
+                closing.IsCashReceived = true;
+
+                closing.CashReceivedByUserId =
+                    _currentUser.UserId;
+
+                closing.CashReceivedAt =
+                    DateTime.UtcNow;
+
+                closing.Status =
+                    SalesRepDayClosingStatus.Completed;
+
+                closing.UpdatedAt =
+                    DateTime.UtcNow;
+
+                session.IsTreasurySettled = true;
+
+                session.TreasurySettledAt =
+                    DateTime.UtcNow;
+
+                session.UpdatedAt =
+                    DateTime.UtcNow;
+
+                _unitOfWork.SalesRepDayClosings
+                    .Update(closing);
+
+                _unitOfWork.SalesRepSessions
+                    .Update(session);
 
                 await _unitOfWork.CompleteAsync();
+
                 await _unitOfWork.CommitTransactionAsync();
             }
             catch
@@ -217,8 +325,6 @@ namespace Salesync.Application.Modules.Sales.Services
 
             return await GetByIdAsync(id);
         }
-
-
         public async Task CancelAsync(int id)
         {
             if (id <= 0)
@@ -229,7 +335,7 @@ namespace Salesync.Application.Modules.Sales.Services
             await EnsureSalesRepCanAccessClosingAsync(closing.SalesRepId);
 
             if (closing.Status != SalesRepDayClosingStatus.Submitted)
-                 throw new InvalidOperationException("Only pending day closings can be cancelled.");
+                throw new InvalidOperationException("Only pending day closings can be cancelled.");
 
             closing.Status = SalesRepDayClosingStatus.Cancelled;
             closing.CancelledByUserId = _currentUser.UserId;
@@ -305,81 +411,7 @@ namespace Salesync.Application.Modules.Sales.Services
                     ));
 
             if (exists)
-                throw new InvalidOperationException("There is already a pending or approved day closing for this session.");
-        }
-
-        private async Task EnsureProductsExistAsync(List<int> productIds)
-        {
-            var distinctProductIds = productIds.Distinct().ToList();
-
-            var existingProductIds = await _unitOfWork.Products
-                .GetQueryable()
-                .Where(x =>
-                    distinctProductIds.Contains(x.Id) &&
-                    x.IsActive)
-                .Select(x => x.Id)
-                .ToListAsync();
-
-            var missingProductIds = distinctProductIds
-                .Except(existingProductIds)
-                .ToList();
-
-            if (missingProductIds.Any())
-                throw new KeyNotFoundException($"Products not found: {string.Join(", ", missingProductIds)}");
-        }
-
-        private async Task EnsureAllCurrentInventoryProductsProvidedAsync(int salesRepId, CreateSalesRepDayClosingDto dto)
-        {
-            var currentInventoryProductIds = await _unitOfWork.SalesRepInventories
-                .GetQueryable()
-                .Where(x =>
-                    x.SalesRepId == salesRepId &&
-                    x.Quantity > 0 &&
-                    x.IsActive)
-                .Select(x => x.ProductId)
-                .ToListAsync();
-
-            var dtoProductIds = dto.Items
-                .Select(x => x.ProductId)
-                .Distinct()
-                .ToList();
-
-            var missingProductIds = currentInventoryProductIds
-                .Except(dtoProductIds)
-                .ToList();
-
-            if (missingProductIds.Any())
-                throw new InvalidOperationException(
-                    $"Closing items must include all current inventory products. Missing products: {string.Join(", ", missingProductIds)}");
-        }
-
-        private async Task EnsureActualReturnedDoesNotExceedCurrentInventoryAsync(int salesRepId, CreateSalesRepDayClosingDto dto)
-        {
-            var currentInventory = await _unitOfWork.SalesRepInventories
-                .GetQueryable()
-                .Where(x =>
-                    x.SalesRepId == salesRepId &&
-                    x.IsActive)
-                .Select(x => new
-                {
-                    x.ProductId,
-                    x.Quantity
-                })
-                .ToListAsync();
-
-            var inventoryByProduct = currentInventory
-                .ToDictionary(x => x.ProductId, x => x.Quantity);
-
-            foreach (var item in dto.Items)
-            {
-                var expectedQuantity = inventoryByProduct.TryGetValue(item.ProductId, out var quantity)
-                    ? quantity
-                    : 0;
-
-                if (item.ActualReturnedQuantity > expectedQuantity)
-                    throw new InvalidOperationException(
-                        $"Actual returned quantity for product {item.ProductId} cannot exceed expected remaining quantity. Expected: {expectedQuantity}, Actual: {item.ActualReturnedQuantity}.");
-            }
+                throw new InvalidOperationException("There is already a submitted or completed day closing for this session.");
         }
 
         private async Task EnsureSalesRepCanAccessClosingAsync(int salesRepId)
@@ -428,6 +460,38 @@ namespace Salesync.Application.Modules.Sales.Services
                 .CountAsync(x => x.ClosingNumber.StartsWith(prefix));
 
             return $"{prefix}-{count + 1:D4}";
+        }
+
+        private async Task EnsureWarehouseMatchesUnloadAsync(
+    int salesRepSessionId,
+    int warehouseId)
+        {
+            var unloadWarehouseIds =
+                await _unitOfWork.SalesRepUnloadRequests
+                    .GetQueryable()
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.SalesRepSessionId == salesRepSessionId &&
+                        x.IsActive &&
+                        (
+                            x.Status == UnloadRequestStatus.Confirmed ||
+                            x.Status == UnloadRequestStatus.PartiallyConfirmed
+                        ))
+                    .Select(x => x.WarehouseId)
+                    .Distinct()
+                    .ToListAsync();
+
+            if (unloadWarehouseIds.Count == 0)
+                throw new InvalidOperationException(
+                    "No confirmed unload request found for this session.");
+
+            if (unloadWarehouseIds.Count > 1)
+                throw new InvalidOperationException(
+                    "Day closing cannot be created because the session was unloaded to multiple warehouses.");
+
+            if (unloadWarehouseIds[0] != warehouseId)
+                throw new InvalidOperationException(
+                    "Day closing warehouse must match the warehouse used for stock unload.");
         }
 
         #endregion

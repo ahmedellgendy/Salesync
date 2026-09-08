@@ -54,7 +54,14 @@ namespace Salesync.Infrastructure.Configurations.Sales
 
             builder.Property(x => x.Notes)
                 .HasMaxLength(500);
+            builder.Property(x => x.CashCollectionAmount)
+           .HasPrecision(18, 2);
 
+            builder.Property(x => x.NonCashCollectionAmount)
+                .HasPrecision(18, 2);
+
+            builder.Property(x => x.OutstandingAmount)
+                .HasPrecision(18, 2);
             builder.HasIndex(x => x.ClosingNumber)
                 .IsUnique();
 

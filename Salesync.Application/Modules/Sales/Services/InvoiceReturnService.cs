@@ -20,7 +20,23 @@ namespace Salesync.Application.Modules.Sales.Services
             _unitOfWork = unitOfWork;
             _mapper = mapper;
         }
+        public async Task<IEnumerable<InvoiceReturnDto>> GetAllAsync()
+        {
+            var returns = await _unitOfWork.InvoiceReturns
+                .GetQueryable()
+                .AsNoTracking()
+                .Include(x => x.Items)
+                .Include(x => x.Invoice)
+                .Include(x => x.Customer)
+                .Include(x => x.SalesRep)
+                .Where(x => x.IsActive)
+                .OrderByDescending(x => x.CreatedAt)
+                .ToListAsync();
 
+            return returns
+                .Select(MapReturnDto)
+                .ToList();
+        }
         public async Task<IEnumerable<InvoiceReturnDto>> GetByInvoiceIdAsync(int invoiceId)
         {
             if (invoiceId <= 0)
@@ -32,6 +48,7 @@ namespace Salesync.Application.Modules.Sales.Services
                 .Include(x => x.Items)
                 .Include(x => x.Invoice)
                 .Include(x => x.Customer)
+                .Include(x => x.SalesRep)
                 .Where(x =>
                     x.InvoiceId == invoiceId &&
                     x.IsActive)
@@ -54,6 +71,7 @@ namespace Salesync.Application.Modules.Sales.Services
                 .Include(x => x.Items)
                 .Include(x => x.Invoice)
                 .Include(x => x.Customer)
+                .Include(x => x.SalesRep)
                 .FirstOrDefaultAsync(x =>
                     x.Id == id &&
                     x.IsActive);
@@ -78,6 +96,7 @@ namespace Salesync.Application.Modules.Sales.Services
                 .Include(x => x.Items)
                 .Include(x => x.Invoice)
                 .Include(x => x.Customer)
+                .Include(x => x.SalesRep)
                 .Where(x =>
                     x.SalesRepId == salesRepId &&
                     x.IsActive)
@@ -906,7 +925,8 @@ namespace Salesync.Application.Modules.Sales.Services
                 CustomerName = invoiceReturn.Customer?.Name,
 
                 SalesRepId = invoiceReturn.SalesRepId,
-
+                SalesRepCode = invoiceReturn.SalesRep?.SalesRepCode,
+                SalesRepName = invoiceReturn.SalesRep?.Name,
                 SalesRepSessionId = invoiceReturn.SalesRepSessionId,
 
                 Status = invoiceReturn.Status,

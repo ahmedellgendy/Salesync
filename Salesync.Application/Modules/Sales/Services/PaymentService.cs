@@ -1,5 +1,6 @@
 ﻿using AutoMapper;
 using FluentValidation;
+using Microsoft.EntityFrameworkCore;
 using Salesync.Application.Interfaces.Repositories;
 using Salesync.Application.Interfaces.Services;
 using Salesync.Application.Modules.Sales.Dtos.Payment;
@@ -24,10 +25,82 @@ namespace Salesync.Application.Modules.Sales.Services
             _currentUser = currentUser;
         }
 
-        public async Task<IEnumerable<PaymentDto>> GetByInvoiceIdAsync(int invoiceId)
+        public async Task<IEnumerable<PaymentDto>> GetAllAsync()
         {
-            var payments = await _unitOfWork.Payments.FindAsync(p => p.InvoiceId == invoiceId);
-            return _mapper.Map<IEnumerable<PaymentDto>>(payments);
+            var payments = await _unitOfWork.Payments
+                .GetQueryable()
+                .AsNoTracking()
+                .Include(x => x.Invoice)
+                .Include(x => x.Customer)
+                .Include(x => x.SalesRep)
+                .Where(x => x.IsActive)
+                .OrderByDescending(x => x.PaymentDate)
+                .ToListAsync();
+
+            var result = _mapper.Map<List<PaymentDto>>(payments);
+
+            for (var i = 0; i < payments.Count; i++)
+            {
+                PopulatePaymentDetails(payments[i], result[i]);
+            }
+
+            return result;
+        }
+
+        public async Task<PaymentDto> GetByIdAsync(int id)
+        {
+            if (id <= 0)
+                throw new ArgumentException("Invalid payment id.");
+
+            var payment = await _unitOfWork.Payments
+                .GetQueryable()
+                .AsNoTracking()
+                .Include(x => x.Invoice)
+                .Include(x => x.Customer)
+                .Include(x => x.SalesRep)
+                .FirstOrDefaultAsync(x =>
+                    x.Id == id &&
+                    x.IsActive);
+
+            if (payment == null)
+                throw new KeyNotFoundException(
+                    $"Payment with id {id} not found.");
+
+            var dto = _mapper.Map<PaymentDto>(payment);
+
+            PopulatePaymentDetails(payment, dto);
+
+            return dto;
+        }
+        public async Task<IEnumerable<PaymentDto>> GetByInvoiceIdAsync(
+     int invoiceId)
+        {
+            if (invoiceId <= 0)
+                throw new ArgumentException("Invalid invoice id.");
+
+            var payments = await _unitOfWork.Payments
+                .GetQueryable()
+                .AsNoTracking()
+                .Include(x => x.Invoice)
+                .Include(x => x.Customer)
+                .Include(x => x.SalesRep)
+                .Where(x =>
+                    x.InvoiceId == invoiceId &&
+                    x.IsActive)
+                .OrderByDescending(x => x.PaymentDate)
+                .ToListAsync();
+
+            var result =
+                _mapper.Map<List<PaymentDto>>(payments);
+
+            for (var i = 0; i < payments.Count; i++)
+            {
+                PopulatePaymentDetails(
+                    payments[i],
+                    result[i]);
+            }
+
+            return result;
         }
         public async Task<PaymentDto> CreateAsync(CreatePaymentDto dto)
         {
@@ -126,7 +199,34 @@ namespace Salesync.Application.Modules.Sales.Services
         #region Helper Method
 
         private static string GeneratePaymentNumber() => $"PAY-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..4].ToUpper()}";
+        private static void PopulatePaymentDetails(
+    Payment payment,
+    PaymentDto dto)
+        {
+            if (payment.Invoice is not null)
+            {
+                dto.InvoiceNumber =
+                    payment.Invoice.InvoiceNumber;
+            }
 
+            if (payment.Customer is not null)
+            {
+                dto.CustomerName =
+                    payment.Customer.Name;
+
+                dto.CustomerPhone =
+                    payment.Customer.Phone;
+            }
+
+            if (payment.SalesRep is not null)
+            {
+                dto.SalesRepCode =
+                    payment.SalesRep.SalesRepCode;
+
+                dto.SalesRepName =
+                    payment.SalesRep.Name;
+            }
+        }
         #endregion
 
     }

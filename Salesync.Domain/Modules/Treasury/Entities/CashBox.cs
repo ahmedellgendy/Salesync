@@ -14,5 +14,6 @@ namespace Salesync.Domain.Modules.Treasury.Entities
 
         public Branch? Branch { get; set; }
         public ICollection<CashReceipt> CashReceipts { get; set; } = new List<CashReceipt>();
+        public ICollection<TreasuryTransaction> Transactions { get; set; } = new List<TreasuryTransaction>();
     }
 }
