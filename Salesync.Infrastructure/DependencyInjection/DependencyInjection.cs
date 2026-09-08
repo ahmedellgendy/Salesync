@@ -39,7 +39,15 @@ namespace Salesync.Infrastructure.DependencyInjection
             services.AddScoped<IProfileService, ProfileService>();
 
             // license service
-            services.AddScoped<ILicenseService,LicenseService>();
+            services.AddScoped<ILicenseService, LicenseService>();
+
+            services.AddSingleton<ILicenseSignatureVerifier, LicenseSignatureVerifier>();
+
+            services.AddSingleton<ILicenseSignatureVerifier, LicenseSignatureVerifier>();
+
+            services.AddScoped<ILicenseFileProvider, LicenseFileProvider>();
+
+            services.AddScoped<ILicenseService, LicenseService>();
 
             return services;
         }

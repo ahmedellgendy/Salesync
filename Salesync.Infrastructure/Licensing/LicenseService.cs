@@ -1,89 +1,127 @@
-﻿using Microsoft.Extensions.Options;
-using Salesync.Application.Common.Licensing;
-using Salesync.Application.Common.Settings;
+﻿using Salesync.Application.Common.Licensing;
 
 namespace Salesync.Infrastructure.Licensing
 {
     public class LicenseService : ILicenseService
     {
-        private readonly LicenseSettings _settings;
+        private readonly ILicenseFileProvider _licenseFileProvider;
+        private readonly ILicenseSignatureVerifier _signatureVerifier;
+
 
         public LicenseService(
-            IOptions<LicenseSettings> options)
+            ILicenseFileProvider licenseFileProvider,
+            ILicenseSignatureVerifier signatureVerifier)
         {
-            _settings = options.Value;
+            _licenseFileProvider =
+                licenseFileProvider;
+
+            _signatureVerifier =
+                signatureVerifier;
         }
 
 
         public LicenseStatus GetStatus()
         {
-            var now =
-                DateTime.UtcNow.Date;
+            SignedLicenseDocument document;
 
-
-            var isConfigured =
-                !string.IsNullOrWhiteSpace(_settings.CompanyId)
-                &&
-                !string.IsNullOrWhiteSpace(_settings.LicenseKey)
-                &&
-                _settings.ValidFrom.HasValue
-                &&
-                _settings.ValidTo.HasValue
-                &&
-                _settings.MaxUsers > 0;
-
-
-            if (!isConfigured)
+            try
+            {
+                document =
+                    _licenseFileProvider.Load();
+            }
+            catch (Exception ex)
             {
                 return new LicenseStatus
                 {
                     IsConfigured = false,
                     IsValid = false,
-                    IsExpired = false,
-                    HasStarted = false,
-                    CompanyId = _settings.CompanyId,
-                    Plan = _settings.Plan,
-                    ValidFrom = _settings.ValidFrom,
-                    ValidTo = _settings.ValidTo,
-                    MaxUsers = _settings.MaxUsers,
-                    Message = "Salesync license is not configured."
+                    Message = ex.Message
                 };
             }
 
 
-            var validFrom =
-                _settings.ValidFrom!.Value.Date;
-
-            var validTo =
-                _settings.ValidTo!.Value.Date;
+            var payload =
+                document.Payload;
 
 
-            if (validTo < validFrom)
+            var signatureValid =
+                _signatureVerifier.Verify(
+                    payload,
+                    document.Signature);
+
+
+            if (!signatureValid)
             {
                 return new LicenseStatus
                 {
                     IsConfigured = true,
                     IsValid = false,
-                    CompanyId = _settings.CompanyId,
-                    Plan = _settings.Plan,
-                    ValidFrom = _settings.ValidFrom,
-                    ValidTo = _settings.ValidTo,
-                    MaxUsers = _settings.MaxUsers,
-                    Message = "License validity period is invalid."
+                    CompanyId = payload.CompanyId,
+                    Plan = payload.Plan,
+                    ValidFrom = payload.ValidFrom,
+                    ValidTo = payload.ValidTo,
+                    MaxUsers = payload.MaxUsers,
+                    Message = "Salesync license signature is invalid."
                 };
             }
 
 
+            if (string.IsNullOrWhiteSpace(
+                    payload.CompanyId))
+            {
+                return Invalid(
+                    payload,
+                    "License company id is missing.");
+            }
+
+
+            if (string.IsNullOrWhiteSpace(
+                    payload.LicenseKey))
+            {
+                return Invalid(
+                    payload,
+                    "License key is missing.");
+            }
+
+
+            if (payload.MaxUsers <= 0)
+            {
+                return Invalid(
+                    payload,
+                    "License maximum users must be greater than zero.");
+            }
+
+
+            var validFrom =
+                payload.ValidFrom.Date;
+
+            var validTo =
+                payload.ValidTo.Date;
+
+
+            if (validTo < validFrom)
+            {
+                return Invalid(
+                    payload,
+                    "License validity period is invalid.");
+            }
+
+
+            var today =
+                DateTime.UtcNow.Date;
+
+
             var hasStarted =
-                now >= validFrom;
+                today >= validFrom;
 
             var isExpired =
-                now > validTo;
+                today > validTo;
 
 
             return new LicenseStatus
             {
                 IsConfigured = true,
+
                 IsValid =
                     hasStarted &&
                     !isExpired,
@@ -95,26 +133,26 @@ namespace Salesync.Infrastructure.Licensing
                     isExpired,
 
                 CompanyId =
-                    _settings.CompanyId,
+                    payload.CompanyId,
 
                 Plan =
-                    _settings.Plan,
+                    payload.Plan,
 
                 ValidFrom =
-                    _settings.ValidFrom,
+                    payload.ValidFrom,
 
                 ValidTo =
-                    _settings.ValidTo,
+                    payload.ValidTo,
 
                 MaxUsers =
-                    _settings.MaxUsers,
+                    payload.MaxUsers,
 
                 Message =
                     !hasStarted
-                        ? "License has not started yet."
+                        ? "Salesync license has not started yet."
                         : isExpired
-                            ? "License has expired."
-                            : "License is valid."
+                            ? "Salesync license has expired."
+                            : "Salesync license is valid."
             };
         }
 
@@ -128,21 +166,8 @@ namespace Salesync.Infrastructure.Licensing
             if (!status.IsConfigured)
             {
                 throw new InvalidOperationException(
+                    status.Message ??
                     "Salesync license is not configured.");
-            }
-
-
-            if (!status.HasStarted)
-            {
-                throw new InvalidOperationException(
-                    "Salesync license has not started yet.");
-            }
-
-
-            if (status.IsExpired)
-            {
-                throw new InvalidOperationException(
-                    "Salesync license has expired.");
             }
 
 
@@ -158,9 +183,6 @@ namespace Salesync.Infrastructure.Licensing
         public void EnsureCanAddActiveUser(
             int currentActiveUsers)
         {
-            EnsureLicenseIsValid();
-
-
             if (currentActiveUsers < 0)
             {
                 throw new ArgumentOutOfRangeException(
@@ -168,11 +190,18 @@ namespace Salesync.Infrastructure.Licensing
             }
 
 
+            EnsureLicenseIsValid();
+
+
+            var document =
+                _licenseFileProvider.Load();
+
+
             if (currentActiveUsers >=
-                _settings.MaxUsers)
+                document.Payload.MaxUsers)
             {
                 throw new InvalidOperationException(
-                    $"The current license allows a maximum of {_settings.MaxUsers} active users.");
+                    $"The current license allows a maximum of {document.Payload.MaxUsers} active users.");
             }
         }
 
@@ -196,11 +225,33 @@ namespace Salesync.Infrastructure.Licensing
             }
 
 
-            return _settings.EnabledFeatures.Any(x =>
-                string.Equals(
+            var document =
+                _licenseFileProvider.Load();
+
+
+            return document.Payload.EnabledFeatures.Any(
+                x => string.Equals(
                     x,
                     feature,
                     StringComparison.OrdinalIgnoreCase));
+        }
+
+
+        private static LicenseStatus Invalid(
+            LicensePayload payload,
+            string message)
+        {
+            return new LicenseStatus
+            {
+                IsConfigured = true,
+                IsValid = false,
+                CompanyId = payload.CompanyId,
+                Plan = payload.Plan,
+                ValidFrom = payload.ValidFrom,
+                ValidTo = payload.ValidTo,
+                MaxUsers = payload.MaxUsers,
+                Message = message
+            };
         }
     }
 }
