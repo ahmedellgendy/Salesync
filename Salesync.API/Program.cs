@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using Salesync.API.Middleware;
 using Salesync.Application;
+using Salesync.Application.Common.Settings;
 using Salesync.Application.Interfaces.Repositories;
 using Salesync.Application.Mappings;
 using Salesync.Application.Modules.MasterData.Interfaces.Services;
@@ -51,6 +52,9 @@ builder.Services.AddInfrastructureServices(builder.Configuration);
 builder.Services.AddMasterDataModule(builder.Configuration);
 builder.Services.AddIdentityServices(builder.Configuration);
 builder.Services.AddApplicationServices();
+
+builder.Services.Configure<CompanySettings>(builder.Configuration.GetSection("Company"));
+builder.Services.Configure<LicenseSettings>(builder.Configuration.GetSection("License"));
 
 builder.Services.AddAutoMapper(typeof(MappingProfile));
 

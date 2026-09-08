@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Salesync.Application.Common.Licensing;
 using Salesync.Application.Interfaces.Repositories;
 using Salesync.Application.Interfaces.Services;
 using Salesync.Application.Modules.Identity.Interfaces;
@@ -8,6 +9,7 @@ using Salesync.Application.Modules.Profile.Interfaces;
 using Salesync.Application.Modules.SalesRep.Interfaces.Services;
 using Salesync.Application.Modules.SalesRep.Services;
 using Salesync.Infrastructure.Data;
+using Salesync.Infrastructure.Licensing;
 using Salesync.Infrastructure.Modules.Identity.Services;
 using Salesync.Infrastructure.Repositories.Common;
 
@@ -35,6 +37,9 @@ namespace Salesync.Infrastructure.DependencyInjection
             services.AddScoped<ICurrentUserService, CurrentUserService>();
 
             services.AddScoped<IProfileService, ProfileService>();
+
+            // license service
+            services.AddScoped<ILicenseService,LicenseService>();
 
             return services;
         }
