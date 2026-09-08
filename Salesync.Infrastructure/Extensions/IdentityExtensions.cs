@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
@@ -36,7 +37,8 @@ namespace Salesync.Infrastructure.Extensions
                 options.Lockout.MaxFailedAccessAttempts = 5;
                 options.Lockout.AllowedForNewUsers = true;
             })
-                .AddEntityFrameworkStores<SalesyncDbContext>();
+                .AddEntityFrameworkStores<SalesyncDbContext>()
+                .AddDefaultTokenProviders();
 
             // Auth services
             services.AddScoped<IAuthService, AuthService>();

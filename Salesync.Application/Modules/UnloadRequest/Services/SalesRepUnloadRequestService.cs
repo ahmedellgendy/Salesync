@@ -439,9 +439,7 @@ namespace Salesync.Application.Modules.UnloadRequest.Services
                         ? DateTime.UtcNow
                         : null;
 
-                session.UpdatedAt =
-                    DateTime.UtcNow;
-
+                
                 session.UpdatedAt = DateTime.UtcNow;
 
                 _unitOfWork.SalesRepUnloadRequests.Update(request);
@@ -506,7 +504,28 @@ namespace Salesync.Application.Modules.UnloadRequest.Services
 
             return salesRep;
         }
+        public async Task<IEnumerable<SalesRepUnloadRequestDto>> GetAllAsync()
+        {
+            var requests =
+                await _unitOfWork.SalesRepUnloadRequests
+                    .GetQueryable()
+                    .AsNoTracking()
+                    .Include(x => x.Items)
+                    .Where(x => x.IsActive)
+                    .OrderByDescending(x => x.RequestedAt)
+                    .ToListAsync();
 
+            var dtos =
+                _mapper.Map<List<SalesRepUnloadRequestDto>>(
+                    requests);
+
+            foreach (var dto in dtos)
+            {
+                await FillDisplayDataAsync(dto);
+            }
+
+            return dtos;
+        }
         public async Task<SalesRepUnloadRequestDto> GetMyRequestByIdAsync(int id)
         {
             if (id <= 0)

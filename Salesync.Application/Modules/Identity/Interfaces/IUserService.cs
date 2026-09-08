@@ -9,6 +9,8 @@ namespace Salesync.Application.Modules.Identity.Interfaces
         Task<IEnumerable<UserDto>> GetAllUsersAsync();
         Task<UserDto> GetUserByIdAsync(string id);
         Task<UserDto> UpdateUserAsync(string id, UpdateUserDto updateUserDto);
+        Task<UserDto> SetUserActiveStatusAsync(string id, bool isActive);
+        Task ResetUserPasswordAsync(string id,string newPassword);
         Task DeleteUserAsync(string id);
     }
 }

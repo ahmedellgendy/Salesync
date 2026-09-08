@@ -22,7 +22,8 @@ namespace Salesync.Infrastructure.Modules.Identity.Services
         public async Task<IEnumerable<UserDto>> GetAllUsersAsync()
         {
             var users = await _userManager.Users
-                .Where(u => u.IsActive)
+                .OrderByDescending(u => u.IsActive)
+                .ThenBy(u => u.FullName)
                 .ToListAsync();
 
             var userDtos = new List<UserDto>();
@@ -182,6 +183,42 @@ namespace Salesync.Infrastructure.Modules.Identity.Services
 
         }
 
+        public async Task<UserDto> SetUserActiveStatusAsync(string id,bool isActive)
+        {
+            var user = await _userManager.FindByIdAsync(id)
+                ?? throw new KeyNotFoundException(
+                    $"User with ID '{id}' not found.");
+
+            user.IsActive = isActive;
+
+            var result = await _userManager.UpdateAsync(user);
+            result.EnsureSuccess();
+
+            var roles = await _userManager.GetRolesAsync(user);
+
+            return MapToUserDto(
+                user,
+                roles.FirstOrDefault() ?? string.Empty);
+        }
+
+        public async Task ResetUserPasswordAsync(string id,string newPassword)
+        {
+            var user = await _userManager.FindByIdAsync(id)
+                ?? throw new KeyNotFoundException(
+                    $"User with ID '{id}' not found.");
+
+            var token = await _userManager
+                .GeneratePasswordResetTokenAsync(user);
+
+            var result = await _userManager
+                .ResetPasswordAsync(
+                    user,
+                    token,
+                    newPassword);
+
+            result.EnsureSuccess();
+        }
+
         // delete user 
         public async Task DeleteUserAsync(string id)
         {
@@ -216,12 +253,27 @@ namespace Salesync.Infrastructure.Modules.Identity.Services
         }
 
         // helper method to update user properties from UpdateUserDto
-        private void UpdateUserFromDto(ApplicationUser user, UpdateUserDto dto)
+        private void UpdateUserFromDto(
+             ApplicationUser user,
+             UpdateUserDto dto)
         {
-            if (dto.FullName != null) user.FullName = dto.FullName;
-            if (dto.BranchId != null) user.BranchId = dto.BranchId;
-            if (dto.BusinessUnitId != null) user.BusinessUnitId = dto.BusinessUnitId;
-            if (dto.IsActive.HasValue) user.IsActive = dto.IsActive.Value;
+            if (dto.FullName != null)
+                user.FullName = dto.FullName;
+
+            if (dto.ClearBranch)
+            {
+                user.BranchId = null;
+            }
+            else if (dto.BranchId.HasValue)
+            {
+                user.BranchId = dto.BranchId.Value;
+            }
+
+            if (dto.BusinessUnitId != null)
+                user.BusinessUnitId = dto.BusinessUnitId;
+
+            if (dto.IsActive.HasValue)
+                user.IsActive = dto.IsActive.Value;
         }
 
         // helper method to update user role 

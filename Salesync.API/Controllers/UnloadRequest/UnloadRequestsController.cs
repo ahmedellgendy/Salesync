@@ -18,6 +18,20 @@ namespace Salesync.API.Controllers
             _unloadRequestService = unloadRequestService;
         }
 
+        [HttpGet]   // GET: api/unload-requests
+        [Authorize(Roles = "Admin,Warehouse")]
+        public async Task<IActionResult> GetAll()
+        {
+            var result =
+                await _unloadRequestService.GetAllAsync();
+
+            return Ok(
+                ApiResponse<IEnumerable<SalesRepUnloadRequestDto>>
+                    .SuccessResponse(
+                        result,
+                        "Unload requests retrieved successfully."));
+        }
+
         [HttpPost] // POST: api/unload-requests
         [Authorize(Roles = "SalesRep")]
         public async Task<IActionResult> Create([FromBody] CreateSalesRepUnloadRequestDto dto)
