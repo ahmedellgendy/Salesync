@@ -163,32 +163,48 @@ namespace Salesync.Application.Modules.SalesRep.Services
             if (teamSalesRepIds.Count == 0)
                 return Enumerable.Empty<CustomerDto>();
 
-            var routeIds = await _unitOfWork.Routes
-                .GetQueryable()
-                .AsNoTracking()
-                .Where(x =>
-                    x.AssignedSalesRepId.HasValue &&
-                    teamSalesRepIds.Contains(x.AssignedSalesRepId.Value) &&
-                    x.IsActive)
-                .Select(x => x.Id)
-                .ToListAsync();
+            var teamRoutes = await _unitOfWork.Routes
+                   .GetQueryable()
+                   .AsNoTracking()
+                   .Where(x =>
+                       x.AssignedSalesRepId.HasValue &&
+                       teamSalesRepIds.Contains(x.AssignedSalesRepId.Value) &&
+                       x.IsActive)
+                   .Select(x => new
+                   {
+                       x.Id,
+                       x.Name
+                   })
+                   .ToListAsync();
 
-            if (routeIds.Count == 0)
+            if (teamRoutes.Count == 0)
                 return Enumerable.Empty<CustomerDto>();
 
-            var customerIds = await _unitOfWork.RouteCustomers
-                .GetQueryable()
-                .AsNoTracking()
-                .Where(x =>
-                    routeIds.Contains(x.RouteId) &&
-                    x.Customer.IsActive &&
-                    x.Customer.Status == CustomerStatus.Active)
+            var routeIds = teamRoutes
+                .Select(x => x.Id)
+                .ToList();
+
+            var routeCustomers = await _unitOfWork.RouteCustomers
+                     .GetQueryable()
+                     .AsNoTracking()
+                     .Where(x =>
+                         routeIds.Contains(x.RouteId) &&
+                         x.Customer.IsActive &&
+                         x.Customer.Status == CustomerStatus.Active)
+                     .Select(x => new
+                     {
+                         x.RouteId,
+                         x.CustomerId
+                     })
+                     .ToListAsync();
+
+            if (routeCustomers.Count == 0)
+                return Enumerable.Empty<CustomerDto>();
+
+            var customerIds = routeCustomers
                 .Select(x => x.CustomerId)
                 .Distinct()
-                .ToListAsync();
-
-            if (customerIds.Count == 0)
-                return Enumerable.Empty<CustomerDto>();
+                .ToList();
 
             var customers = await _unitOfWork.Customers
                 .GetQueryable()
@@ -200,7 +216,31 @@ namespace Salesync.Application.Modules.SalesRep.Services
                 .OrderBy(x => x.Name)
                 .ToListAsync();
 
-            return _mapper.Map<IEnumerable<CustomerDto>>(customers);
+            var customerDtos = _mapper.Map<List<CustomerDto>>(customers);
+
+            foreach (var customerDto in customerDtos)
+            {
+                var routeCustomer =
+                    routeCustomers
+                        .FirstOrDefault(x =>
+                            x.CustomerId == customerDto.Id);
+
+                if (routeCustomer is null)
+                    continue;
+
+                var route =
+                    teamRoutes
+                        .FirstOrDefault(x =>
+                            x.Id == routeCustomer.RouteId);
+
+                if (route is null)
+                    continue;
+
+                customerDto.RouteId = route.Id;
+                customerDto.RouteName = route.Name;
+            }
+
+            return customerDtos;
         }
 
         public async Task<RouteCustomerDto> CreateAsync(CreateRouteCustomerDto dto)

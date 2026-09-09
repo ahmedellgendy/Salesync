@@ -38,5 +38,8 @@ namespace Salesync.Application.Modules.MasterData.Dtos.CustomerDto
         public string? BranchName { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
+
+        public int? RouteId { get; set; }
+        public string? RouteName { get; set; }
     }
 }

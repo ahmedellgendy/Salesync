@@ -3,6 +3,7 @@
     public interface ILicenseService
     {
         LicenseStatus GetStatus();
+        Task<LicenseStatusDto> GetDetailedStatusAsync();
 
         void EnsureLicenseIsValid();
 

@@ -1,4 +1,7 @@
-﻿using Salesync.Application.Common.Licensing;
+﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using Salesync.Application.Common.Licensing;
+using Salesync.Infrastructure.Modules.Identity.Entities;
 
 namespace Salesync.Infrastructure.Licensing
 {
@@ -6,17 +9,21 @@ namespace Salesync.Infrastructure.Licensing
     {
         private readonly ILicenseFileProvider _licenseFileProvider;
         private readonly ILicenseSignatureVerifier _signatureVerifier;
-
+        private readonly UserManager<ApplicationUser> _userManager;
 
         public LicenseService(
             ILicenseFileProvider licenseFileProvider,
-            ILicenseSignatureVerifier signatureVerifier)
+            ILicenseSignatureVerifier signatureVerifier,
+                UserManager<ApplicationUser> userManager)
+
         {
             _licenseFileProvider =
                 licenseFileProvider;
 
             _signatureVerifier =
                 signatureVerifier;
+
+            _userManager = userManager;
         }
 
 
@@ -58,6 +65,7 @@ namespace Salesync.Infrastructure.Licensing
                     IsValid = false,
                     CompanyId = payload.CompanyId,
                     Plan = payload.Plan,
+                    SubscriptionType =payload.SubscriptionType,
                     ValidFrom = payload.ValidFrom,
                     ValidTo = payload.ValidTo,
                     MaxUsers = payload.MaxUsers,
@@ -138,6 +146,9 @@ namespace Salesync.Infrastructure.Licensing
                 Plan =
                     payload.Plan,
 
+                SubscriptionType =
+                  payload.SubscriptionType,
+
                 ValidFrom =
                     payload.ValidFrom,
 
@@ -155,7 +166,75 @@ namespace Salesync.Infrastructure.Licensing
                             : "Salesync license is valid."
             };
         }
+        public async Task<LicenseStatusDto> GetDetailedStatusAsync()
+        {
+            var status =
+                GetStatus();
 
+            var activeUsers =
+                await _userManager.Users
+                    .CountAsync(x => x.IsActive);
+
+            var enabledFeatures =
+                new List<string>();
+
+
+            if (status.IsValid)
+            {
+                var document =
+                    _licenseFileProvider.Load();
+
+                enabledFeatures =
+                    document.Payload.EnabledFeatures
+                        .OrderBy(x => x)
+                        .ToList();
+            }
+
+
+            var remainingUsers =
+                status.MaxUsers > 0
+                    ? Math.Max(
+                        0,
+                        status.MaxUsers - activeUsers)
+                    : 0;
+
+
+            return new LicenseStatusDto
+            {
+                IsValid =
+                    status.IsValid,
+
+                CompanyId =
+                    status.CompanyId,
+
+                Plan =
+                    status.Plan,
+
+                SubscriptionType =
+                    status.SubscriptionType,
+
+                ValidFrom =
+                    status.ValidFrom,
+
+                ValidTo =
+                    status.ValidTo,
+
+                MaxUsers =
+                    status.MaxUsers,
+
+                ActiveUsers =
+                    activeUsers,
+
+                RemainingUsers =
+                    remainingUsers,
+
+                EnabledFeatures =
+                    enabledFeatures,
+
+                Message =
+                    status.Message ?? string.Empty
+            };
+        }
 
         public void EnsureLicenseIsValid()
         {
@@ -247,6 +326,7 @@ namespace Salesync.Infrastructure.Licensing
                 IsValid = false,
                 CompanyId = payload.CompanyId,
                 Plan = payload.Plan,
+                SubscriptionType = payload.SubscriptionType,
                 ValidFrom = payload.ValidFrom,
                 ValidTo = payload.ValidTo,
                 MaxUsers = payload.MaxUsers,
