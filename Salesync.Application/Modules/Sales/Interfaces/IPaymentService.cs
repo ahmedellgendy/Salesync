@@ -10,6 +10,8 @@ namespace Salesync.Application.Modules.Sales.Interfaces
 
         Task<IEnumerable<PaymentDto>> GetByInvoiceIdAsync(int invoiceId);
 
+        Task<IEnumerable<OutstandingInvoiceDto>>GetCurrentSalesRepOutstandingInvoicesAsync();
+
         Task<PaymentDto> CreateAsync(CreatePaymentDto dto);
     }
 }

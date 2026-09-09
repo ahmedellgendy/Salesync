@@ -58,5 +58,19 @@ namespace Salesync.API.Controllers.Sales
             var result = await _paymentService.CreateAsync(dto);
             return Ok(ApiResponse<PaymentDto>.SuccessResponse(result, "Payment created successfully"));
         }
+
+        [HttpGet("outstanding-invoices/current-sales-rep")]
+        [Authorize(Roles = "SalesRep")]
+        public async Task<IActionResult>
+    GetCurrentSalesRepOutstandingInvoicesAsync()
+        {
+            var result =
+                await _paymentService
+                    .GetCurrentSalesRepOutstandingInvoicesAsync();
+
+            return Ok(
+                ApiResponse<IEnumerable<OutstandingInvoiceDto>>
+                    .SuccessResponse(result));
+        }
     }
 }

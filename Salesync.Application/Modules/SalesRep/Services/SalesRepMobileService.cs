@@ -387,44 +387,98 @@ namespace Salesync.Application.Modules.SalesRep.Services
 
             return await _customerVisitService.CompleteAsync(visitId, completeVisitDto);
         }
-        public async Task<PaymentDto> CreatePaymentAsync(CreateSalesRepMobilePaymentDto dto)
+        public async Task<PaymentDto> CreatePaymentAsync(
+            CreateSalesRepMobilePaymentDto dto)
         {
             if (dto.InvoiceId <= 0)
-                throw new ArgumentException("Invalid invoice id.");
-
-            if (dto.SalesRepSessionId <= 0)
-                throw new ArgumentException("Invalid session id.");
+                throw new ArgumentException(
+                    "Invalid invoice id.");
 
             if (dto.Amount <= 0)
-                throw new ArgumentException("Payment amount must be greater than zero.");
+                throw new ArgumentException(
+                    "Payment amount must be greater than zero.");
 
-            var salesRep = await GetCurrentSalesRepAsync();
+            var salesRep =
+                await GetCurrentSalesRepAsync();
 
-            await EnsureSessionBelongsToSalesRepAsync(dto.SalesRepSessionId, salesRep.Id);
 
-            var invoice = await _unitOfWork.Invoices
-                .GetQueryable()
-                .AsNoTracking()
-                .FirstOrDefaultAsync(x =>
-                    x.Id == dto.InvoiceId &&
-                    x.IsActive &&
-                    x.SalesRepId == salesRep.Id &&
-                    x.SalesRepSessionId == dto.SalesRepSessionId);
+            // Invoice may belong to an old session.
+            var invoice =
+                await _unitOfWork.Invoices
+                    .GetQueryable()
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(x =>
+                        x.Id == dto.InvoiceId &&
+                        x.IsActive &&
+                        x.SalesRepId == salesRep.Id);
 
             if (invoice is null)
-                throw new KeyNotFoundException("Invoice not found for current sales rep session.");
-
-            var createPaymentDto = new CreatePaymentDto
             {
-                InvoiceId = invoice.Id,
-                SalesRepId = salesRep.Id,
-                SalesRepSessionId = dto.SalesRepSessionId,
-                Amount = dto.Amount,
-                PaymentMethod = (PaymentMethod)dto.PaymentMethod,
-                Notes = dto.Notes
-            };
+                throw new KeyNotFoundException(
+                    "Invoice not found for current sales rep.");
+            }
 
-            return await _paymentService.CreateAsync(createPaymentDto);
+
+            if (invoice.Status != InvoiceStatus.Confirmed)
+            {
+                throw new InvalidOperationException(
+                    "Payment is allowed only for confirmed invoices.");
+            }
+
+
+            // Resolve CURRENT active session.
+            var activeSession =
+                await _unitOfWork.SalesRepSessions
+                    .GetQueryable()
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.SalesRepId == salesRep.Id &&
+                        x.IsActive &&
+                        !x.EndTime.HasValue &&
+                        !x.IsTreasurySettled)
+                    .OrderByDescending(x =>
+                        x.StartTime)
+                    .FirstOrDefaultAsync();
+
+            if (activeSession is null)
+            {
+                throw new InvalidOperationException(
+                    "No active sales rep session was found.");
+            }
+
+
+            if (activeSession.IsStockSettled)
+            {
+                throw new InvalidOperationException(
+                    "Cannot collect payment after stock settlement.");
+            }
+
+
+            var createPaymentDto =
+                new CreatePaymentDto
+                {
+                    InvoiceId =
+                        invoice.Id,
+
+                    SalesRepId =
+                        salesRep.Id,
+
+                    SalesRepSessionId =
+                        activeSession.Id,
+
+                    Amount =
+                        dto.Amount,
+
+                    PaymentMethod =
+                        (PaymentMethod)dto.PaymentMethod,
+
+                    Notes =
+                        dto.Notes
+                };
+
+
+            return await _paymentService
+                .CreateAsync(createPaymentDto);
         }
         public async Task<IEnumerable<SalesRepMobileRouteDto>> GetRoutesAsync(int sessionId)
         {
