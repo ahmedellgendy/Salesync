@@ -15,5 +15,9 @@ namespace Salesync.Application.Modules.Treasury.Interfaces.Services
 
         Task<IEnumerable<SalesRepReceivableDto>>
             GetSalesRepReceivablesAsync();
+
+        Task<SalesRepDebtPaymentResultDto> PaySalesRepDebtAsync(
+        int salesRepId,
+        PaySalesRepDebtDto dto);
     }
 }

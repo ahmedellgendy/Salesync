@@ -66,8 +66,7 @@ namespace Salesync.API.Controllers.Treasury
 
 
         [HttpGet("sales-reps")]
-        public async Task<ActionResult<ApiResponse<IEnumerable<SalesRepReceivableDto>>>>
-            GetSalesRepReceivables()
+        public async Task<ActionResult<ApiResponse<IEnumerable<SalesRepReceivableDto>>>> GetSalesRepReceivables()
         {
             var result =
                 await _receivablesService
@@ -75,6 +74,22 @@ namespace Salesync.API.Controllers.Treasury
 
             return Ok(
                 ApiResponse<IEnumerable<SalesRepReceivableDto>>
+                    .SuccessResponse(result));
+        }
+
+        [HttpPost("sales-reps/{salesRepId:int}/debt-payment")]
+        public async Task<ActionResult<ApiResponse<SalesRepDebtPaymentResultDto>>> PaySalesRepDebt(
+        int salesRepId,
+        [FromBody] PaySalesRepDebtDto dto)
+        {
+            var result =
+                await _receivablesService
+                    .PaySalesRepDebtAsync(
+                        salesRepId,
+                        dto);
+
+            return Ok(
+                ApiResponse<SalesRepDebtPaymentResultDto>
                     .SuccessResponse(result));
         }
     }

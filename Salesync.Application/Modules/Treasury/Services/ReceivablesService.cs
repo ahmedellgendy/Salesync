@@ -1,8 +1,11 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Salesync.Application.Interfaces.Repositories;
+using Salesync.Application.Interfaces.Services;
 using Salesync.Application.Modules.Treasury.Dtos.Receivables;
 using Salesync.Application.Modules.Treasury.Interfaces.Services;
 using Salesync.Domain.Common.Enums.Sales;
+using Salesync.Domain.Common.Enums.Treasury;
+using Salesync.Domain.Modules.Treasury.Entities;
 
 namespace Salesync.Application.Modules.Treasury.Services
 {
@@ -10,13 +13,17 @@ namespace Salesync.Application.Modules.Treasury.Services
         : IReceivablesService
     {
         private readonly IUnitOfWork _unitOfWork;
+        private readonly ICurrentUserService _currentUser;
 
 
         public ReceivablesService(
-            IUnitOfWork unitOfWork)
+            IUnitOfWork unitOfWork,
+            ICurrentUserService currentUser)
+
         {
-            _unitOfWork =
-                unitOfWork;
+            _unitOfWork = unitOfWork;
+            _currentUser = currentUser;
+
         }
 
 
@@ -70,8 +77,7 @@ namespace Salesync.Application.Modules.Treasury.Services
         // Customer Receivables
         // =========================================================
 
-        public async Task<IEnumerable<CustomerReceivableDto>>
-            GetCustomerReceivablesAsync()
+        public async Task<IEnumerable<CustomerReceivableDto>> GetCustomerReceivablesAsync()
         {
             var invoices =
                 await _unitOfWork.Invoices
@@ -167,9 +173,7 @@ namespace Salesync.Application.Modules.Treasury.Services
         // Customer Receivable Details
         // =========================================================
 
-        public async Task<IEnumerable<CustomerReceivableInvoiceDto>>
-            GetCustomerReceivableDetailsAsync(
-                int customerId)
+        public async Task<IEnumerable<CustomerReceivableInvoiceDto>> GetCustomerReceivableDetailsAsync(int customerId)
         {
             if (customerId <= 0)
             {
@@ -261,8 +265,7 @@ namespace Salesync.Application.Modules.Treasury.Services
         // Sales Rep Receivables
         // =========================================================
 
-        public async Task<IEnumerable<SalesRepReceivableDto>>
-            GetSalesRepReceivablesAsync()
+        public async Task<IEnumerable<SalesRepReceivableDto>> GetSalesRepReceivablesAsync()
         {
             var salesReps =
                 await _unitOfWork.SalesReps
@@ -357,6 +360,251 @@ namespace Salesync.Application.Modules.Treasury.Services
 
 
             return result;
+        }
+
+
+        public async Task<SalesRepDebtPaymentResultDto> PaySalesRepDebtAsync(int salesRepId, PaySalesRepDebtDto dto)
+        {
+            if (salesRepId <= 0)
+                throw new ArgumentException(
+                    "Invalid sales rep id.");
+
+            if (dto.CashBoxId <= 0)
+                throw new ArgumentException(
+                    "Invalid cash box id.");
+
+            if (dto.Amount <= 0)
+                throw new InvalidOperationException(
+                    "Payment amount must be greater than zero.");
+
+            if (string.IsNullOrWhiteSpace(_currentUser.UserId))
+                throw new UnauthorizedAccessException(
+                    "User is not authenticated.");
+
+
+            var salesRep =
+                await _unitOfWork.SalesReps
+                    .GetQueryable()
+                    .FirstOrDefaultAsync(x =>
+                        x.Id == salesRepId &&
+                        x.IsActive);
+
+            if (salesRep == null)
+                throw new KeyNotFoundException(
+                    $"Sales rep with id {salesRepId} not found.");
+
+
+            var currentBalance =
+                await _unitOfWork
+                    .SalesRepCashLedgers
+                    .GetQueryable()
+                    .Where(x =>
+                        x.SalesRepId == salesRepId &&
+                        x.IsActive)
+                    .SumAsync(x =>
+                        (decimal?)x.Amount)
+                ?? 0m;
+
+
+            if (currentBalance >= 0)
+                throw new InvalidOperationException(
+                    "Sales rep has no outstanding debt.");
+
+
+            var currentDebt =
+                Math.Abs(currentBalance);
+
+
+            if (dto.Amount > currentDebt)
+            {
+                throw new InvalidOperationException(
+                    $"Payment amount exceeds current debt of {currentDebt:N2}.");
+            }
+
+
+            var cashBox =
+                await _unitOfWork.CashBoxes
+                    .GetQueryable()
+                    .FirstOrDefaultAsync(x =>
+                        x.Id == dto.CashBoxId &&
+                        x.IsActive);
+
+            if (cashBox == null)
+                throw new KeyNotFoundException(
+                    $"Cash box with id {dto.CashBoxId} not found.");
+
+
+            var now =
+                DateTime.UtcNow;
+
+            var cashBoxBalanceBefore =
+                cashBox.CurrentBalance;
+
+            var cashBoxBalanceAfter =
+                cashBoxBalanceBefore +
+                dto.Amount;
+
+            var newLedgerBalance =
+                currentBalance +
+                dto.Amount;
+
+
+            await _unitOfWork.BeginTransactionAsync();
+
+            try
+            {
+                var treasuryTransaction =
+                    new TreasuryTransaction
+                    {
+                        CashBoxId =
+                            cashBox.Id,
+
+                        Type =
+                            TreasuryTransactionType.CashIn,
+
+                        Source =
+                            TreasuryTransactionSource.SalesRepSettlement,
+
+                        Amount =
+                            dto.Amount,
+
+                        BalanceBefore =
+                            cashBoxBalanceBefore,
+
+                        BalanceAfter =
+                            cashBoxBalanceAfter,
+
+                        TransactionDate =
+                            now,
+
+                        ReferenceNumber =
+                            string.IsNullOrWhiteSpace(
+                                dto.ReferenceNumber)
+                                ? null
+                                : dto.ReferenceNumber.Trim(),
+
+                        Notes =
+                            string.IsNullOrWhiteSpace(
+                                dto.Notes)
+                                ? $"Sales rep debt payment. SalesRepId: {salesRepId}."
+                                : dto.Notes.Trim(),
+
+                        CreatedByUserId =
+                            _currentUser.UserId,
+
+                        IsActive =
+                            true,
+
+                        CreatedAt =
+                            now
+                    };
+
+
+                await _unitOfWork
+                    .TreasuryTransactions
+                    .AddAsync(treasuryTransaction);
+
+
+                cashBox.CurrentBalance =
+                    cashBoxBalanceAfter;
+
+                cashBox.UpdatedAt =
+                    now;
+
+                _unitOfWork.CashBoxes
+                    .Update(cashBox);
+
+
+                var ledgerEntry =
+                    new SalesRepCashLedger
+                    {
+                        SalesRepId =
+                            salesRepId,
+
+                        EntryDate =
+                            now,
+
+                        Amount =
+                            dto.Amount,
+
+                        BalanceAfter =
+                            newLedgerBalance,
+
+                        Source =
+                            SalesRepCashLedgerSource.DebtPayment,
+
+                        ReferenceNumber =
+                            string.IsNullOrWhiteSpace(
+                                dto.ReferenceNumber)
+                                ? null
+                                : dto.ReferenceNumber.Trim(),
+
+                        Notes =
+                            string.IsNullOrWhiteSpace(
+                                dto.Notes)
+                                ? $"Debt payment of {dto.Amount:N2}."
+                                : dto.Notes.Trim(),
+
+                        IsActive =
+                            true,
+
+                        CreatedAt =
+                            now
+                    };
+
+
+                await _unitOfWork
+                    .SalesRepCashLedgers
+                    .AddAsync(ledgerEntry);
+
+
+                await _unitOfWork
+                    .CompleteAsync();
+
+                await _unitOfWork
+                    .CommitTransactionAsync();
+
+
+                return new SalesRepDebtPaymentResultDto
+                {
+                    SalesRepId =
+                        salesRep.Id,
+
+                    SalesRepName =
+                        salesRep.Name,
+
+                    PreviousDebtAmount =
+                        currentDebt,
+
+                    PaidAmount =
+                        dto.Amount,
+
+                    RemainingDebtAmount =
+                        Math.Abs(
+                            Math.Min(
+                                0m,
+                                newLedgerBalance)),
+
+                    CashBoxId =
+                        cashBox.Id,
+
+                    CashBoxBalanceAfter =
+                        cashBox.CurrentBalance,
+
+                    TreasuryTransactionId =
+                        treasuryTransaction.Id,
+
+                    PaymentDate =
+                        now
+                };
+            }
+            catch
+            {
+                await _unitOfWork
+                    .RollbackTransactionAsync();
+
+                throw;
+            }
         }
     }
 }
