@@ -85,9 +85,10 @@ namespace Salesync.Application
             services.AddScoped<IManagementReportService, ManagementReportService>();
 
             // Register DataImport Service
-            services.AddScoped<IBranchImportService,BranchImportService>();
-            services.AddScoped<IWarehouseImportService,WarehouseImportService>();
-            services.AddScoped<IProductImportService,ProductImportService>();
+            services.AddScoped<IBranchImportService, BranchImportService>();
+            services.AddScoped<IWarehouseImportService, WarehouseImportService>();
+            services.AddScoped<IProductImportService, ProductImportService>();
+            services.AddScoped<ICustomerImportService, CustomerImportService>();
 
             return services;
         }
