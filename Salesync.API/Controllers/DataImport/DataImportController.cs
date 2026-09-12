@@ -15,20 +15,32 @@ namespace Salesync.API.Controllers.DataImport
         private readonly IBranchImportService
             _branchImportService;
 
+        private readonly IWarehouseImportService
+            _warehouseImportService;
+
 
         public DataImportController(
-            IBranchImportService branchImportService)
+            IBranchImportService branchImportService,
+            IWarehouseImportService warehouseImportService)
         {
             _branchImportService =
                 branchImportService;
+
+            _warehouseImportService =
+                warehouseImportService;
         }
 
+
+        // =====================================================
+        // BRANCHES
+        // =====================================================
 
         [HttpGet("branches/template")]
         public IActionResult DownloadBranchTemplate()
         {
             var file =
-                _branchImportService.GenerateTemplate();
+                _branchImportService
+                    .GenerateTemplate();
 
             return File(
                 file,
@@ -48,11 +60,12 @@ namespace Salesync.API.Controllers.DataImport
                 file.Length <= 0)
             {
                 return BadRequest(
-                  new
-                  {
-                      success = false,
-                      message = "Excel file is required."
-                  });
+                    new
+                    {
+                        success = false,
+                        message =
+                            "Excel file is required."
+                    });
             }
 
 
@@ -66,11 +79,12 @@ namespace Salesync.API.Controllers.DataImport
                     StringComparison.OrdinalIgnoreCase))
             {
                 return BadRequest(
-                  new
-                  {
-                      success = false,
-                      message = "Only .xlsx files are supported."
-                  });
+                    new
+                    {
+                        success = false,
+                        message =
+                            "Only .xlsx files are supported."
+                    });
             }
 
 
@@ -150,6 +164,151 @@ namespace Salesync.API.Controllers.DataImport
         {
             var result =
                 await _branchImportService
+                    .GetHistoryAsync(
+                        cancellationToken);
+
+
+            return Ok(
+                ApiResponse<IEnumerable<ImportBatchHistoryDto>>
+                    .SuccessResponse(
+                        result));
+        }
+
+
+        // =====================================================
+        // WAREHOUSES
+        // =====================================================
+
+        [HttpGet("warehouses/template")]
+        public IActionResult DownloadWarehouseTemplate()
+        {
+            var file =
+                _warehouseImportService
+                    .GenerateTemplate();
+
+
+            return File(
+                file,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "Salesync-Warehouses-Template.xlsx");
+        }
+
+
+        [HttpPost("warehouses/validate")]
+        [RequestSizeLimit(10 * 1024 * 1024)]
+        public async Task<IActionResult>
+            ValidateWarehousesAsync(
+                IFormFile file,
+                CancellationToken cancellationToken)
+        {
+            if (file is null ||
+                file.Length <= 0)
+            {
+                return BadRequest(
+                    new
+                    {
+                        success = false,
+                        message =
+                            "Excel file is required."
+                    });
+            }
+
+
+            var extension =
+                Path.GetExtension(
+                    file.FileName);
+
+
+            if (!extension.Equals(
+                    ".xlsx",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return BadRequest(
+                    new
+                    {
+                        success = false,
+                        message =
+                            "Only .xlsx files are supported."
+                    });
+            }
+
+
+            var userId =
+                User.FindFirstValue(
+                    ClaimTypes.NameIdentifier);
+
+
+            await using var stream =
+                file.OpenReadStream();
+
+
+            var result =
+                await _warehouseImportService
+                    .ValidateAsync(
+                        stream,
+                        file.FileName,
+                        userId,
+                        cancellationToken);
+
+
+            return Ok(
+                ApiResponse<ImportPreviewDto>
+                    .SuccessResponse(
+                        result,
+                        result.CanImport
+                            ? "File validated successfully."
+                            : "File contains validation errors."));
+        }
+
+
+        [HttpPost("warehouses/{batchId:int}/import")]
+        public async Task<IActionResult>
+            ImportWarehousesAsync(
+                int batchId,
+                CancellationToken cancellationToken)
+        {
+            var result =
+                await _warehouseImportService
+                    .ImportAsync(
+                        batchId,
+                        cancellationToken);
+
+
+            return Ok(
+                ApiResponse<ImportResultDto>
+                    .SuccessResponse(
+                        result,
+                        result.Message));
+        }
+
+
+        [HttpGet("warehouses/{batchId:int}/errors")]
+        public async Task<IActionResult>
+            DownloadWarehouseErrorsAsync(
+                int batchId,
+                CancellationToken cancellationToken)
+        {
+            var file =
+                await _warehouseImportService
+                    .GenerateErrorReportAsync(
+                        batchId,
+                        cancellationToken);
+
+
+            return File(
+                file,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                $"Salesync-Warehouse-Import-Errors-{batchId}.xlsx");
+        }
+
+
+        [HttpGet("warehouses/history")]
+        public async Task<IActionResult>
+            GetWarehouseImportHistoryAsync(
+                CancellationToken cancellationToken)
+        {
+            var result =
+                await _warehouseImportService
                     .GetHistoryAsync(
                         cancellationToken);
 
