@@ -2,6 +2,8 @@
 using Microsoft.Extensions.DependencyInjection;
 using Salesync.Application.Modules.CustomerVisit.Interfaces;
 using Salesync.Application.Modules.CustomerVisit.Services;
+using Salesync.Application.Modules.DataImport.Interfaces;
+using Salesync.Application.Modules.DataImport.Services;
 using Salesync.Application.Modules.Inventory.Interfaces;
 using Salesync.Application.Modules.Inventory.Services;
 using Salesync.Application.Modules.LoadRequest.Interfaces;
@@ -81,6 +83,9 @@ namespace Salesync.Application
 
             // Register ManagementReport Service
             services.AddScoped<IManagementReportService, ManagementReportService>();
+
+            // Register DataImport Service
+            services.AddScoped<IBranchImportService,BranchImportService>();
 
             return services;
         }

@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Salesync.Infrastructure.Data;
 
@@ -11,9 +12,11 @@ using Salesync.Infrastructure.Data;
 namespace Salesync.Infrastructure.Migrations
 {
     [DbContext(typeof(SalesyncDbContext))]
-    partial class SalesyncDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260912071456_AddDataImportModule")]
+    partial class AddDataImportModule
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -287,52 +290,6 @@ namespace Salesync.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("ImportBatches");
-                });
-
-            modelBuilder.Entity("Salesync.Domain.Modules.DataImport.Entities.ImportBatchRow", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("CreatedBy")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("DataJson")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("ErrorsJson")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("ImportBatchId")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsValid")
-                        .HasColumnType("bit");
-
-                    b.Property<int>("RowNumber")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("UpdatedBy")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ImportBatchId");
-
-                    b.ToTable("ImportBatchRows");
                 });
 
             modelBuilder.Entity("Salesync.Domain.Modules.Inventory.Entities.StockBalance", b =>
@@ -2924,17 +2881,6 @@ namespace Salesync.Infrastructure.Migrations
                     b.Navigation("SalesRepSession");
                 });
 
-            modelBuilder.Entity("Salesync.Domain.Modules.DataImport.Entities.ImportBatchRow", b =>
-                {
-                    b.HasOne("Salesync.Domain.Modules.DataImport.Entities.ImportBatch", "ImportBatch")
-                        .WithMany("Rows")
-                        .HasForeignKey("ImportBatchId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("ImportBatch");
-                });
-
             modelBuilder.Entity("Salesync.Domain.Modules.Inventory.Entities.StockBalance", b =>
                 {
                     b.HasOne("Salesync.Domain.Modules.MasterData.Entities.Product", "Product")
@@ -3466,11 +3412,6 @@ namespace Salesync.Infrastructure.Migrations
                         .HasForeignKey("BranchId");
 
                     b.Navigation("Branch");
-                });
-
-            modelBuilder.Entity("Salesync.Domain.Modules.DataImport.Entities.ImportBatch", b =>
-                {
-                    b.Navigation("Rows");
                 });
 
             modelBuilder.Entity("Salesync.Domain.Modules.LoadRequest.Entities.LoadRequest", b =>

@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore.Storage;
 using Salesync.Application.Interfaces.Repositories;
+using Salesync.Domain.Modules.DataImport.Entities;
 using Salesync.Domain.Modules.Inventory.Entities;
 using Salesync.Domain.Modules.LoadRequest.Entities;
 using Salesync.Domain.Modules.MasterData.Entities;
@@ -54,6 +55,8 @@ namespace Salesync.Infrastructure.Repositories.Common
         public IGenericRepository<SalesRepUnloadRequest> SalesRepUnloadRequests { get; }
         public IGenericRepository<SalesRepUnloadRequestItem> SalesRepUnloadRequestItems { get; }
 
+        public IGenericRepository<ImportBatch> ImportBatches { get; }
+        public IGenericRepository<ImportBatchRow> ImportBatchRows { get; }
         public UnitOfWork(SalesyncDbContext context)
         {
             _context = context;
@@ -94,6 +97,9 @@ namespace Salesync.Infrastructure.Repositories.Common
 
             SalesRepUnloadRequests = new GenericRepository<SalesRepUnloadRequest>(_context);
             SalesRepUnloadRequestItems = new GenericRepository<SalesRepUnloadRequestItem>(_context);
+
+            ImportBatches = new GenericRepository<ImportBatch>(_context);
+            ImportBatchRows = new GenericRepository<ImportBatchRow>(_context);
         }
 
         public async Task BeginTransactionAsync()

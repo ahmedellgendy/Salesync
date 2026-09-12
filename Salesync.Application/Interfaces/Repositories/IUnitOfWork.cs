@@ -1,4 +1,5 @@
-﻿using Salesync.Domain.Modules.Inventory.Entities;
+﻿using Salesync.Domain.Modules.DataImport.Entities;
+using Salesync.Domain.Modules.Inventory.Entities;
 using Salesync.Domain.Modules.LoadRequest.Entities;
 using Salesync.Domain.Modules.MasterData.Entities;
 using Salesync.Domain.Modules.Sales.Entities;
@@ -78,6 +79,14 @@ namespace Salesync.Application.Interfaces.Repositories
 
         IGenericRepository<SalesRepUnloadRequest> SalesRepUnloadRequests { get; }
         IGenericRepository<SalesRepUnloadRequestItem> SalesRepUnloadRequestItems { get; }
+
+        #endregion
+
+        #region DataImport
+
+        IGenericRepository<ImportBatch> ImportBatches { get; }
+
+        IGenericRepository<ImportBatchRow> ImportBatchRows { get; }
 
         #endregion
 
