@@ -72,8 +72,7 @@ namespace Salesync.Application.Modules.Sales.Services
 
             return dto;
         }
-        public async Task<IEnumerable<PaymentDto>> GetByInvoiceIdAsync(
-     int invoiceId)
+        public async Task<IEnumerable<PaymentDto>> GetByInvoiceIdAsync(int invoiceId)
         {
             if (invoiceId <= 0)
                 throw new ArgumentException("Invalid invoice id.");
@@ -102,106 +101,370 @@ namespace Salesync.Application.Modules.Sales.Services
 
             return result;
         }
+
+        public async Task<IEnumerable<OutstandingInvoiceDto>> GetCurrentSalesRepOutstandingInvoicesAsync()
+        {
+            if (string.IsNullOrWhiteSpace(_currentUser.UserId))
+            {
+                throw new UnauthorizedAccessException(
+                    "Current user is not authenticated.");
+            }
+
+
+            var salesRep =
+                (await _unitOfWork.SalesReps
+                    .FindAsync(x =>
+                        x.UserId == _currentUser.UserId &&
+                        x.IsActive))
+                .FirstOrDefault()
+                ?? throw new UnauthorizedAccessException(
+                    "Sales rep not found for current user.");
+
+
+            var invoices =
+                await _unitOfWork.Invoices
+                    .GetQueryable()
+                    .AsNoTracking()
+                    .Include(x => x.Customer)
+                    .Where(x =>
+                        x.IsActive &&
+                        x.Status == InvoiceStatus.Confirmed &&
+                        x.SalesRepId == salesRep.Id &&
+                        x.PaidAmount < x.TotalAmount)
+                    .OrderByDescending(x =>
+                        x.CreatedAt)
+                    .Select(x =>
+                        new OutstandingInvoiceDto
+                        {
+                            InvoiceId =
+                                x.Id,
+
+                            InvoiceNumber =
+                                x.InvoiceNumber,
+
+                            CustomerId =
+                                x.CustomerId,
+
+                            CustomerName =
+                                x.Customer.Name,
+
+                            InvoiceDate =
+                                x.CreatedAt,
+
+                            TotalAmount =
+                                x.TotalAmount,
+
+                            PaidAmount =
+                                x.PaidAmount,
+
+                            OutstandingAmount =
+                                x.TotalAmount -
+                                x.PaidAmount,
+
+                            OriginalSalesRepSessionId =
+                                x.SalesRepSessionId ?? 0
+                        })
+                    .ToListAsync();
+
+
+            return invoices;
+        }
+
         public async Task<PaymentDto> CreateAsync(CreatePaymentDto dto)
         {
-            var validationResult = await _createPaymentValidator.ValidateAsync(dto);
+            var validationResult =
+                await _createPaymentValidator.ValidateAsync(dto);
 
             if (!validationResult.IsValid)
                 throw new ValidationException(validationResult.Errors);
 
-            var invoice = await _unitOfWork.Invoices.GetByIdAsync(dto.InvoiceId)
-                ?? throw new KeyNotFoundException($"Invoice with id {dto.InvoiceId} not found.");
+
+            var invoice =
+                await _unitOfWork.Invoices
+                    .GetByIdAsync(dto.InvoiceId)
+                ?? throw new KeyNotFoundException(
+                    $"Invoice with id {dto.InvoiceId} not found.");
+
 
             if (invoice.Status != InvoiceStatus.Confirmed)
-                throw new InvalidOperationException("Payment is allowed only for confirmed invoices.");
+            {
+                throw new InvalidOperationException(
+                    "Payment is allowed only for confirmed invoices.");
+            }
+
 
             if (invoice.PaymentStatus == PaymentStatus.Paid)
-                throw new InvalidOperationException("Invoice is already fully paid.");
+            {
+                throw new InvalidOperationException(
+                    "Invoice is already fully paid.");
+            }
 
-            var remaining = invoice.TotalAmount - invoice.PaidAmount;
+
+            var remaining =
+                invoice.TotalAmount -
+                invoice.PaidAmount;
+
 
             if (remaining <= 0)
-                throw new InvalidOperationException("Invoice has no remaining balance.");
+            {
+                throw new InvalidOperationException(
+                    "Invoice has no remaining balance.");
+            }
+
+
+            if (dto.Amount <= 0)
+            {
+                throw new InvalidOperationException(
+                    "Payment amount must be greater than zero.");
+            }
+
 
             if (dto.Amount > remaining)
-                throw new InvalidOperationException($"Payment amount exceeds remaining balance of {remaining}.");
+            {
+                throw new InvalidOperationException(
+                    $"Payment amount exceeds remaining balance of {remaining:N2}.");
+            }
 
-            if (!invoice.SalesRepId.HasValue)
-                throw new InvalidOperationException("Invoice is not assigned to a sales rep.");
 
-            if (!invoice.SalesRepSessionId.HasValue)
-                throw new InvalidOperationException("Invoice is not linked to a sales rep session.");
+            var invoiceSalesRepId =
+                invoice.SalesRepId
+                ?? throw new InvalidOperationException(
+                    "Invoice is not assigned to a sales rep.");
+
 
             if (string.IsNullOrWhiteSpace(_currentUser.UserId))
-                throw new UnauthorizedAccessException("Current user is not authenticated.");
+            {
+                throw new UnauthorizedAccessException(
+                    "Current user is not authenticated.");
+            }
 
-            var isSalesRepUser = string.Equals(_currentUser.Role, "SalesRep", StringComparison.OrdinalIgnoreCase);
+
+            var isSalesRepUser =
+                string.Equals(
+                    _currentUser.Role,
+                    "SalesRep",
+                    StringComparison.OrdinalIgnoreCase);
+
+
+            int paymentSessionId;
+
+
+            // =========================================================
+            // Sales Rep
+            // =========================================================
 
             if (isSalesRepUser)
             {
-                var salesRep = (await _unitOfWork.SalesReps
-                    .FindAsync(s => s.UserId == _currentUser.UserId && s.IsActive))
+                var salesRep =
+                    (await _unitOfWork.SalesReps
+                        .FindAsync(x =>
+                            x.UserId == _currentUser.UserId &&
+                            x.IsActive))
                     .FirstOrDefault()
-                    ?? throw new UnauthorizedAccessException("SalesRep not found for current user.");
+                    ?? throw new UnauthorizedAccessException(
+                        "Sales rep not found for current user.");
 
-                if (invoice.SalesRepId.Value != salesRep.Id)
-                    throw new UnauthorizedAccessException("You cannot add payment to another sales rep's invoice.");
 
-                var session = await _unitOfWork.SalesRepSessions.GetByIdAsync(invoice.SalesRepSessionId.Value)
-                    ?? throw new KeyNotFoundException($"SalesRepSession with id {invoice.SalesRepSessionId.Value} not found.");
+                if (salesRep.Id != invoiceSalesRepId)
+                {
+                    throw new UnauthorizedAccessException(
+                        "You cannot collect payment for another sales rep's invoice.");
+                }
 
-                if (session.SalesRepId != salesRep.Id)
-                    throw new UnauthorizedAccessException("You cannot add payment to another sales rep's session.");
+
+                /*
+                 * Important:
+                 *
+                 * The invoice can belong to an OLD session.
+                 *
+                 * The new payment must belong to the CURRENT
+                 * active session so it is included in today's
+                 * collections and day closing.
+                 */
+
+                var activeSession =
+                    await _unitOfWork.SalesRepSessions
+                        .GetQueryable()
+                        .Where(x =>
+                            x.SalesRepId == salesRep.Id &&
+                            x.IsActive &&
+                            !x.EndTime.HasValue &&
+                            !x.IsTreasurySettled)
+                        .OrderByDescending(x =>
+                            x.StartTime)
+                        .FirstOrDefaultAsync();
+
+
+                if (activeSession == null)
+                {
+                    throw new InvalidOperationException(
+                        "No active sales rep session was found.");
+                }
+
+
+                if (activeSession.IsStockSettled)
+                {
+                    throw new InvalidOperationException(
+                        "Cannot collect payment after the current session stock has been settled.");
+                }
+
+
+                paymentSessionId =
+                    activeSession.Id;
             }
+
+            // =========================================================
+            // Admin / Supervisor
+            // =========================================================
+
             else
             {
                 if (!dto.SalesRepId.HasValue)
-                    throw new InvalidOperationException("SalesRepId is required for admin or supervisor payment creation.");
+                {
+                    throw new InvalidOperationException(
+                        "SalesRepId is required for admin or supervisor payment creation.");
+                }
+
+
+                if (dto.SalesRepId.Value != invoiceSalesRepId)
+                {
+                    throw new InvalidOperationException(
+                        "SalesRepId does not match invoice sales rep.");
+                }
+
 
                 if (!dto.SalesRepSessionId.HasValue)
-                    throw new InvalidOperationException("SalesRepSessionId is required for admin or supervisor payment creation.");
+                {
+                    throw new InvalidOperationException(
+                        "SalesRepSessionId is required for admin or supervisor payment creation.");
+                }
 
-                if (dto.SalesRepId.Value != invoice.SalesRepId.Value)
-                    throw new InvalidOperationException("SalesRepId does not match invoice sales rep.");
 
-                if (dto.SalesRepSessionId.Value != invoice.SalesRepSessionId.Value)
-                    throw new InvalidOperationException("SalesRepSessionId does not match invoice sales rep session.");
+                var paymentSession =
+                    await _unitOfWork.SalesRepSessions
+                        .GetQueryable()
+                        .FirstOrDefaultAsync(x =>
+                            x.Id == dto.SalesRepSessionId.Value &&
+                            x.SalesRepId == invoiceSalesRepId &&
+                            x.IsActive);
+
+
+                if (paymentSession == null)
+                {
+                    throw new InvalidOperationException(
+                        "Sales rep session was not found.");
+                }
+
+
+                if (paymentSession.EndTime.HasValue)
+                {
+                    throw new InvalidOperationException(
+                        "Cannot add payment to a closed sales rep session.");
+                }
+
+
+                if (paymentSession.IsStockSettled)
+                {
+                    throw new InvalidOperationException(
+                        "Cannot add payment after the sales rep session stock has been settled.");
+                }
+
+
+                if (paymentSession.IsTreasurySettled)
+                {
+                    throw new InvalidOperationException(
+                        "Cannot add payment to a treasury-settled session.");
+                }
+
+
+                paymentSessionId =
+                    paymentSession.Id;
             }
 
-            var payment = _mapper.Map<Payment>(dto);
 
-            payment.PaymentNumber = GeneratePaymentNumber();
-            payment.CustomerId = invoice.CustomerId;
-            payment.SalesRepId = invoice.SalesRepId;
-            payment.SalesRepSessionId = invoice.SalesRepSessionId;
-            payment.Status = PaymentStatus.Paid;
-            payment.PaymentDate = DateTime.UtcNow;
-            payment.CreatedAt = DateTime.UtcNow;
-            payment.IsActive = true;
+            // =========================================================
+            // Create Payment
+            // =========================================================
 
-            // Update Invoice PaidAmount
-            invoice.PaidAmount += dto.Amount;
+            var payment =
+                _mapper.Map<Payment>(dto);
+
+
+            payment.PaymentNumber =
+                GeneratePaymentNumber();
+
+            payment.InvoiceId =
+                invoice.Id;
+
+            payment.CustomerId =
+                invoice.CustomerId;
+
+            payment.SalesRepId =
+                invoiceSalesRepId;
+
+            /*
+             * Payment is linked to CURRENT collection session,
+             * not necessarily the original invoice session.
+             */
+            payment.SalesRepSessionId =
+                paymentSessionId;
+
+            payment.Status =
+                PaymentStatus.Paid;
+
+            payment.PaymentDate =
+                DateTime.UtcNow;
+
+            payment.CreatedAt =
+                DateTime.UtcNow;
+
+            payment.IsActive =
+                true;
+
+
+            // =========================================================
+            // Update Invoice
+            // =========================================================
+
+            invoice.PaidAmount +=
+                dto.Amount;
+
+
             invoice.PaymentStatus =
                 invoice.PaidAmount >= invoice.TotalAmount
-                ? PaymentStatus.Paid
-                : PaymentStatus.PartiallyPaid;
+                    ? PaymentStatus.Paid
+                    : PaymentStatus.PartiallyPaid;
 
-            invoice.UpdatedAt = DateTime.UtcNow;
 
-            await _unitOfWork.Payments.AddAsync(payment);
-            _unitOfWork.Invoices.Update(invoice);
-            await _unitOfWork.CompleteAsync();
+            invoice.UpdatedAt =
+                DateTime.UtcNow;
 
-            return _mapper.Map<PaymentDto>(payment);
+
+            // =========================================================
+            // Save
+            // =========================================================
+
+            await _unitOfWork.Payments
+                .AddAsync(payment);
+
+
+            _unitOfWork.Invoices
+                .Update(invoice);
+
+
+            await _unitOfWork
+                .CompleteAsync();
+
+
+            return _mapper.Map<PaymentDto>(
+                payment);
         }
 
 
         #region Helper Method
 
         private static string GeneratePaymentNumber() => $"PAY-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..4].ToUpper()}";
-        private static void PopulatePaymentDetails(
-    Payment payment,
-    PaymentDto dto)
+        private static void PopulatePaymentDetails(Payment payment, PaymentDto dto)
         {
             if (payment.Invoice is not null)
             {
@@ -227,6 +490,7 @@ namespace Salesync.Application.Modules.Sales.Services
                     payment.SalesRep.Name;
             }
         }
+
         #endregion
 
     }

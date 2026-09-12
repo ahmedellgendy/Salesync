@@ -4,8 +4,6 @@
     {
         public int InvoiceId { get; set; }
 
-        public int SalesRepSessionId { get; set; }
-
         public decimal Amount { get; set; }
 
         public int PaymentMethod { get; set; } = 1;

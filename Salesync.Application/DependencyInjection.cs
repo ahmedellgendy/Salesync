@@ -37,7 +37,7 @@ namespace Salesync.Application
             services.AddScoped<ISalesRepService, SalesRepService>();
             services.AddScoped<IRouteService, RouteService>();
             services.AddScoped<IRouteCustomerService, RouteCustomerService>();
-            services.AddScoped<ISalesRepAccountService,SalesRepAccountService>();
+            services.AddScoped<ISalesRepAccountService, SalesRepAccountService>();
 
             services.AddScoped<ISalesRepMobileService, SalesRepMobileService>();
 
@@ -62,6 +62,7 @@ namespace Salesync.Application
 
             // Register Treasury Service
             services.AddScoped<ITreasuryService, TreasuryService>();
+            services.AddScoped<IReceivablesService, ReceivablesService>();
 
             // Register UnloadRequset Service
             services.AddScoped<ISalesRepUnloadRequestService, SalesRepUnloadRequestService>();
