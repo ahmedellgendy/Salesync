@@ -23,7 +23,7 @@ namespace Salesync.API.Controllers.SalesRep
         }
 
         [HttpGet] // GET: api/SalesRep
-        [Authorize(Roles = "Admin,Supervisor")]
+        [Authorize(Roles = "Admin,Supervisor,Warehouse")]
         public async Task<IActionResult> GetAllAsync()
         {
             var salesReps = await _salesRepService.GetAllAsync();
