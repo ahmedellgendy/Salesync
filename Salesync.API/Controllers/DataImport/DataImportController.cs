@@ -18,16 +18,23 @@ namespace Salesync.API.Controllers.DataImport
         private readonly IWarehouseImportService
             _warehouseImportService;
 
+        private readonly IProductImportService
+            _productImportService;
+
 
         public DataImportController(
             IBranchImportService branchImportService,
-            IWarehouseImportService warehouseImportService)
+            IWarehouseImportService warehouseImportService,
+            IProductImportService productImportService)
         {
             _branchImportService =
                 branchImportService;
 
             _warehouseImportService =
                 warehouseImportService;
+
+            _productImportService =
+                productImportService;
         }
 
 
@@ -309,6 +316,151 @@ namespace Salesync.API.Controllers.DataImport
         {
             var result =
                 await _warehouseImportService
+                    .GetHistoryAsync(
+                        cancellationToken);
+
+
+            return Ok(
+                ApiResponse<IEnumerable<ImportBatchHistoryDto>>
+                    .SuccessResponse(
+                        result));
+        }
+
+
+        // =====================================================
+        // PRODUCTS
+        // =====================================================
+
+        [HttpGet("products/template")]
+        public IActionResult DownloadProductTemplate()
+        {
+            var file =
+                _productImportService
+                    .GenerateTemplate();
+
+
+            return File(
+                file,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "Salesync-Products-Template.xlsx");
+        }
+
+
+        [HttpPost("products/validate")]
+        [RequestSizeLimit(10 * 1024 * 1024)]
+        public async Task<IActionResult>
+            ValidateProductsAsync(
+                IFormFile file,
+                CancellationToken cancellationToken)
+        {
+            if (file is null ||
+                file.Length <= 0)
+            {
+                return BadRequest(
+                    new
+                    {
+                        success = false,
+                        message =
+                            "Excel file is required."
+                    });
+            }
+
+
+            var extension =
+                Path.GetExtension(
+                    file.FileName);
+
+
+            if (!extension.Equals(
+                    ".xlsx",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return BadRequest(
+                    new
+                    {
+                        success = false,
+                        message =
+                            "Only .xlsx files are supported."
+                    });
+            }
+
+
+            var userId =
+                User.FindFirstValue(
+                    ClaimTypes.NameIdentifier);
+
+
+            await using var stream =
+                file.OpenReadStream();
+
+
+            var result =
+                await _productImportService
+                    .ValidateAsync(
+                        stream,
+                        file.FileName,
+                        userId,
+                        cancellationToken);
+
+
+            return Ok(
+                ApiResponse<ImportPreviewDto>
+                    .SuccessResponse(
+                        result,
+                        result.CanImport
+                            ? "File validated successfully."
+                            : "File contains validation errors."));
+        }
+
+
+        [HttpPost("products/{batchId:int}/import")]
+        public async Task<IActionResult>
+            ImportProductsAsync(
+                int batchId,
+                CancellationToken cancellationToken)
+        {
+            var result =
+                await _productImportService
+                    .ImportAsync(
+                        batchId,
+                        cancellationToken);
+
+
+            return Ok(
+                ApiResponse<ImportResultDto>
+                    .SuccessResponse(
+                        result,
+                        result.Message));
+        }
+
+
+        [HttpGet("products/{batchId:int}/errors")]
+        public async Task<IActionResult>
+            DownloadProductErrorsAsync(
+                int batchId,
+                CancellationToken cancellationToken)
+        {
+            var file =
+                await _productImportService
+                    .GenerateErrorReportAsync(
+                        batchId,
+                        cancellationToken);
+
+
+            return File(
+                file,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                $"Salesync-Product-Import-Errors-{batchId}.xlsx");
+        }
+
+
+        [HttpGet("products/history")]
+        public async Task<IActionResult>
+            GetProductImportHistoryAsync(
+                CancellationToken cancellationToken)
+        {
+            var result =
+                await _productImportService
                     .GetHistoryAsync(
                         cancellationToken);
 
