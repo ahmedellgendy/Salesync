@@ -909,29 +909,24 @@ namespace Salesync.Application.Modules.DataImport.Services
             }
             catch
             {
-                await _unitOfWork
-                    .RollbackTransactionAsync();
+                await _unitOfWork.RollbackTransactionAsync();
 
+                _unitOfWork.ClearTracking();
 
                 var failedBatch =
                     await _unitOfWork.ImportBatches
                         .GetByIdAsync(batchId);
-
 
                 if (failedBatch is not null)
                 {
                     failedBatch.Status =
                         ImportStatus.Failed;
 
-
                     failedBatch.Notes =
-                        "Price list import failed during database commit.";
+                        "Product import failed during database commit.";
 
-
-                    await _unitOfWork
-                        .CompleteAsync();
+                    await _unitOfWork.CompleteAsync();
                 }
-
 
                 throw;
             }

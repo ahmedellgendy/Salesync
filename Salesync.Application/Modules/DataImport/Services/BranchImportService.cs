@@ -584,18 +584,13 @@ namespace Salesync.Application.Modules.DataImport.Services
             }
             catch
             {
-                await _unitOfWork
-                    .RollbackTransactionAsync();
+                await _unitOfWork.RollbackTransactionAsync();
 
+                _unitOfWork.ClearTracking();
 
-                /*
-                 * Transaction rollback may revert the Failed status
-                 * too, so persist it after rollback.
-                 */
                 var failedBatch =
                     await _unitOfWork.ImportBatches
                         .GetByIdAsync(batchId);
-
 
                 if (failedBatch is not null)
                 {
@@ -603,11 +598,10 @@ namespace Salesync.Application.Modules.DataImport.Services
                         ImportStatus.Failed;
 
                     failedBatch.Notes =
-                        "Import failed during database commit.";
+                        "Product import failed during database commit.";
 
                     await _unitOfWork.CompleteAsync();
                 }
-
 
                 throw;
             }

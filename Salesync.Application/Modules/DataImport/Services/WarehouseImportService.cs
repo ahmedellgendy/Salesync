@@ -759,8 +759,9 @@ namespace Salesync.Application.Modules.DataImport.Services
             }
             catch
             {
-                await _unitOfWork
-                    .RollbackTransactionAsync();
+                await _unitOfWork.RollbackTransactionAsync();
+
+                _unitOfWork.ClearTracking();
 
                 var failedBatch =
                     await _unitOfWork.ImportBatches
@@ -772,7 +773,7 @@ namespace Salesync.Application.Modules.DataImport.Services
                         ImportStatus.Failed;
 
                     failedBatch.Notes =
-                        "Warehouse import failed during database commit.";
+                        "Product import failed during database commit.";
 
                     await _unitOfWork.CompleteAsync();
                 }

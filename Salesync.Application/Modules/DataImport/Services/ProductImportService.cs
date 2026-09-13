@@ -882,6 +882,8 @@ namespace Salesync.Application.Modules.DataImport.Services
             {
                 await _unitOfWork.RollbackTransactionAsync();
 
+                _unitOfWork.ClearTracking();
+
                 var failedBatch =
                     await _unitOfWork.ImportBatches
                         .GetByIdAsync(batchId);
