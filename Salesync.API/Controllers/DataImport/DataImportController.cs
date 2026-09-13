@@ -16,17 +16,21 @@ namespace Salesync.API.Controllers.DataImport
         private readonly IWarehouseImportService _warehouseImportService;
         private readonly IProductImportService _productImportService;
         private readonly ICustomerImportService _customerImportService;
+        private readonly IOpeningInventoryImportService _openingInventoryImportService;
 
         public DataImportController(
             IBranchImportService branchImportService,
             IWarehouseImportService warehouseImportService,
             IProductImportService productImportService,
-            ICustomerImportService customerImportService)
+            ICustomerImportService customerImportService,
+                IOpeningInventoryImportService openingInventoryImportService)
+
         {
             _branchImportService = branchImportService;
             _warehouseImportService = warehouseImportService;
             _productImportService = productImportService;
             _customerImportService = customerImportService;
+            _openingInventoryImportService = openingInventoryImportService;
         }
 
         // =====================================================
@@ -419,6 +423,117 @@ namespace Salesync.API.Controllers.DataImport
             return Ok(
                 ApiResponse<IEnumerable<ImportBatchHistoryDto>>
                     .SuccessResponse(result));
+        }
+
+        // =====================================================
+        // OPENING INVENTORY
+        // =====================================================
+
+        [HttpGet("opening-inventory/template")]
+        public IActionResult DownloadOpeningInventoryTemplate()
+        {
+            var file =
+                _openingInventoryImportService
+                    .GenerateTemplate();
+
+            return File(
+                file,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "Salesync-Opening-Inventory-Template.xlsx");
+        }
+
+
+        [HttpPost("opening-inventory/validate")]
+        [RequestSizeLimit(10 * 1024 * 1024)]
+        public async Task<IActionResult>
+            ValidateOpeningInventoryAsync(
+                IFormFile file,
+                CancellationToken cancellationToken)
+        {
+            var validationError =
+                ValidateExcelFile(file);
+
+            if (validationError is not null)
+                return validationError;
+
+            var userId =
+                User.FindFirstValue(
+                    ClaimTypes.NameIdentifier);
+
+            await using var stream =
+                file.OpenReadStream();
+
+            var result =
+                await _openingInventoryImportService
+                    .ValidateAsync(
+                        stream,
+                        file.FileName,
+                        userId,
+                        cancellationToken);
+
+            return Ok(
+                ApiResponse<ImportPreviewDto>
+                    .SuccessResponse(
+                        result,
+                        result.CanImport
+                            ? "File validated successfully."
+                            : "File contains validation errors."));
+        }
+
+
+        [HttpPost("opening-inventory/{batchId:int}/import")]
+        public async Task<IActionResult>
+            ImportOpeningInventoryAsync(
+                int batchId,
+                CancellationToken cancellationToken)
+        {
+            var result =
+                await _openingInventoryImportService
+                    .ImportAsync(
+                        batchId,
+                        cancellationToken);
+
+            return Ok(
+                ApiResponse<ImportResultDto>
+                    .SuccessResponse(
+                        result,
+                        result.Message));
+        }
+
+
+        [HttpGet("opening-inventory/{batchId:int}/errors")]
+        public async Task<IActionResult>
+            DownloadOpeningInventoryErrorsAsync(
+                int batchId,
+                CancellationToken cancellationToken)
+        {
+            var file =
+                await _openingInventoryImportService
+                    .GenerateErrorReportAsync(
+                        batchId,
+                        cancellationToken);
+
+            return File(
+                file,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                $"Salesync-Opening-Inventory-Errors-{batchId}.xlsx");
+        }
+
+
+        [HttpGet("opening-inventory/history")]
+        public async Task<IActionResult>
+            GetOpeningInventoryHistoryAsync(
+                CancellationToken cancellationToken)
+        {
+            var result =
+                await _openingInventoryImportService
+                    .GetHistoryAsync(
+                        cancellationToken);
+
+            return Ok(
+                ApiResponse<IEnumerable<ImportBatchHistoryDto>>
+                    .SuccessResponse(
+                        result));
         }
 
         // =====================================================

@@ -89,6 +89,8 @@ namespace Salesync.Application
             services.AddScoped<IWarehouseImportService, WarehouseImportService>();
             services.AddScoped<IProductImportService, ProductImportService>();
             services.AddScoped<ICustomerImportService, CustomerImportService>();
+            services.AddScoped<IOpeningInventoryImportService, OpeningInventoryImportService>();
+
 
             return services;
         }
