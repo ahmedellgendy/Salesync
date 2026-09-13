@@ -55,6 +55,7 @@ builder.Services.AddApplicationServices();
 
 builder.Services.Configure<CompanySettings>(builder.Configuration.GetSection("Company"));
 builder.Services.Configure<LicenseSettings>(builder.Configuration.GetSection("License"));
+builder.Services.Configure<InitialAdminSettings>(builder.Configuration.GetSection("InitialAdmin"));
 
 builder.Services.AddAutoMapper(typeof(MappingProfile));
 
@@ -90,10 +91,26 @@ var app = builder.Build();
 // Seed roles
 using (var scope = app.Services.CreateScope())
 {
-    await IdentitySeeder.SeedRolesAsync(scope.ServiceProvider);
-    await IdentitySeeder.SeedAdminUserAsync(scope.ServiceProvider);
-    await IdentitySeeder.SeedSupervisorUserAsync(app.Services);
-    await IdentitySeeder.SeedManagementUserAsync(app.Services);
+    await IdentitySeeder.SeedRolesAsync(
+        scope.ServiceProvider);
+
+    if (app.Environment.IsDevelopment())
+    {
+        await IdentitySeeder.SeedAdminUserAsync(
+            scope.ServiceProvider);
+
+        await IdentitySeeder.SeedSupervisorUserAsync(
+            scope.ServiceProvider);
+
+        await IdentitySeeder.SeedManagementUserAsync(
+            scope.ServiceProvider);
+    }
+    else
+    {
+        await InitialAdminSeeder.SeedAsync(
+            scope.ServiceProvider,
+            builder.Configuration);
+    }
 }
 
 // Configure pipeline
