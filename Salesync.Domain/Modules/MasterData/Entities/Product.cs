@@ -35,5 +35,7 @@ namespace Salesync.Domain.Modules.MasterData.Entities
         public int? WarehouseId { get; set; }
         public Warehouse? Warehouse { get; set; }
 
+        public ICollection<ProductPrice> Prices { get; set; }= new List<ProductPrice>();
+
     }
 }

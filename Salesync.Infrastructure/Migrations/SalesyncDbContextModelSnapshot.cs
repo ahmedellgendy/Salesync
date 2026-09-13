@@ -224,6 +224,117 @@ namespace Salesync.Infrastructure.Migrations
                     b.ToTable("CustomerVisits", (string)null);
                 });
 
+            modelBuilder.Entity("Salesync.Domain.Modules.DataImport.Entities.ImportBatch", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ErrorReportFileName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("ErrorRows")
+                        .HasColumnType("int");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("ImportType")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ImportedByUserId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("ImportedRows")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TotalRows")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("ValidRows")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ValidatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ImportBatches");
+                });
+
+            modelBuilder.Entity("Salesync.Domain.Modules.DataImport.Entities.ImportBatchRow", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("DataJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ErrorsJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("ImportBatchId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsValid")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("RowNumber")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ImportBatchId");
+
+                    b.ToTable("ImportBatchRows");
+                });
+
             modelBuilder.Entity("Salesync.Domain.Modules.Inventory.Entities.StockBalance", b =>
                 {
                     b.Property<int>("Id")
@@ -796,8 +907,8 @@ namespace Salesync.Infrastructure.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
-                    b.Property<string>("PriceId")
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<int?>("PriceListId")
+                        .HasColumnType("int");
 
                     b.Property<string>("Region")
                         .HasMaxLength(50)
@@ -845,9 +956,69 @@ namespace Salesync.Infrastructure.Migrations
 
                     b.HasIndex("Phone");
 
+                    b.HasIndex("PriceListId");
+
                     b.HasIndex("TaxId");
 
                     b.ToTable("Customers", (string)null);
+                });
+
+            modelBuilder.Entity("Salesync.Domain.Modules.MasterData.Entities.PriceList", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ValidFrom")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ValidTo")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("IsActive");
+
+                    b.HasIndex("IsDefault");
+
+                    b.ToTable("PriceLists", (string)null);
                 });
 
             modelBuilder.Entity("Salesync.Domain.Modules.MasterData.Entities.Product", b =>
@@ -978,6 +1149,61 @@ namespace Salesync.Infrastructure.Migrations
                     b.HasIndex("WarehouseId");
 
                     b.ToTable("Products", (string)null);
+                });
+
+            modelBuilder.Entity("Salesync.Domain.Modules.MasterData.Entities.ProductPrice", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal>("DiscountPercentage")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(5, 2)
+                        .HasColumnType("decimal(5,2)")
+                        .HasDefaultValue(0m);
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("PriceListId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ValidFrom")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ValidTo")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("PriceListId", "ProductId")
+                        .IsUnique();
+
+                    b.ToTable("ProductPrices", (string)null);
                 });
 
             modelBuilder.Entity("Salesync.Domain.Modules.MasterData.Entities.Warehouse", b =>
@@ -2813,6 +3039,17 @@ namespace Salesync.Infrastructure.Migrations
                     b.Navigation("SalesRepSession");
                 });
 
+            modelBuilder.Entity("Salesync.Domain.Modules.DataImport.Entities.ImportBatchRow", b =>
+                {
+                    b.HasOne("Salesync.Domain.Modules.DataImport.Entities.ImportBatch", "ImportBatch")
+                        .WithMany("Rows")
+                        .HasForeignKey("ImportBatchId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ImportBatch");
+                });
+
             modelBuilder.Entity("Salesync.Domain.Modules.Inventory.Entities.StockBalance", b =>
                 {
                     b.HasOne("Salesync.Domain.Modules.MasterData.Entities.Product", "Product")
@@ -2934,7 +3171,14 @@ namespace Salesync.Infrastructure.Migrations
                         .HasForeignKey("BranchId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("Salesync.Domain.Modules.MasterData.Entities.PriceList", "PriceList")
+                        .WithMany("Customers")
+                        .HasForeignKey("PriceListId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Branch");
+
+                    b.Navigation("PriceList");
                 });
 
             modelBuilder.Entity("Salesync.Domain.Modules.MasterData.Entities.Product", b =>
@@ -2945,6 +3189,25 @@ namespace Salesync.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Warehouse");
+                });
+
+            modelBuilder.Entity("Salesync.Domain.Modules.MasterData.Entities.ProductPrice", b =>
+                {
+                    b.HasOne("Salesync.Domain.Modules.MasterData.Entities.PriceList", "PriceList")
+                        .WithMany("ProductPrices")
+                        .HasForeignKey("PriceListId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Salesync.Domain.Modules.MasterData.Entities.Product", "Product")
+                        .WithMany("Prices")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("PriceList");
+
+                    b.Navigation("Product");
                 });
 
             modelBuilder.Entity("Salesync.Domain.Modules.MasterData.Entities.Warehouse", b =>
@@ -3346,6 +3609,11 @@ namespace Salesync.Infrastructure.Migrations
                     b.Navigation("Branch");
                 });
 
+            modelBuilder.Entity("Salesync.Domain.Modules.DataImport.Entities.ImportBatch", b =>
+                {
+                    b.Navigation("Rows");
+                });
+
             modelBuilder.Entity("Salesync.Domain.Modules.LoadRequest.Entities.LoadRequest", b =>
                 {
                     b.Navigation("Items");
@@ -3354,6 +3622,18 @@ namespace Salesync.Infrastructure.Migrations
             modelBuilder.Entity("Salesync.Domain.Modules.MasterData.Entities.Branch", b =>
                 {
                     b.Navigation("Warehouses");
+                });
+
+            modelBuilder.Entity("Salesync.Domain.Modules.MasterData.Entities.PriceList", b =>
+                {
+                    b.Navigation("Customers");
+
+                    b.Navigation("ProductPrices");
+                });
+
+            modelBuilder.Entity("Salesync.Domain.Modules.MasterData.Entities.Product", b =>
+                {
+                    b.Navigation("Prices");
                 });
 
             modelBuilder.Entity("Salesync.Domain.Modules.MasterData.Entities.Warehouse", b =>

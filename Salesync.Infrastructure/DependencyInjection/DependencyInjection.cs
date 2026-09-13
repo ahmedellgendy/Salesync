@@ -4,11 +4,13 @@ using Microsoft.Extensions.DependencyInjection;
 using Salesync.Application.Common.Licensing;
 using Salesync.Application.Interfaces.Repositories;
 using Salesync.Application.Interfaces.Services;
+using Salesync.Application.Modules.DataImport.Interfaces;
 using Salesync.Application.Modules.Identity.Interfaces;
 using Salesync.Application.Modules.Profile.Interfaces;
 using Salesync.Application.Modules.SalesRep.Interfaces.Services;
 using Salesync.Application.Modules.SalesRep.Services;
 using Salesync.Infrastructure.Data;
+using Salesync.Infrastructure.DataImport.Excel;
 using Salesync.Infrastructure.Licensing;
 using Salesync.Infrastructure.Modules.Identity.Services;
 using Salesync.Infrastructure.Repositories.Common;
@@ -48,6 +50,8 @@ namespace Salesync.Infrastructure.DependencyInjection
             services.AddScoped<ILicenseFileProvider, LicenseFileProvider>();
 
             services.AddScoped<ILicenseService, LicenseService>();
+
+            services.AddScoped<IExcelImportService, ExcelImportService>();
 
             return services;
         }

@@ -39,6 +39,10 @@ namespace Salesync.Application.Modules.MasterData.Validators.Customer
                 .WithMessage("Order ceiling must be greater than 0.")
                 .When(x => x.OrderCeiling.HasValue);
 
+            RuleFor(x => x.PriceListId)
+                     .GreaterThan(0)
+                     .When(x => x.PriceListId.HasValue);
+
             RuleFor(x => x.OrderCeiling)
                 .GreaterThanOrEqualTo(x => x.CreditLimit)
                 .WithMessage("Order ceiling must be >= credit limit.")

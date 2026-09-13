@@ -1,63 +1,84 @@
-﻿using Salesync.Domain.Modules.Inventory.Entities;
+﻿using Salesync.Domain.Modules.DataImport.Entities;
+using Salesync.Domain.Modules.Inventory.Entities;
 using Salesync.Domain.Modules.LoadRequest.Entities;
 using Salesync.Domain.Modules.MasterData.Entities;
 using Salesync.Domain.Modules.Sales.Entities;
 using Salesync.Domain.Modules.SalesRep.Entities;
 using Salesync.Domain.Modules.Treasury.Entities;
 using Salesync.Domain.Modules.UnloadRequest.Entities;
-using CustomerVisitEntity = Salesync.Domain.Modules.CustomerVisit.Entities.CustomerVisit;
+using CustomerVisitEntity =
+    Salesync.Domain.Modules.CustomerVisit.Entities.CustomerVisit;
 
 namespace Salesync.Application.Interfaces.Repositories
 {
     public interface IUnitOfWork
     {
-         
-        #region MasterData 
+        #region MasterData
 
         IGenericRepository<Branch> Branches { get; }
+
         IGenericRepository<Warehouse> Warehouses { get; }
+
         IGenericRepository<Product> Products { get; }
+
         IGenericRepository<Customer> Customers { get; }
 
         #endregion
 
+
         #region SalesRep
 
         IGenericRepository<SalesRep> SalesReps { get; }
+
         IGenericRepository<Route> Routes { get; }
+
         IGenericRepository<RouteCustomer> RouteCustomers { get; }
 
         #endregion
 
+
         #region Sales
 
         IGenericRepository<SalesRepSession> SalesRepSessions { get; }
+
         IGenericRepository<Invoice> Invoices { get; }
+
         IGenericRepository<InvoiceItem> InvoiceItems { get; }
+
         IGenericRepository<InvoiceReturn> InvoiceReturns { get; }
+
         IGenericRepository<InvoiceReturnItem> InvoiceReturnItems { get; }
+
         IGenericRepository<Payment> Payments { get; }
 
         IGenericRepository<SalesRepDayClosing> SalesRepDayClosings { get; }
+
         IGenericRepository<SalesRepDayClosingItem> SalesRepDayClosingItems { get; }
 
         #endregion
 
+
         #region Inventory
 
         IGenericRepository<StockBalance> StockBalances { get; }
+
         IGenericRepository<StockMovement> StockMovements { get; }
 
         #endregion
 
+
         #region LoadRequest
 
         IGenericRepository<LoadRequest> LoadRequests { get; }
+
         IGenericRepository<LoadRequestItem> LoadRequestItems { get; }
+
         IGenericRepository<SalesRepInventory> SalesRepInventories { get; }
+
         IGenericRepository<SalesRepInventoryMovement> SalesRepInventoryMovements { get; }
 
         #endregion
+
 
         #region CustomerVisit
 
@@ -65,25 +86,70 @@ namespace Salesync.Application.Interfaces.Repositories
 
         #endregion
 
+
         #region Treasury
 
         IGenericRepository<CashBox> CashBoxes { get; }
+
         IGenericRepository<CashReceipt> CashReceipts { get; }
+
         IGenericRepository<SalesRepCashLedger> SalesRepCashLedgers { get; }
+
         IGenericRepository<TreasuryTransaction> TreasuryTransactions { get; }
+
         IGenericRepository<ExpenseCategory> ExpenseCategories { get; }
+
         #endregion
+
 
         #region UnLoadRequest
 
         IGenericRepository<SalesRepUnloadRequest> SalesRepUnloadRequests { get; }
+
         IGenericRepository<SalesRepUnloadRequestItem> SalesRepUnloadRequestItems { get; }
 
         #endregion
 
+
+        #region DataImport
+
+        IGenericRepository<ImportBatch> ImportBatches { get; }
+
+        IGenericRepository<ImportBatchRow> ImportBatchRows { get; }
+
+        #endregion
+
+
+        #region PriceList
+
+        IGenericRepository<PriceList> PriceLists { get; }
+
+        IGenericRepository<ProductPrice> ProductPrices { get; }
+
+        #endregion
+
+
+        // =====================================================
+        // TRANSACTIONS
+        // =====================================================
+
         Task BeginTransactionAsync();
+
         Task CommitTransactionAsync();
+
         Task RollbackTransactionAsync();
+
+
+        // =====================================================
+        // CHANGE TRACKING
+        // =====================================================
+
+        void ClearTracking();
+
+
+        // =====================================================
+        // SAVE
+        // =====================================================
 
         Task<int> CompleteAsync();
     }

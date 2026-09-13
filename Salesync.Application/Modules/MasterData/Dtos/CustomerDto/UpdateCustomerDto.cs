@@ -36,8 +36,7 @@ namespace Salesync.Application.Modules.MasterData.Dtos.CustomerDto
 
         public string? AccountNumber { get; set; }
         public string? TaxId { get; set; }
-        public string? PriceId { get; set; }
-
+        public int? PriceListId { get; set; }
         public int? BranchId { get; set; }
 
         public CustomerStatus Status { get; set; }

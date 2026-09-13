@@ -49,9 +49,17 @@ namespace Salesync.Application.Mappings
             CreateMap<CreateProductDto, Product>();
             CreateMap<UpdateProductDto, Product>().ForAllMembers(o => o.Condition((src, dest, srcMember) => srcMember != null));
 
-            CreateMap<Customer, CustomerDto>().ReverseMap();
-            CreateMap<CreateCustomerDto, Customer>().ReverseMap();
-            CreateMap<UpdateCustomerDto, Customer>().ForAllMembers(o => o.Condition((src, dest, srcMember) => srcMember != null));
+            CreateMap<Customer, CustomerDto>()
+                .ForMember(dest => dest.PriceListId, opt => opt.MapFrom(src => src.PriceListId))
+                .ForMember(dest => dest.PriceListCode, opt => opt.MapFrom(src => src.PriceList != null ? src.PriceList.Code : null))
+                .ForMember(dest => dest.PriceListName, opt => opt.MapFrom(src => src.PriceList != null ? src.PriceList.Name : null));
+
+            CreateMap<CreateCustomerDto, Customer>()
+                .ForMember(dest => dest.PriceList, opt => opt.Ignore());
+
+            CreateMap<UpdateCustomerDto, Customer>()
+                .ForMember(dest => dest.PriceList, opt => opt.Ignore())
+                .ForAllMembers(o => o.Condition((src, dest, srcMember) => srcMember != null));
 
             #endregion
 

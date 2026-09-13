@@ -33,7 +33,9 @@ namespace Salesync.Application.Modules.MasterData.Dtos.CustomerDto
         public string Status { get; set; } = string.Empty;
         public string? AccountNumber { get; set; }
         public string? TaxId { get; set; }
-        public string? PriceId { get; set; }
+        public int? PriceListId { get; set; }
+        public string? PriceListCode { get; set; }
+        public string? PriceListName { get; set; }
         public int? BranchId { get; set; }
         public string? BranchName { get; set; }
         public DateTime CreatedAt { get; set; }
