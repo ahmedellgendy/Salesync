@@ -129,4 +129,11 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
+app.MapGet("/", () => Results.Ok(new
+{
+    service = "Salesync API",
+    status = "Running",
+    environment = app.Environment.EnvironmentName
+}));
+
 app.Run();
