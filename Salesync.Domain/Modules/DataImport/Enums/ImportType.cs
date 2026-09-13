@@ -10,6 +10,8 @@
         Routes = 6,
         RouteCustomers = 7,
         OpeningInventory = 8,
-        CustomerOpeningBalances = 9
+        CustomerOpeningBalances = 9,
+        PriceLists = 10,
+        ProductPrices = 11
     }
 }

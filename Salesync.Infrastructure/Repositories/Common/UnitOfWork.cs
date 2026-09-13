@@ -57,6 +57,9 @@ namespace Salesync.Infrastructure.Repositories.Common
 
         public IGenericRepository<ImportBatch> ImportBatches { get; }
         public IGenericRepository<ImportBatchRow> ImportBatchRows { get; }
+
+        public IGenericRepository<PriceList> PriceLists { get; }
+        public IGenericRepository<ProductPrice> ProductPrices { get; }
         public UnitOfWork(SalesyncDbContext context)
         {
             _context = context;
@@ -100,6 +103,9 @@ namespace Salesync.Infrastructure.Repositories.Common
 
             ImportBatches = new GenericRepository<ImportBatch>(_context);
             ImportBatchRows = new GenericRepository<ImportBatchRow>(_context);
+
+            PriceLists = new GenericRepository<PriceList>(context);
+            ProductPrices = new GenericRepository<ProductPrice>(context);
         }
 
         public async Task BeginTransactionAsync()
@@ -127,7 +133,6 @@ namespace Salesync.Infrastructure.Repositories.Common
             await _transaction.DisposeAsync();
             _transaction = null;
         }
-
         public async Task<int> CompleteAsync() => await _context.SaveChangesAsync();
     }
 }

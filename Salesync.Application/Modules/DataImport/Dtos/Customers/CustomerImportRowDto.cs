@@ -52,7 +52,7 @@
 
         public string? TaxId { get; set; }
 
-        public string? PriceId { get; set; }
+        public string? PriceListCode { get; set; }
 
         public string? BranchCode { get; set; }
     }

@@ -41,7 +41,7 @@ namespace Salesync.Application.Modules.DataImport.Services
             "OrderCeiling",
             "AccountNumber",
             "TaxId",
-            "PriceId",
+            "PriceListCode",
             "BranchCode"
         };
 
@@ -164,14 +164,27 @@ namespace Salesync.Application.Modules.DataImport.Services
                         x => x.First(),
                         StringComparer.OrdinalIgnoreCase);
 
+            var priceLists =
+                (await _unitOfWork.PriceLists.GetAllAsync())
+                .Where(x => x.IsActive)
+                .ToList();
+
+            var priceListByCode =
+                priceLists
+                    .Where(x =>
+                        !string.IsNullOrWhiteSpace(x.Code))
+                    .GroupBy(
+                        x => x.Code.Trim(),
+                        StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(
+                        x => x.Key,
+                        x => x.First(),
+                        StringComparer.OrdinalIgnoreCase);
+
             var customers =
                 (await _unitOfWork.Customers.GetAllAsync())
                 .ToList();
 
-            /*
-             * Phone is required by CustomerCreateValidator,
-             * therefore use it as the duplicate key for onboarding.
-             */
             var existingPhones =
                 customers
                     .Where(x =>
@@ -400,7 +413,7 @@ namespace Salesync.Application.Modules.DataImport.Services
                         customerRow.BranchCode))
                 {
                     if (!branchByCode.TryGetValue(
-                            customerRow.BranchCode,
+                            customerRow.BranchCode.Trim(),
                             out var branch))
                     {
                         AddError(
@@ -414,6 +427,33 @@ namespace Salesync.Application.Modules.DataImport.Services
                     {
                         branchId =
                             branch.Id;
+                    }
+                }
+
+                // -------------------------------------------------
+                // PriceListCode -> PriceListId
+                // -------------------------------------------------
+
+                int? priceListId = null;
+
+                if (!string.IsNullOrWhiteSpace(
+                        customerRow.PriceListCode))
+                {
+                    if (!priceListByCode.TryGetValue(
+                            customerRow.PriceListCode.Trim(),
+                            out var priceList))
+                    {
+                        AddError(
+                            previewErrors,
+                            rowErrors,
+                            rowNumber,
+                            "PriceListCode",
+                            $"Price list code '{customerRow.PriceListCode}' does not exist or is inactive.");
+                    }
+                    else
+                    {
+                        priceListId =
+                            priceList.Id;
                     }
                 }
 
@@ -496,8 +536,8 @@ namespace Salesync.Application.Modules.DataImport.Services
                         TaxId =
                             customerRow.TaxId,
 
-                        PriceId =
-                            customerRow.PriceId,
+                        PriceListId =
+                            priceListId,
 
                         BranchId =
                             branchId
@@ -526,8 +566,11 @@ namespace Salesync.Application.Modules.DataImport.Services
                 if (!string.IsNullOrWhiteSpace(
                         customerRow.Phone))
                 {
+                    var normalizedPhone =
+                        customerRow.Phone.Trim();
+
                     if (!excelPhones.Add(
-                            customerRow.Phone))
+                            normalizedPhone))
                     {
                         AddError(
                             previewErrors,
@@ -538,7 +581,7 @@ namespace Salesync.Application.Modules.DataImport.Services
                     }
 
                     if (existingPhones.Contains(
-                            customerRow.Phone))
+                            normalizedPhone))
                     {
                         AddError(
                             previewErrors,
@@ -701,6 +744,23 @@ namespace Salesync.Application.Modules.DataImport.Services
                         x => x.First(),
                         StringComparer.OrdinalIgnoreCase);
 
+            var priceLists =
+                (await _unitOfWork.PriceLists.GetAllAsync())
+                .Where(x => x.IsActive)
+                .ToList();
+
+            var priceListByCode =
+                priceLists
+                    .Where(x =>
+                        !string.IsNullOrWhiteSpace(x.Code))
+                    .GroupBy(
+                        x => x.Code.Trim(),
+                        StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(
+                        x => x.Key,
+                        x => x.First(),
+                        StringComparer.OrdinalIgnoreCase);
+
             var currentPhones =
                 (await _unitOfWork.Customers.GetAllAsync())
                 .Where(x =>
@@ -735,12 +795,19 @@ namespace Salesync.Application.Modules.DataImport.Services
                             $"Unable to read import row {stagingRow.RowNumber}.");
                     }
 
+                    var normalizedPhone =
+                        dto.Phone.Trim();
+
                     if (currentPhones.Contains(
-                            dto.Phone))
+                            normalizedPhone))
                     {
                         throw new InvalidOperationException(
                             $"Customer phone '{dto.Phone}' already exists.");
                     }
+
+                    // ---------------------------------------------
+                    // Branch
+                    // ---------------------------------------------
 
                     int? branchId = null;
 
@@ -748,7 +815,7 @@ namespace Salesync.Application.Modules.DataImport.Services
                             dto.BranchCode))
                     {
                         if (!branchByCode.TryGetValue(
-                                dto.BranchCode,
+                                dto.BranchCode.Trim(),
                                 out var branch))
                         {
                             throw new InvalidOperationException(
@@ -759,6 +826,31 @@ namespace Salesync.Application.Modules.DataImport.Services
                             branch.Id;
                     }
 
+                    // ---------------------------------------------
+                    // Price List
+                    // ---------------------------------------------
+
+                    int? priceListId = null;
+
+                    if (!string.IsNullOrWhiteSpace(
+                            dto.PriceListCode))
+                    {
+                        if (!priceListByCode.TryGetValue(
+                                dto.PriceListCode.Trim(),
+                                out var priceList))
+                        {
+                            throw new InvalidOperationException(
+                                $"Price list code '{dto.PriceListCode}' does not exist or is inactive.");
+                        }
+
+                        priceListId =
+                            priceList.Id;
+                    }
+
+                    // ---------------------------------------------
+                    // Customer Type
+                    // ---------------------------------------------
+
                     if (!TryParseCustomerType(
                             dto.CustomerType,
                             out var customerType))
@@ -767,6 +859,10 @@ namespace Salesync.Application.Modules.DataImport.Services
                             $"Customer type '{dto.CustomerType}' is invalid.");
                     }
 
+                    // ---------------------------------------------
+                    // Customer
+                    // ---------------------------------------------
+
                     var customer =
                         new Customer
                         {
@@ -774,7 +870,7 @@ namespace Salesync.Application.Modules.DataImport.Services
                                 dto.Name.Trim(),
 
                             Phone =
-                                dto.Phone.Trim(),
+                                normalizedPhone,
 
                             Email =
                                 NormalizeNullable(dto.Email),
@@ -852,13 +948,15 @@ namespace Salesync.Application.Modules.DataImport.Services
                                     "OrderCeiling"),
 
                             AccountNumber =
-                                NormalizeNullable(dto.AccountNumber),
+                                NormalizeNullable(
+                                    dto.AccountNumber),
 
                             TaxId =
-                                NormalizeNullable(dto.TaxId),
+                                NormalizeNullable(
+                                    dto.TaxId),
 
-                            PriceId =
-                                NormalizeNullable(dto.PriceId),
+                            PriceListId =
+                                priceListId,
 
                             BranchId =
                                 branchId,
@@ -883,7 +981,7 @@ namespace Salesync.Application.Modules.DataImport.Services
                         .AddAsync(customer);
 
                     currentPhones.Add(
-                        customer.Phone!);
+                        normalizedPhone);
 
                     importedRows++;
                 }
@@ -904,9 +1002,15 @@ namespace Salesync.Application.Modules.DataImport.Services
 
                 return new ImportResultDto
                 {
-                    BatchId = batch.Id,
-                    ImportedRows = importedRows,
-                    Success = true,
+                    BatchId =
+                        batch.Id,
+
+                    ImportedRows =
+                        importedRows,
+
+                    Success =
+                        true,
+
                     Message =
                         $"{importedRows} customers imported successfully."
                 };
@@ -987,33 +1091,86 @@ namespace Salesync.Application.Modules.DataImport.Services
                     new Dictionary<string, string>(
                         StringComparer.OrdinalIgnoreCase)
                     {
-                        ["Name"] = dto.Name,
-                        ["Phone"] = dto.Phone,
-                        ["Email"] = dto.Email ?? string.Empty,
-                        ["Country"] = dto.Country ?? string.Empty,
-                        ["Address"] = dto.Address,
-                        ["Area"] = dto.Area ?? string.Empty,
-                        ["City"] = dto.City ?? string.Empty,
-                        ["District"] = dto.District ?? string.Empty,
-                        ["Region"] = dto.Region ?? string.Empty,
-                        ["PostalCode"] = dto.PostalCode ?? string.Empty,
-                        ["Latitude"] = dto.Latitude ?? string.Empty,
-                        ["Longitude"] = dto.Longitude ?? string.Empty,
-                        ["CategoryCode"] = dto.CategoryCode ?? string.Empty,
-                        ["SalesSectorCode"] = dto.SalesSectorCode ?? string.Empty,
-                        ["ClassId"] = dto.ClassId ?? string.Empty,
-                        ["CustomerType"] = dto.CustomerType,
-                        ["AllowCash"] = dto.AllowCash,
-                        ["AllowCheck"] = dto.AllowCheck,
-                        ["AllowCreditCard"] = dto.AllowCreditCard,
-                        ["PaymentTermsCode"] = dto.PaymentTermsCode ?? string.Empty,
-                        ["CreditLimit"] = dto.CreditLimit ?? string.Empty,
-                        ["OrderCeiling"] = dto.OrderCeiling ?? string.Empty,
-                        ["AccountNumber"] = dto.AccountNumber ?? string.Empty,
-                        ["TaxId"] = dto.TaxId ?? string.Empty,
-                        ["PriceId"] = dto.PriceId ?? string.Empty,
-                        ["BranchCode"] = dto.BranchCode ?? string.Empty,
-                        ["__RowNumber"] = dto.RowNumber.ToString()
+                        ["Name"] =
+                            dto.Name,
+
+                        ["Phone"] =
+                            dto.Phone,
+
+                        ["Email"] =
+                            dto.Email ?? string.Empty,
+
+                        ["Country"] =
+                            dto.Country ?? string.Empty,
+
+                        ["Address"] =
+                            dto.Address,
+
+                        ["Area"] =
+                            dto.Area ?? string.Empty,
+
+                        ["City"] =
+                            dto.City ?? string.Empty,
+
+                        ["District"] =
+                            dto.District ?? string.Empty,
+
+                        ["Region"] =
+                            dto.Region ?? string.Empty,
+
+                        ["PostalCode"] =
+                            dto.PostalCode ?? string.Empty,
+
+                        ["Latitude"] =
+                            dto.Latitude ?? string.Empty,
+
+                        ["Longitude"] =
+                            dto.Longitude ?? string.Empty,
+
+                        ["CategoryCode"] =
+                            dto.CategoryCode ?? string.Empty,
+
+                        ["SalesSectorCode"] =
+                            dto.SalesSectorCode ?? string.Empty,
+
+                        ["ClassId"] =
+                            dto.ClassId ?? string.Empty,
+
+                        ["CustomerType"] =
+                            dto.CustomerType,
+
+                        ["AllowCash"] =
+                            dto.AllowCash,
+
+                        ["AllowCheck"] =
+                            dto.AllowCheck,
+
+                        ["AllowCreditCard"] =
+                            dto.AllowCreditCard,
+
+                        ["PaymentTermsCode"] =
+                            dto.PaymentTermsCode ?? string.Empty,
+
+                        ["CreditLimit"] =
+                            dto.CreditLimit ?? string.Empty,
+
+                        ["OrderCeiling"] =
+                            dto.OrderCeiling ?? string.Empty,
+
+                        ["AccountNumber"] =
+                            dto.AccountNumber ?? string.Empty,
+
+                        ["TaxId"] =
+                            dto.TaxId ?? string.Empty,
+
+                        ["PriceListCode"] =
+                            dto.PriceListCode ?? string.Empty,
+
+                        ["BranchCode"] =
+                            dto.BranchCode ?? string.Empty,
+
+                        ["__RowNumber"] =
+                            dto.RowNumber.ToString()
                     });
 
                 if (!string.IsNullOrWhiteSpace(
@@ -1056,17 +1213,38 @@ namespace Salesync.Application.Modules.DataImport.Services
                 .Select(x =>
                     new ImportBatchHistoryDto
                     {
-                        Id = x.Id,
-                        ImportType = x.ImportType,
-                        Status = x.Status,
-                        FileName = x.FileName,
-                        TotalRows = x.TotalRows,
-                        ValidRows = x.ValidRows,
-                        ErrorRows = x.ErrorRows,
-                        ImportedRows = x.ImportedRows,
-                        ImportedByUserId = x.ImportedByUserId,
-                        CreatedAt = x.CreatedAt,
-                        CompletedAt = x.CompletedAt
+                        Id =
+                            x.Id,
+
+                        ImportType =
+                            x.ImportType,
+
+                        Status =
+                            x.Status,
+
+                        FileName =
+                            x.FileName,
+
+                        TotalRows =
+                            x.TotalRows,
+
+                        ValidRows =
+                            x.ValidRows,
+
+                        ErrorRows =
+                            x.ErrorRows,
+
+                        ImportedRows =
+                            x.ImportedRows,
+
+                        ImportedByUserId =
+                            x.ImportedByUserId,
+
+                        CreatedAt =
+                            x.CreatedAt,
+
+                        CompletedAt =
+                            x.CompletedAt
                     })
                 .ToList();
         }
@@ -1081,7 +1259,8 @@ namespace Salesync.Application.Modules.DataImport.Services
             if (rows.Count == 0)
                 return;
 
-            var firstRow = rows[0];
+            var firstRow =
+                rows[0];
 
             var missingHeaders =
                 Headers
@@ -1102,52 +1281,95 @@ namespace Salesync.Application.Modules.DataImport.Services
         {
             return new CustomerImportRowDto
             {
-                RowNumber = rowNumber,
+                RowNumber =
+                    rowNumber,
 
                 Name =
-                    GetValue(row, "Name"),
+                    GetValue(
+                        row,
+                        "Name"),
 
                 Phone =
-                    GetValue(row, "Phone"),
+                    GetValue(
+                        row,
+                        "Phone"),
 
                 Email =
-                    NormalizeNullable(GetValue(row, "Email")),
+                    NormalizeNullable(
+                        GetValue(
+                            row,
+                            "Email")),
 
                 Country =
-                    NormalizeNullable(GetValue(row, "Country")),
+                    NormalizeNullable(
+                        GetValue(
+                            row,
+                            "Country")),
 
                 Address =
-                    GetValue(row, "Address"),
+                    GetValue(
+                        row,
+                        "Address"),
 
                 Area =
-                    NormalizeNullable(GetValue(row, "Area")),
+                    NormalizeNullable(
+                        GetValue(
+                            row,
+                            "Area")),
 
                 City =
-                    NormalizeNullable(GetValue(row, "City")),
+                    NormalizeNullable(
+                        GetValue(
+                            row,
+                            "City")),
 
                 District =
-                    NormalizeNullable(GetValue(row, "District")),
+                    NormalizeNullable(
+                        GetValue(
+                            row,
+                            "District")),
 
                 Region =
-                    NormalizeNullable(GetValue(row, "Region")),
+                    NormalizeNullable(
+                        GetValue(
+                            row,
+                            "Region")),
 
                 PostalCode =
-                    NormalizeNullable(GetValue(row, "PostalCode")),
+                    NormalizeNullable(
+                        GetValue(
+                            row,
+                            "PostalCode")),
 
                 Latitude =
-                    NormalizeNullable(GetValue(row, "Latitude")),
+                    NormalizeNullable(
+                        GetValue(
+                            row,
+                            "Latitude")),
 
                 Longitude =
-                    NormalizeNullable(GetValue(row, "Longitude")),
+                    NormalizeNullable(
+                        GetValue(
+                            row,
+                            "Longitude")),
 
                 CategoryCode =
-                    NormalizeNullable(GetValue(row, "CategoryCode")),
+                    NormalizeNullable(
+                        GetValue(
+                            row,
+                            "CategoryCode")),
 
                 SalesSectorCode =
-                    NormalizeNullable(GetValue(row, "SalesSectorCode")),
+                    NormalizeNullable(
+                        GetValue(
+                            row,
+                            "SalesSectorCode")),
 
                 ClassId =
-                    NormalizeNullable(GetValue(row, "ClassId")),
+                    NormalizeNullable(
+                        GetValue(
+                            row,
+                            "ClassId")),
 
                 CustomerType =
                     GetValueOrDefault(
@@ -1203,11 +1425,11 @@ namespace Salesync.Application.Modules.DataImport.Services
                             row,
                             "TaxId")),
 
-                PriceId =
+                PriceListCode =
                     NormalizeNullable(
                         GetValue(
                             row,
-                            "PriceId")),
+                            "PriceListCode")),
 
                 BranchCode =
                     NormalizeNullable(
@@ -1226,7 +1448,8 @@ namespace Salesync.Application.Modules.DataImport.Services
             if (string.IsNullOrWhiteSpace(value))
                 return false;
 
-            var normalized = value.Trim();
+            var normalized =
+                value.Trim();
 
             if (int.TryParse(
                     normalized,
@@ -1401,9 +1624,14 @@ namespace Salesync.Application.Modules.DataImport.Services
             previewErrors.Add(
                 new ImportValidationErrorDto
                 {
-                    RowNumber = rowNumber,
-                    ColumnName = columnName,
-                    Message = message
+                    RowNumber =
+                        rowNumber,
+
+                    ColumnName =
+                        columnName,
+
+                    Message =
+                        message
                 });
         }
 

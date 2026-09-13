@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Salesync.Infrastructure.Data;
 
@@ -11,9 +12,11 @@ using Salesync.Infrastructure.Data;
 namespace Salesync.Infrastructure.Migrations
 {
     [DbContext(typeof(SalesyncDbContext))]
-    partial class SalesyncDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260913073233_AddPriceLists")]
+    partial class AddPriceLists
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -907,8 +910,8 @@ namespace Salesync.Infrastructure.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
-                    b.Property<int?>("PriceListId")
-                        .HasColumnType("int");
+                    b.Property<string>("PriceId")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Region")
                         .HasMaxLength(50)
@@ -955,8 +958,6 @@ namespace Salesync.Infrastructure.Migrations
                     b.HasIndex("Name");
 
                     b.HasIndex("Phone");
-
-                    b.HasIndex("PriceListId");
 
                     b.HasIndex("TaxId");
 
@@ -3171,14 +3172,7 @@ namespace Salesync.Infrastructure.Migrations
                         .HasForeignKey("BranchId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("Salesync.Domain.Modules.MasterData.Entities.PriceList", "PriceList")
-                        .WithMany("Customers")
-                        .HasForeignKey("PriceListId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.Navigation("Branch");
-
-                    b.Navigation("PriceList");
                 });
 
             modelBuilder.Entity("Salesync.Domain.Modules.MasterData.Entities.Product", b =>
@@ -3626,8 +3620,6 @@ namespace Salesync.Infrastructure.Migrations
 
             modelBuilder.Entity("Salesync.Domain.Modules.MasterData.Entities.PriceList", b =>
                 {
-                    b.Navigation("Customers");
-
                     b.Navigation("ProductPrices");
                 });
 

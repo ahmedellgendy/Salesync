@@ -18,20 +18,41 @@ namespace Salesync.API.Controllers.DataImport
         private readonly ICustomerImportService _customerImportService;
         private readonly IOpeningInventoryImportService _openingInventoryImportService;
 
+        private readonly IPriceListImportService _priceListImportService;
+        private readonly IProductPriceImportService _productPriceImportService;
+
+
         public DataImportController(
             IBranchImportService branchImportService,
             IWarehouseImportService warehouseImportService,
             IProductImportService productImportService,
             ICustomerImportService customerImportService,
-                IOpeningInventoryImportService openingInventoryImportService)
-
+            IOpeningInventoryImportService openingInventoryImportService,
+            IPriceListImportService priceListImportService,
+            IProductPriceImportService productPriceImportService)
         {
-            _branchImportService = branchImportService;
-            _warehouseImportService = warehouseImportService;
-            _productImportService = productImportService;
-            _customerImportService = customerImportService;
-            _openingInventoryImportService = openingInventoryImportService;
+            _branchImportService =
+                branchImportService;
+
+            _warehouseImportService =
+                warehouseImportService;
+
+            _productImportService =
+                productImportService;
+
+            _customerImportService =
+                customerImportService;
+
+            _openingInventoryImportService =
+                openingInventoryImportService;
+
+            _priceListImportService =
+                priceListImportService;
+
+            _productPriceImportService =
+                productPriceImportService;
         }
+
 
         // =====================================================
         // BRANCHES
@@ -48,6 +69,7 @@ namespace Salesync.API.Controllers.DataImport
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 "Salesync-Branches-Template.xlsx");
         }
+
 
         [HttpPost("branches/validate")]
         [RequestSizeLimit(10 * 1024 * 1024)]
@@ -84,6 +106,7 @@ namespace Salesync.API.Controllers.DataImport
                             : "File contains validation errors."));
         }
 
+
         [HttpPost("branches/{batchId:int}/import")]
         public async Task<IActionResult> ImportBranchesAsync(
             int batchId,
@@ -100,6 +123,7 @@ namespace Salesync.API.Controllers.DataImport
                         result,
                         result.Message));
         }
+
 
         [HttpGet("branches/{batchId:int}/errors")]
         public async Task<IActionResult> DownloadBranchErrorsAsync(
@@ -118,6 +142,7 @@ namespace Salesync.API.Controllers.DataImport
                 $"Salesync-Branch-Import-Errors-{batchId}.xlsx");
         }
 
+
         [HttpGet("branches/history")]
         public async Task<IActionResult> GetBranchImportHistoryAsync(
             CancellationToken cancellationToken)
@@ -130,6 +155,7 @@ namespace Salesync.API.Controllers.DataImport
                 ApiResponse<IEnumerable<ImportBatchHistoryDto>>
                     .SuccessResponse(result));
         }
+
 
         // =====================================================
         // WAREHOUSES
@@ -146,6 +172,7 @@ namespace Salesync.API.Controllers.DataImport
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 "Salesync-Warehouses-Template.xlsx");
         }
+
 
         [HttpPost("warehouses/validate")]
         [RequestSizeLimit(10 * 1024 * 1024)]
@@ -182,6 +209,7 @@ namespace Salesync.API.Controllers.DataImport
                             : "File contains validation errors."));
         }
 
+
         [HttpPost("warehouses/{batchId:int}/import")]
         public async Task<IActionResult> ImportWarehousesAsync(
             int batchId,
@@ -198,6 +226,7 @@ namespace Salesync.API.Controllers.DataImport
                         result,
                         result.Message));
         }
+
 
         [HttpGet("warehouses/{batchId:int}/errors")]
         public async Task<IActionResult> DownloadWarehouseErrorsAsync(
@@ -216,6 +245,7 @@ namespace Salesync.API.Controllers.DataImport
                 $"Salesync-Warehouse-Import-Errors-{batchId}.xlsx");
         }
 
+
         [HttpGet("warehouses/history")]
         public async Task<IActionResult> GetWarehouseImportHistoryAsync(
             CancellationToken cancellationToken)
@@ -228,6 +258,7 @@ namespace Salesync.API.Controllers.DataImport
                 ApiResponse<IEnumerable<ImportBatchHistoryDto>>
                     .SuccessResponse(result));
         }
+
 
         // =====================================================
         // PRODUCTS
@@ -244,6 +275,7 @@ namespace Salesync.API.Controllers.DataImport
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 "Salesync-Products-Template.xlsx");
         }
+
 
         [HttpPost("products/validate")]
         [RequestSizeLimit(10 * 1024 * 1024)]
@@ -280,6 +312,7 @@ namespace Salesync.API.Controllers.DataImport
                             : "File contains validation errors."));
         }
 
+
         [HttpPost("products/{batchId:int}/import")]
         public async Task<IActionResult> ImportProductsAsync(
             int batchId,
@@ -296,6 +329,7 @@ namespace Salesync.API.Controllers.DataImport
                         result,
                         result.Message));
         }
+
 
         [HttpGet("products/{batchId:int}/errors")]
         public async Task<IActionResult> DownloadProductErrorsAsync(
@@ -314,6 +348,7 @@ namespace Salesync.API.Controllers.DataImport
                 $"Salesync-Product-Import-Errors-{batchId}.xlsx");
         }
 
+
         [HttpGet("products/history")]
         public async Task<IActionResult> GetProductImportHistoryAsync(
             CancellationToken cancellationToken)
@@ -326,6 +361,221 @@ namespace Salesync.API.Controllers.DataImport
                 ApiResponse<IEnumerable<ImportBatchHistoryDto>>
                     .SuccessResponse(result));
         }
+
+
+        // =====================================================
+        // PRICE LISTS
+        // =====================================================
+
+        [HttpGet("price-lists/template")]
+        public IActionResult DownloadPriceListTemplate()
+        {
+            var file =
+                _priceListImportService
+                    .GenerateTemplate();
+
+            return File(
+                file,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "Salesync-Price-Lists-Template.xlsx");
+        }
+
+
+        [HttpPost("price-lists/validate")]
+        [RequestSizeLimit(10 * 1024 * 1024)]
+        public async Task<IActionResult> ValidatePriceListsAsync(
+            IFormFile file,
+            CancellationToken cancellationToken)
+        {
+            var validationError =
+                ValidateExcelFile(file);
+
+            if (validationError is not null)
+                return validationError;
+
+            var userId =
+                User.FindFirstValue(
+                    ClaimTypes.NameIdentifier);
+
+            await using var stream =
+                file.OpenReadStream();
+
+            var result =
+                await _priceListImportService
+                    .ValidateAsync(
+                        stream,
+                        file.FileName,
+                        userId,
+                        cancellationToken);
+
+            return Ok(
+                ApiResponse<ImportPreviewDto>
+                    .SuccessResponse(
+                        result,
+                        result.CanImport
+                            ? "File validated successfully."
+                            : "File contains validation errors."));
+        }
+
+
+        [HttpPost("price-lists/{batchId:int}/import")]
+        public async Task<IActionResult> ImportPriceListsAsync(
+            int batchId,
+            CancellationToken cancellationToken)
+        {
+            var result =
+                await _priceListImportService
+                    .ImportAsync(
+                        batchId,
+                        cancellationToken);
+
+            return Ok(
+                ApiResponse<ImportResultDto>
+                    .SuccessResponse(
+                        result,
+                        result.Message));
+        }
+
+
+        [HttpGet("price-lists/{batchId:int}/errors")]
+        public async Task<IActionResult> DownloadPriceListErrorsAsync(
+            int batchId,
+            CancellationToken cancellationToken)
+        {
+            var file =
+                await _priceListImportService
+                    .GenerateErrorReportAsync(
+                        batchId,
+                        cancellationToken);
+
+            return File(
+                file,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                $"Salesync-Price-List-Import-Errors-{batchId}.xlsx");
+        }
+
+
+        [HttpGet("price-lists/history")]
+        public async Task<IActionResult> GetPriceListImportHistoryAsync(
+            CancellationToken cancellationToken)
+        {
+            var result =
+                await _priceListImportService
+                    .GetHistoryAsync(
+                        cancellationToken);
+
+            return Ok(
+                ApiResponse<IEnumerable<ImportBatchHistoryDto>>
+                    .SuccessResponse(result));
+        }
+
+
+        // =====================================================
+        // PRODUCT PRICES
+        // =====================================================
+
+        [HttpGet("product-prices/template")]
+        public IActionResult DownloadProductPriceTemplate()
+        {
+            var file =
+                _productPriceImportService
+                    .GenerateTemplate();
+
+            return File(
+                file,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "Salesync-Product-Prices-Template.xlsx");
+        }
+
+
+        [HttpPost("product-prices/validate")]
+        [RequestSizeLimit(10 * 1024 * 1024)]
+        public async Task<IActionResult> ValidateProductPricesAsync(
+            IFormFile file,
+            CancellationToken cancellationToken)
+        {
+            var validationError =
+                ValidateExcelFile(file);
+
+            if (validationError is not null)
+                return validationError;
+
+            var userId =
+                User.FindFirstValue(
+                    ClaimTypes.NameIdentifier);
+
+            await using var stream =
+                file.OpenReadStream();
+
+            var result =
+                await _productPriceImportService
+                    .ValidateAsync(
+                        stream,
+                        file.FileName,
+                        userId,
+                        cancellationToken);
+
+            return Ok(
+                ApiResponse<ImportPreviewDto>
+                    .SuccessResponse(
+                        result,
+                        result.CanImport
+                            ? "File validated successfully."
+                            : "File contains validation errors."));
+        }
+
+
+        [HttpPost("product-prices/{batchId:int}/import")]
+        public async Task<IActionResult> ImportProductPricesAsync(
+            int batchId,
+            CancellationToken cancellationToken)
+        {
+            var result =
+                await _productPriceImportService
+                    .ImportAsync(
+                        batchId,
+                        cancellationToken);
+
+            return Ok(
+                ApiResponse<ImportResultDto>
+                    .SuccessResponse(
+                        result,
+                        result.Message));
+        }
+
+
+        [HttpGet("product-prices/{batchId:int}/errors")]
+        public async Task<IActionResult> DownloadProductPriceErrorsAsync(
+            int batchId,
+            CancellationToken cancellationToken)
+        {
+            var file =
+                await _productPriceImportService
+                    .GenerateErrorReportAsync(
+                        batchId,
+                        cancellationToken);
+
+            return File(
+                file,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                $"Salesync-Product-Price-Import-Errors-{batchId}.xlsx");
+        }
+
+
+        [HttpGet("product-prices/history")]
+        public async Task<IActionResult> GetProductPriceImportHistoryAsync(
+            CancellationToken cancellationToken)
+        {
+            var result =
+                await _productPriceImportService
+                    .GetHistoryAsync(
+                        cancellationToken);
+
+            return Ok(
+                ApiResponse<IEnumerable<ImportBatchHistoryDto>>
+                    .SuccessResponse(result));
+        }
+
 
         // =====================================================
         // CUSTOMERS
@@ -342,6 +592,7 @@ namespace Salesync.API.Controllers.DataImport
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 "Salesync-Customers-Template.xlsx");
         }
+
 
         [HttpPost("customers/validate")]
         [RequestSizeLimit(10 * 1024 * 1024)]
@@ -378,6 +629,7 @@ namespace Salesync.API.Controllers.DataImport
                             : "File contains validation errors."));
         }
 
+
         [HttpPost("customers/{batchId:int}/import")]
         public async Task<IActionResult> ImportCustomersAsync(
             int batchId,
@@ -394,6 +646,7 @@ namespace Salesync.API.Controllers.DataImport
                         result,
                         result.Message));
         }
+
 
         [HttpGet("customers/{batchId:int}/errors")]
         public async Task<IActionResult> DownloadCustomerErrorsAsync(
@@ -412,6 +665,7 @@ namespace Salesync.API.Controllers.DataImport
                 $"Salesync-Customer-Import-Errors-{batchId}.xlsx");
         }
 
+
         [HttpGet("customers/history")]
         public async Task<IActionResult> GetCustomerImportHistoryAsync(
             CancellationToken cancellationToken)
@@ -424,6 +678,7 @@ namespace Salesync.API.Controllers.DataImport
                 ApiResponse<IEnumerable<ImportBatchHistoryDto>>
                     .SuccessResponse(result));
         }
+
 
         // =====================================================
         // OPENING INVENTORY
@@ -536,6 +791,7 @@ namespace Salesync.API.Controllers.DataImport
                         result));
         }
 
+
         // =====================================================
         // HELPERS
         // =====================================================
@@ -555,9 +811,11 @@ namespace Salesync.API.Controllers.DataImport
                     });
             }
 
+
             var extension =
                 Path.GetExtension(
                     file.FileName);
+
 
             if (!extension.Equals(
                     ".xlsx",
@@ -571,6 +829,7 @@ namespace Salesync.API.Controllers.DataImport
                             "Only .xlsx files are supported."
                     });
             }
+
 
             return null;
         }

@@ -77,14 +77,19 @@ namespace Salesync.Infrastructure.Configurations.MasterData
                .HasForeignKey(c => c.BranchId)
                .OnDelete(DeleteBehavior.Restrict);
 
+            builder.HasOne(x => x.PriceList)
+              .WithMany(x => x.Customers)
+              .HasForeignKey(x => x.PriceListId)
+              .OnDelete(DeleteBehavior.Restrict);
+
             // Indexes
             builder.HasIndex(c => c.Name);
             builder.HasIndex(c => c.Phone);
             builder.HasIndex(c => c.Email).IsUnique();
             builder.HasIndex(c => c.AccountNumber);
             builder.HasIndex(c => c.TaxId);
+            builder.HasIndex(x => x.PriceListId);
 
-           
         }
     }
 }

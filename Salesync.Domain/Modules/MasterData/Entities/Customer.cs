@@ -54,8 +54,9 @@ namespace Salesync.Domain.Modules.MasterData.Entities
 
         // External References
         public string? AccountNumber { get; set; }              
-        public string? TaxId { get; set; }                     
-        public string? PriceId { get; set; }                   
+        public string? TaxId { get; set; }
+        public int? PriceListId { get; set; }
+        public PriceList? PriceList { get; set; }
 
         // Navigation Properties
         public int? BranchId { get; set; }

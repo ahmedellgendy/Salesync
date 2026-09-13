@@ -26,6 +26,10 @@ namespace Salesync.Application.Modules.MasterData.Validators.Customer
                 .Matches(@"^(01)[0-9]{9}$")
                 .WithMessage("Invalid Egyptian phone number format.")
                 .When(x => !string.IsNullOrWhiteSpace(x.Phone));
+
+            RuleFor(x => x.PriceListId)
+                 .GreaterThan(0)
+                 .When(x => x.PriceListId.HasValue);
         }
     }
 }

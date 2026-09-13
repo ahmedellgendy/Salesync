@@ -90,6 +90,14 @@ namespace Salesync.Application.Interfaces.Repositories
 
         #endregion
 
+        #region PriceList
+
+        IGenericRepository<PriceList> PriceLists { get; }
+
+        IGenericRepository<ProductPrice> ProductPrices { get; }
+
+        #endregion
+
         Task BeginTransactionAsync();
         Task CommitTransactionAsync();
         Task RollbackTransactionAsync();

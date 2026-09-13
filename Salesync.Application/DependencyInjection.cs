@@ -8,7 +8,11 @@ using Salesync.Application.Modules.Inventory.Interfaces;
 using Salesync.Application.Modules.Inventory.Services;
 using Salesync.Application.Modules.LoadRequest.Interfaces;
 using Salesync.Application.Modules.LoadRequest.Services;
+using Salesync.Application.Modules.MasterData.PriceLists.Interfaces;
+using Salesync.Application.Modules.MasterData.PriceLists.Services;
 using Salesync.Application.Modules.MasterData.Validators.Customer;
+using Salesync.Application.Modules.PriceLists.Interfaces;
+using Salesync.Application.Modules.PriceLists.Services;
 using Salesync.Application.Modules.Reports.Admin.Interfaces;
 using Salesync.Application.Modules.Reports.Admin.Services;
 using Salesync.Application.Modules.Reports.Common.Interfaces;
@@ -91,6 +95,13 @@ namespace Salesync.Application
             services.AddScoped<ICustomerImportService, CustomerImportService>();
             services.AddScoped<IOpeningInventoryImportService, OpeningInventoryImportService>();
 
+            // Register PriceList Service
+            services.AddScoped<IPriceListService, PriceListService>();
+            services.AddScoped<IProductPriceService, ProductPriceService>();
+            services.AddScoped<IPricingService, PricingService>();
+
+            services.AddScoped<IPriceListImportService, PriceListImportService>();
+            services.AddScoped<IProductPriceImportService, ProductPriceImportService>();
 
             return services;
         }

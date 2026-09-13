@@ -97,5 +97,8 @@ namespace Salesync.Infrastructure.Data
 
         public DbSet<ImportBatch> ImportBatches { get; set; }
         public DbSet<ImportBatchRow> ImportBatchRows { get; set; }
+
+        public DbSet<PriceList> PriceLists => Set<PriceList>();
+        public DbSet<ProductPrice> ProductPrices => Set<ProductPrice>();
     }
 }
