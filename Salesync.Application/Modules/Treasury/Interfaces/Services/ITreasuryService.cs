@@ -27,5 +27,7 @@ namespace Salesync.Application.Modules.Treasury.Interfaces.Services
         Task<ExpenseCategoryDto> CreateExpenseCategoryAsync(CreateExpenseCategoryDto dto);
 
         Task<ExpenseCategoryDto> UpdateExpenseCategoryAsync(int id, UpdateExpenseCategoryDto dto);
+
+        Task<CashBoxDto> SetOpeningBalanceAsync(int cashBoxId, SetCashBoxOpeningBalanceDto dto);
     }
 }

@@ -453,7 +453,7 @@ namespace Salesync.Application.Modules.Treasury.Services
             return await GetCurrentSalesRepCashBalanceAsync(salesRepId);
         }
 
-        public async Task<IEnumerable<TreasuryTransactionDto>> GetTransactionsAsync(int? cashBoxId = null,DateTime? fromDate = null,DateTime? toDate = null)
+        public async Task<IEnumerable<TreasuryTransactionDto>> GetTransactionsAsync(int? cashBoxId = null, DateTime? fromDate = null, DateTime? toDate = null)
         {
             var query =
                 _unitOfWork.TreasuryTransactions
@@ -709,7 +709,7 @@ namespace Salesync.Application.Modules.Treasury.Services
             }
         }
 
-        public async Task<IEnumerable<ExpenseCategoryDto>>GetExpenseCategoriesAsync()
+        public async Task<IEnumerable<ExpenseCategoryDto>> GetExpenseCategoriesAsync()
         {
             var categories =
                 await _unitOfWork.ExpenseCategories
@@ -722,7 +722,7 @@ namespace Salesync.Application.Modules.Treasury.Services
             return _mapper.Map<IEnumerable<ExpenseCategoryDto>>(categories);
         }
 
-        public async Task<ExpenseCategoryDto>GetExpenseCategoryByIdAsync(int id)
+        public async Task<ExpenseCategoryDto> GetExpenseCategoryByIdAsync(int id)
         {
             if (id <= 0)
                 throw new ArgumentException(
@@ -744,7 +744,7 @@ namespace Salesync.Application.Modules.Treasury.Services
                 category);
         }
 
-        public async Task<ExpenseCategoryDto>CreateExpenseCategoryAsync(CreateExpenseCategoryDto dto)
+        public async Task<ExpenseCategoryDto> CreateExpenseCategoryAsync(CreateExpenseCategoryDto dto)
         {
             var validationResult =
                 await _createExpenseCategoryValidator
@@ -797,7 +797,7 @@ namespace Salesync.Application.Modules.Treasury.Services
                 category);
         }
 
-        public async Task<ExpenseCategoryDto>UpdateExpenseCategoryAsync(int id,UpdateExpenseCategoryDto dto)
+        public async Task<ExpenseCategoryDto> UpdateExpenseCategoryAsync(int id, UpdateExpenseCategoryDto dto)
         {
             if (id <= 0)
                 throw new ArgumentException(
@@ -859,6 +859,145 @@ namespace Salesync.Application.Modules.Treasury.Services
 
             return _mapper.Map<ExpenseCategoryDto>(
                 category);
+        }
+
+        public async Task<CashBoxDto> SetOpeningBalanceAsync(int cashBoxId, SetCashBoxOpeningBalanceDto dto)
+        {
+            if (cashBoxId <= 0)
+                throw new ArgumentException("Invalid cash box id.");
+
+            if (dto.Amount < 0)
+                throw new ArgumentException(
+                    "Opening balance cannot be negative.");
+
+            if (dto.EffectiveDate == default)
+                throw new ArgumentException(
+                    "Effective date is required.");
+
+            var userId =
+                _currentUser.UserId;
+
+            if (string.IsNullOrWhiteSpace(userId))
+                throw new UnauthorizedAccessException(
+                    "User is not authenticated.");
+
+            var cashBox =
+                await _unitOfWork.CashBoxes
+                    .GetQueryable()
+                    .FirstOrDefaultAsync(x =>
+                        x.Id == cashBoxId &&
+                        x.IsActive);
+
+            if (cashBox == null)
+                throw new KeyNotFoundException(
+                    $"Cash box with id {cashBoxId} not found.");
+
+            var hasOpeningBalance =
+                await _unitOfWork.TreasuryTransactions
+                    .GetQueryable()
+                    .AnyAsync(x =>
+                        x.CashBoxId == cashBoxId &&
+                        x.Type == TreasuryTransactionType.OpeningBalance &&
+                        x.IsActive);
+
+            if (hasOpeningBalance)
+                throw new InvalidOperationException(
+                    "Opening balance has already been set for this cash box.");
+
+            var hasOtherTransactions =
+                await _unitOfWork.TreasuryTransactions
+                    .GetQueryable()
+                    .AnyAsync(x =>
+                        x.CashBoxId == cashBoxId &&
+                        x.IsActive);
+
+            if (hasOtherTransactions)
+                throw new InvalidOperationException(
+                    "Opening balance cannot be set after treasury transactions have started.");
+
+            var now =
+                DateTime.UtcNow;
+
+            var balanceBefore =
+                cashBox.CurrentBalance;
+
+            var balanceAfter =
+                balanceBefore + dto.Amount;
+
+            await _unitOfWork.BeginTransactionAsync();
+
+            try
+            {
+                var transaction =
+                    new TreasuryTransaction
+                    {
+                        CashBoxId =
+                            cashBox.Id,
+
+                        Type =
+                            TreasuryTransactionType.OpeningBalance,
+
+                        Source =
+                            TreasuryTransactionSource.OpeningBalance,
+
+                        Amount =
+                            dto.Amount,
+
+                        BalanceBefore =
+                            balanceBefore,
+
+                        BalanceAfter =
+                            balanceAfter,
+
+                        TransactionDate =
+                            dto.EffectiveDate,
+
+                        ReferenceNumber =
+                            string.IsNullOrWhiteSpace(
+                                dto.ReferenceNumber)
+                                ? null
+                                : dto.ReferenceNumber.Trim(),
+
+                        Notes =
+                            string.IsNullOrWhiteSpace(
+                                dto.Notes)
+                                ? "Opening balance."
+                                : dto.Notes.Trim(),
+
+                        CreatedByUserId =
+                            userId,
+
+                        IsActive =
+                            true,
+
+                        CreatedAt =
+                            now
+                    };
+
+                await _unitOfWork.TreasuryTransactions
+                    .AddAsync(transaction);
+
+                cashBox.CurrentBalance =
+                    balanceAfter;
+
+                cashBox.UpdatedAt =
+                    now;
+
+                _unitOfWork.CashBoxes
+                    .Update(cashBox);
+
+                await _unitOfWork.CompleteAsync();
+
+                await _unitOfWork.CommitTransactionAsync();
+
+                return _mapper.Map<CashBoxDto>(
+                    cashBox);
+            }
+            catch
+            {
+                await _unitOfWork.RollbackTransactionAsync();
+                throw;
+            }
         }
 
 
