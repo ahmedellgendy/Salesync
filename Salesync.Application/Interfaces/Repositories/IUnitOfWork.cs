@@ -1,4 +1,5 @@
-﻿using Salesync.Domain.Modules.DataImport.Entities;
+﻿using Salesync.Domain.Modules.Company.Entities;
+using Salesync.Domain.Modules.DataImport.Entities;
 using Salesync.Domain.Modules.Inventory.Entities;
 using Salesync.Domain.Modules.LoadRequest.Entities;
 using Salesync.Domain.Modules.MasterData.Entities;
@@ -13,6 +14,12 @@ namespace Salesync.Application.Interfaces.Repositories
 {
     public interface IUnitOfWork
     {
+        #region Company
+
+        IGenericRepository<CompanyProfile> CompanyProfiles { get; }
+
+        #endregion
+
         #region MasterData
 
         IGenericRepository<Branch> Branches { get; }
@@ -127,6 +134,8 @@ namespace Salesync.Application.Interfaces.Repositories
         IGenericRepository<ProductPrice> ProductPrices { get; }
 
         #endregion
+
+
 
 
         // =====================================================

@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Salesync.Domain.Modules.Company.Entities;
 using Salesync.Domain.Modules.DataImport.Entities;
 using Salesync.Domain.Modules.Inventory.Entities;
 using Salesync.Domain.Modules.LoadRequest.Entities;
@@ -92,6 +93,12 @@ namespace Salesync.Infrastructure.Data
 
         public DbSet<SalesRepUnloadRequest> SalesRepUnloadRequests { get; set; }
         public DbSet<SalesRepUnloadRequestItem> SalesRepUnloadRequestItems { get; set; }
+
+        #endregion
+
+        #region Company Dbsets
+
+        public DbSet<CompanyProfile> CompanyProfiles { get; set; }
 
         #endregion
 
