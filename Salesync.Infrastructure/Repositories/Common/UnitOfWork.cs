@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Salesync.Application.Interfaces.Repositories;
 using Salesync.Domain.Modules.Company.Entities;
 using Salesync.Domain.Modules.DataImport.Entities;
@@ -20,6 +21,7 @@ namespace Salesync.Infrastructure.Repositories.Common
         private readonly SalesyncDbContext _context;
 
         private IDbContextTransaction? _transaction;
+        private int _transactionDepth;
 
         // =====================================================
         // COMPANY
@@ -287,14 +289,36 @@ namespace Salesync.Infrastructure.Repositories.Common
         {
             if (_transaction is not null)
             {
+                _transactionDepth++;
                 return;
             }
 
             _transaction =
                 await _context.Database
-                    .BeginTransactionAsync();
+                    .BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+            _transactionDepth = 1;
         }
 
+
+        public async Task<T> ExecuteInTransactionAsync<T>(Func<Task<T>> action)
+        {
+            var ownsTransaction = _transaction is null;
+            if (ownsTransaction) await BeginTransactionAsync();
+            try
+            {
+                var result = await action();
+                if (ownsTransaction) await CommitTransactionAsync();
+                return result;
+            }
+            catch
+            {
+                if (ownsTransaction) await RollbackTransactionAsync();
+                throw;
+            }
+        }
+
+        public async Task ExecuteInTransactionAsync(Func<Task> action) =>
+            await ExecuteInTransactionAsync(async () => { await action(); return true; });
 
         public async Task CommitTransactionAsync()
         {
@@ -303,6 +327,7 @@ namespace Salesync.Infrastructure.Repositories.Common
                 return;
             }
 
+            if (_transactionDepth > 1) { _transactionDepth--; return; }
             await _transaction
                 .CommitAsync();
 
@@ -311,6 +336,7 @@ namespace Salesync.Infrastructure.Repositories.Common
 
             _transaction =
                 null;
+            _transactionDepth = 0;
         }
 
 
@@ -333,6 +359,8 @@ namespace Salesync.Infrastructure.Repositories.Common
 
                 _transaction =
                     null;
+                _transactionDepth = 0;
+                _context.ChangeTracker.Clear();
             }
         }
 

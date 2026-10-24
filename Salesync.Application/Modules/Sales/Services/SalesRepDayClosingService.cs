@@ -1,4 +1,6 @@
-﻿using AutoMapper;
+using Salesync.Application.Modules.Treasury.Interfaces.Services;
+using Salesync.Application.Modules.Treasury.Dtos;
+using AutoMapper;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Salesync.Application.Interfaces.Repositories;
@@ -14,6 +16,8 @@ namespace Salesync.Application.Modules.Sales.Services
 {
     public class SalesRepDayClosingService : ISalesRepDayClosingService
     {
+        private readonly ISalesAccessScopeService _access;
+        private readonly ITreasuryService _treasury;
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
         private readonly IValidator<CreateSalesRepDayClosingDto> _createValidator;
@@ -25,8 +29,11 @@ namespace Salesync.Application.Modules.Sales.Services
             IMapper mapper,
             IValidator<CreateSalesRepDayClosingDto> createValidator,
             ICurrentUserService currentUser,
-            ISalesRepDayClosingCalculator calculator)
+            ISalesRepDayClosingCalculator calculator,
+            ISalesAccessScopeService access, ITreasuryService treasury)
         {
+            _access = access;
+            _treasury = treasury;
             _unitOfWork = unitOfWork;
             _mapper = mapper;
             _createValidator = createValidator;
@@ -36,9 +43,10 @@ namespace Salesync.Application.Modules.Sales.Services
 
         public async Task<IEnumerable<SalesRepDayClosingDto>> GetAllAsync(SalesRepDayClosingFilterDto filter)
         {
+            var accessScope = await _access.GetAsync();
             filter ??= new SalesRepDayClosingFilterDto();
 
-            var query = GetClosingQuery();
+            var query = GetClosingQuery().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId));
 
             if (filter.SalesRepId.HasValue)
                 query = query.Where(x => x.SalesRepId == filter.SalesRepId.Value);
@@ -68,10 +76,11 @@ namespace Salesync.Application.Modules.Sales.Services
         }
         public async Task<SalesRepDayClosingDto> GetByIdAsync(int id)
         {
+            var accessScope = await _access.GetAsync();
             if (id <= 0)
                 throw new ArgumentException("Invalid closing id.");
 
-            var closing = await GetClosingQuery()
+            var closing = await GetClosingQuery().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId))
                 .FirstOrDefaultAsync(x => x.Id == id);
 
             if (closing == null)
@@ -83,20 +92,26 @@ namespace Salesync.Application.Modules.Sales.Services
         }
         public async Task<IEnumerable<SalesRepDayClosingDto>> GetBySalesRepAsync(int salesRepId)
         {
+            await _access.RequireSalesRepAsync(salesRepId);
+            var accessScope = await _access.GetAsync();
             if (salesRepId <= 0)
                 throw new ArgumentException("Invalid sales rep id.");
 
             await EnsureSalesRepCanAccessClosingAsync(salesRepId);
 
-            var closings = await GetClosingQuery()
+            var closings = await GetClosingQuery().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId))
                 .Where(x => x.SalesRepId == salesRepId)
                 .OrderByDescending(x => x.ClosingDate)
                 .ToListAsync();
 
             return _mapper.Map<IEnumerable<SalesRepDayClosingDto>>(closings);
         }
-        public async Task<SalesRepDayClosingDto> CreateAsync(CreateSalesRepDayClosingDto dto)
+        public Task<SalesRepDayClosingDto> CreateAsync(CreateSalesRepDayClosingDto dto) =>
+            _unitOfWork.ExecuteInTransactionAsync(() => CreateAsyncCore(dto));
+
+        private async Task<SalesRepDayClosingDto> CreateAsyncCore(CreateSalesRepDayClosingDto dto)
         {
+            var accessScope = await _access.GetAsync();
             var validationResult =
                 await _createValidator.ValidateAsync(dto);
 
@@ -118,6 +133,12 @@ namespace Salesync.Application.Modules.Sales.Services
                 throw new InvalidOperationException(
                     "Stock must be fully settled before submitting day closing.");
 
+            if (await _unitOfWork.SalesRepInventories.GetQueryable().AnyAsync(x =>
+                x.SalesRepId == session.SalesRepId && x.IsActive && x.Quantity != 0))
+                throw new InvalidOperationException("STOCK_REMAINING: Stock must be fully settled.");
+            if (await _unitOfWork.SalesRepUnloadRequests.GetQueryable().AnyAsync(x =>
+                x.SalesRepSessionId == session.Id && x.IsActive && (x.Status == UnloadRequestStatus.PendingWarehouse || x.Status == UnloadRequestStatus.Draft)))
+                throw new InvalidOperationException("PENDING_UNLOAD: Warehouse confirmation is required.");
             await EnsureWarehouseExistsAsync(dto.WarehouseId);
 
             await EnsureWarehouseMatchesUnloadAsync(session.Id,dto.WarehouseId);
@@ -221,112 +242,18 @@ namespace Salesync.Application.Modules.Sales.Services
         }
         public async Task<SalesRepDayClosingDto> ReceiveCashAsync(int id, ReceiveSalesRepDayClosingCashDto dto)
         {
-            if (id <= 0)
-                throw new ArgumentException(
-                    "Invalid closing id.");
-
-            if (dto.ActualCashAmount < 0)
-                throw new ArgumentException(
-                    "Actual cash amount cannot be negative.");
-
-            if (_currentUser.Role != "Admin" &&
-                 _currentUser.Role != "Treasury")
-            {
-                throw new UnauthorizedAccessException(
-                    "Only Admin or Treasury users can receive closing cash.");
-            }
-
-            var closing =
-                await GetClosingForUpdateAsync(id);
-
-            if (closing.Status !=
-                SalesRepDayClosingStatus.Submitted)
-            {
-                throw new InvalidOperationException(
-                    "Cash can only be received for submitted day closing.");
-            }
-
-            if (closing.IsCashReceived)
-                throw new InvalidOperationException(
-                    "Cash has already been received for this day closing.");
-
-            if (closing.ExpectedCashAmount <= 0)
-                throw new InvalidOperationException(
-                    "This day closing has no expected cash amount to receive.");
-
-            var session =
-                await _unitOfWork.SalesRepSessions
-                    .GetQueryable()
-                    .FirstOrDefaultAsync(x =>
-                        x.Id == closing.SalesRepSessionId &&
-                        x.IsActive);
-
-            if (session == null)
-                throw new KeyNotFoundException(
-                    "Sales rep session not found.");
-
-            if (!session.IsStockSettled)
-                throw new InvalidOperationException(
-                    "Stock settlement must be completed before cash settlement.");
-
-            await _unitOfWork.BeginTransactionAsync();
-
-            try
-            {
-                closing.ActualCashAmount =
-                    dto.ActualCashAmount;
-
-                closing.CashVariance =
-                    dto.ActualCashAmount -
-                    closing.ExpectedCashAmount;
-
-                closing.CashNotes =
-                    string.IsNullOrWhiteSpace(dto.Notes)
-                        ? null
-                        : dto.Notes.Trim();
-
-                closing.IsCashReceived = true;
-
-                closing.CashReceivedByUserId =
-                    _currentUser.UserId;
-
-                closing.CashReceivedAt =
-                    DateTime.UtcNow;
-
-                closing.Status =
-                    SalesRepDayClosingStatus.Completed;
-
-                closing.UpdatedAt =
-                    DateTime.UtcNow;
-
-                session.IsTreasurySettled = true;
-
-                session.TreasurySettledAt =
-                    DateTime.UtcNow;
-
-                session.UpdatedAt =
-                    DateTime.UtcNow;
-
-                _unitOfWork.SalesRepDayClosings
-                    .Update(closing);
-
-                _unitOfWork.SalesRepSessions
-                    .Update(session);
-
-                await _unitOfWork.CompleteAsync();
-
-                await _unitOfWork.CommitTransactionAsync();
-            }
-            catch
-            {
-                await _unitOfWork.RollbackTransactionAsync();
-                throw;
-            }
-
+            if (!dto.CashBoxId.HasValue || dto.CashBoxId.Value <= 0)
+                throw new ArgumentException("CASHBOX_REQUIRED: Select an authorized cash box or use the Treasury receiving endpoint.");
+            await _treasury.ReceiveDayClosingCashAsync(id, new ReceiveDayClosingCashDto {
+                CashBoxId = dto.CashBoxId.Value, ReceivedAmount = dto.ActualCashAmount, Notes = dto.Notes });
             return await GetByIdAsync(id);
         }
-        public async Task CancelAsync(int id)
+        public Task CancelAsync(int id) =>
+            _unitOfWork.ExecuteInTransactionAsync(() => CancelAsyncCore(id));
+
+        private async Task CancelAsyncCore(int id)
         {
+            var accessScope = await _access.GetAsync();
             if (id <= 0)
                 throw new ArgumentException("Invalid closing id.");
 
@@ -363,8 +290,9 @@ namespace Salesync.Application.Modules.Sales.Services
 
         private async Task<ClosingEntity> GetClosingForUpdateAsync(int id)
         {
+            var accessScope = await _access.GetAsync();
             var closing = await _unitOfWork.SalesRepDayClosings
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId))
                 .Include(x => x.Items)
                 .FirstOrDefaultAsync(x => x.Id == id && x.IsActive);
 
@@ -376,8 +304,9 @@ namespace Salesync.Application.Modules.Sales.Services
 
         private async Task<Salesync.Domain.Modules.Sales.Entities.SalesRepSession> GetSessionForClosingAsync(int salesRepSessionId)
         {
+            var accessScope = await _access.GetAsync();
             var session = await _unitOfWork.SalesRepSessions
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId))
                 .FirstOrDefaultAsync(x =>
                     x.Id == salesRepSessionId &&
                     x.IsActive);
@@ -390,6 +319,8 @@ namespace Salesync.Application.Modules.Sales.Services
 
         private async Task EnsureWarehouseExistsAsync(int warehouseId)
         {
+            await _access.RequireWarehouseAsync(warehouseId);
+            var accessScope = await _access.GetAsync();
             var exists = await _unitOfWork.Warehouses
                 .GetQueryable()
                 .AnyAsync(x => x.Id == warehouseId && x.IsActive);
@@ -400,8 +331,9 @@ namespace Salesync.Application.Modules.Sales.Services
 
         private async Task EnsureNoClosingExistsForSessionAsync(int salesRepSessionId)
         {
+            var accessScope = await _access.GetAsync();
             var exists = await _unitOfWork.SalesRepDayClosings
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId))
                 .AnyAsync(x =>
                     x.SalesRepSessionId == salesRepSessionId &&
                     x.IsActive &&
@@ -416,6 +348,8 @@ namespace Salesync.Application.Modules.Sales.Services
 
         private async Task EnsureSalesRepCanAccessClosingAsync(int salesRepId)
         {
+            await _access.RequireSalesRepAsync(salesRepId);
+            var accessScope = await _access.GetAsync();
             if (_currentUser.Role != "SalesRep")
                 return;
 
@@ -433,6 +367,7 @@ namespace Salesync.Application.Modules.Sales.Services
 
         private async Task<IQueryable<ClosingEntity>> ApplySalesRepAccessFilterAsync(IQueryable<ClosingEntity> query)
         {
+            var accessScope = await _access.GetAsync();
             if (_currentUser.Role != "SalesRep")
                 return query;
 
@@ -452,11 +387,12 @@ namespace Salesync.Application.Modules.Sales.Services
 
         private async Task<string> GenerateClosingNumberAsync()
         {
+            var accessScope = await _access.GetAsync();
             var today = DateTime.UtcNow;
             var prefix = $"DC-{today:yyyyMMdd}";
 
             var count = await _unitOfWork.SalesRepDayClosings
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId))
                 .CountAsync(x => x.ClosingNumber.StartsWith(prefix));
 
             return $"{prefix}-{count + 1:D4}";
@@ -466,9 +402,10 @@ namespace Salesync.Application.Modules.Sales.Services
     int salesRepSessionId,
     int warehouseId)
         {
+            var accessScope = await _access.GetAsync();
             var unloadWarehouseIds =
                 await _unitOfWork.SalesRepUnloadRequests
-                    .GetQueryable()
+                    .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId))
                     .AsNoTracking()
                     .Where(x =>
                         x.SalesRepSessionId == salesRepSessionId &&
@@ -481,9 +418,7 @@ namespace Salesync.Application.Modules.Sales.Services
                     .Distinct()
                     .ToListAsync();
 
-            if (unloadWarehouseIds.Count == 0)
-                throw new InvalidOperationException(
-                    "No confirmed unload request found for this session.");
+            if (unloadWarehouseIds.Count == 0) return; // Empty-stock day: warehouse was explicitly authorized.
 
             if (unloadWarehouseIds.Count > 1)
                 throw new InvalidOperationException(

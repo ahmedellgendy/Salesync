@@ -7,7 +7,7 @@ public class CompanyProfileDto
     public string Name { get; set; } = string.Empty;
 
     public string ShortName { get; set; } = string.Empty;
-
+    public string CompanyId { get; set; } = string.Empty;
     public string? LogoUrl { get; set; }
 
     public string? Address { get; set; }

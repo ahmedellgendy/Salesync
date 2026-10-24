@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Salesync.Application.Interfaces.Repositories;
@@ -17,6 +17,7 @@ namespace Salesync.Application.Modules.Sales.Services
 {
     public class InvoiceService : IInvoiceService
     {
+        private readonly ISalesAccessScopeService _access;
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
         private readonly IValidator<CreateInvoiceDto> _createInvoiceValidator;
@@ -30,8 +31,10 @@ namespace Salesync.Application.Modules.Sales.Services
             IValidator<CreateInvoiceDto> createInvoiceValidator,
             ICurrentUserService currentUser,
             IInventoryService inventoryService,
-            IPricingService pricingService)
+            IPricingService pricingService,
+            ISalesAccessScopeService access)
         {
+            _access = access;
             _unitOfWork = unitOfWork;
             _mapper = mapper;
             _createInvoiceValidator = createInvoiceValidator;
@@ -42,8 +45,9 @@ namespace Salesync.Application.Modules.Sales.Services
 
         public async Task<IEnumerable<InvoiceDto>> GetAllAsync()
         {
+            var accessScope = await _access.GetAsync();
             var invoices = await _unitOfWork.Invoices
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId ?? 0))
                 .AsNoTracking()
                 .Include(x => x.Customer)
                 .Include(x => x.SalesRep)
@@ -80,11 +84,12 @@ namespace Salesync.Application.Modules.Sales.Services
 
         public async Task<InvoiceDto> GetByIdAsync(int id)
         {
+            var accessScope = await _access.GetAsync();
             if (id <= 0)
                 throw new ArgumentException("Invalid invoice id.");
 
             var invoice = await _unitOfWork.Invoices
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId ?? 0))
                 .AsNoTracking()
                 .Include(x => x.Customer)
                 .Include(x => x.SalesRep)
@@ -119,9 +124,14 @@ namespace Salesync.Application.Modules.Sales.Services
             return dto;
         }
 
-        public async Task<InvoiceDto> CreateAsync(
+        public Task<InvoiceDto> CreateAsync(
+            CreateInvoiceDto dto) =>
+            _unitOfWork.ExecuteInTransactionAsync(() => CreateAsyncCore(dto));
+
+        private async Task<InvoiceDto> CreateAsyncCore(
             CreateInvoiceDto dto)
         {
+            var accessScope = await _access.GetAsync();
             var validationResult =
                 await _createInvoiceValidator.ValidateAsync(dto);
 
@@ -214,6 +224,7 @@ namespace Salesync.Application.Modules.Sales.Services
                         dto.SalesRepSessionId.Value)
                 ?? throw new KeyNotFoundException(
                     $"SalesRepSession with id {dto.SalesRepSessionId.Value} not found.");
+            await _access.RequireSalesRepAsync(session.SalesRepId);
 
             if (!session.IsActive)
             {
@@ -251,6 +262,9 @@ namespace Salesync.Application.Modules.Sales.Services
             invoice.IsActive =
                 true;
 
+            await _access.RequireSalesRepAsync(salesRep.Id);
+            await _access.RequireWarehouseAsync(dto.WarehouseId);
+            await _access.RequireCustomerAsync(dto.CustomerId, salesRep.Id);
             invoice.SalesRepId =
                 salesRep.Id;
 
@@ -454,17 +468,22 @@ namespace Salesync.Application.Modules.Sales.Services
                 invoice);
         }
 
-        public async Task<InvoiceDto> UpdateAsync(
-            int id,
-            UpdateInvoiceDto dto)
+        public Task<InvoiceDto> UpdateAsync(int id, UpdateInvoiceDto dto) =>
+            _unitOfWork.ExecuteInTransactionAsync(() => UpdateCoreAsync(id, dto));
+
+        private async Task<InvoiceDto> UpdateCoreAsync(int id, UpdateInvoiceDto dto)
         {
+            var accessScope = await _access.GetAsync();
             var invoice =
                 await _unitOfWork.Invoices
                     .GetByIdAsync(id)
                 ?? throw new KeyNotFoundException(
                     $"Invoice with id {id} not found.");
+            await _access.RequireSalesRepAsync(invoice.SalesRepId);
 
-            _mapper.Map(dto, invoice);
+            if (dto.Status.HasValue && dto.Status != invoice.Status)
+                throw new InvalidOperationException("INVOICE_STATUS_TRANSITION: Use the confirm or cancel operation.");
+            invoice.Notes = dto.Notes;
 
             invoice.UpdatedAt =
                 DateTime.UtcNow;
@@ -478,11 +497,15 @@ namespace Salesync.Application.Modules.Sales.Services
                 invoice);
         }
 
-        public async Task<InvoiceDto> ConfirmAsync(int id)
+        public Task<InvoiceDto> ConfirmAsync(int id) =>
+            _unitOfWork.ExecuteInTransactionAsync(() => ConfirmAsyncCore(id));
+
+        private async Task<InvoiceDto> ConfirmAsyncCore(int id)
         {
+            var accessScope = await _access.GetAsync();
             var invoice =
                 await _unitOfWork.Invoices
-                    .GetQueryable()
+                    .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId ?? 0))
                     .Include(i =>
                         i.InvoiceItems)
                     .FirstOrDefaultAsync(i =>
@@ -531,6 +554,11 @@ namespace Salesync.Application.Modules.Sales.Services
                 throw new InvalidOperationException(
                     "Invoice is not assigned to a sales rep.");
             }
+
+            var session = await _unitOfWork.SalesRepSessions.GetQueryable().FirstOrDefaultAsync(x =>
+                x.Id == invoice.SalesRepSessionId && x.SalesRepId == invoice.SalesRepId && x.IsActive);
+            if (session == null || session.Status == DayStatus.Closed || session.EndTime.HasValue || session.IsTreasurySettled || session.IsStockSettled)
+                throw new InvalidOperationException("SESSION_CLOSED: Invoices can only be confirmed during an active sales session.");
 
             var requiredInventory =
                 invoice.InvoiceItems
@@ -630,13 +658,18 @@ namespace Salesync.Application.Modules.Sales.Services
             }
         }
 
-        public async Task CancelAsync(int id)
+        public Task CancelAsync(int id) =>
+            _unitOfWork.ExecuteInTransactionAsync(() => CancelAsyncCore(id));
+
+        private async Task CancelAsyncCore(int id)
         {
+            var accessScope = await _access.GetAsync();
             var invoice =
                 await _unitOfWork.Invoices
                     .GetByIdAsync(id)
                 ?? throw new KeyNotFoundException(
                     $"Invoice with id {id} not found.");
+            await _access.RequireSalesRepAsync(invoice.SalesRepId);
 
             if (invoice.Status ==
                 InvoiceStatus.Confirmed)
@@ -673,6 +706,7 @@ namespace Salesync.Application.Modules.Sales.Services
             string? sourceNumber = null,
             string? notes = null)
         {
+            var accessScope = await _access.GetAsync();
             if (quantity <= 0)
             {
                 throw new InvalidOperationException(

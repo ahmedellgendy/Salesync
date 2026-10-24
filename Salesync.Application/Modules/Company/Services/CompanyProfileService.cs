@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Salesync.Application.Common.Licensing;
 using Salesync.Application.Common.Settings;
 using Salesync.Application.Interfaces.Repositories;
 using Salesync.Application.Modules.Company.Dtos;
@@ -11,22 +12,35 @@ namespace Salesync.Application.Modules.Company.Services;
 public class CompanyProfileService : ICompanyProfileService
 {
     private readonly IUnitOfWork _unitOfWork;
-
     private readonly CompanySettings _companySettings;
+    private readonly ILicenseService _licenseService;
 
 
     public CompanyProfileService(
         IUnitOfWork unitOfWork,
-        IOptions<CompanySettings> companyOptions)
+        IOptions<CompanySettings> companyOptions,
+        ILicenseService licenseService)
     {
-        _unitOfWork = unitOfWork;
+        _unitOfWork =
+            unitOfWork;
 
-        _companySettings = companyOptions.Value;
+        _companySettings =
+            companyOptions.Value;
+
+        _licenseService =
+            licenseService;
     }
 
 
     public async Task<CompanyProfileDto> GetAsync()
     {
+        var license =
+            _licenseService.GetStatus();
+
+        EnsureCompanyIdentityIsAvailable(
+            license);
+
+
         var profile =
             await _unitOfWork.CompanyProfiles
                 .GetQueryable()
@@ -35,23 +49,45 @@ public class CompanyProfileService : ICompanyProfileService
                 .OrderBy(x => x.Id)
                 .FirstOrDefaultAsync();
 
+
         if (profile is not null)
         {
-            return Map(profile);
+            return Map(
+                profile,
+                license);
         }
+
 
         return new CompanyProfileDto
         {
             Id = 0,
 
+            CompanyId =
+                license.CompanyId,
+
             Name =
-                _companySettings.Name,
+                license.CompanyName,
 
             ShortName =
-                _companySettings.ShortName,
+                license.ShortName,
+
+            TaxRegistrationNumber =
+                license.TaxRegistrationNumber,
+
+            CommercialRegistrationNumber =
+                license.CommercialRegistrationNumber,
 
             LogoUrl =
                 _companySettings.LogoUrl,
+
+            Address =
+                null,
+
+            Phone =
+                null,
+
+            Email =
+                null,
 
             Country =
                 string.IsNullOrWhiteSpace(
@@ -85,7 +121,16 @@ public class CompanyProfileService : ICompanyProfileService
     {
         ArgumentNullException.ThrowIfNull(dto);
 
-        Validate(dto);
+
+        var license =
+            _licenseService.GetStatus();
+
+        EnsureCompanyIdentityIsAvailable(
+            license);
+
+
+        ValidateProfileSettings(dto);
+
 
         var profile =
             await _unitOfWork.CompanyProfiles
@@ -94,17 +139,33 @@ public class CompanyProfileService : ICompanyProfileService
                 .OrderBy(x => x.Id)
                 .FirstOrDefaultAsync();
 
+
         if (profile is null)
         {
             profile =
                 new CompanyProfile
                 {
+                    //
+                    // Company identity is controlled
+                    // by the signed Salesync license.
+                    //
                     Name =
-                        dto.Name.Trim(),
+                        license.CompanyName,
 
                     ShortName =
-                        dto.ShortName.Trim(),
+                        license.ShortName,
 
+                    TaxRegistrationNumber =
+                        Normalize(
+                            license.TaxRegistrationNumber),
+
+                    CommercialRegistrationNumber =
+                        Normalize(
+                            license.CommercialRegistrationNumber),
+
+                    //
+                    // Company profile / branding data.
+                    //
                     LogoUrl =
                         Normalize(dto.LogoUrl),
 
@@ -117,19 +178,13 @@ public class CompanyProfileService : ICompanyProfileService
                     Email =
                         Normalize(dto.Email),
 
-                    TaxRegistrationNumber =
-                        Normalize(
-                            dto.TaxRegistrationNumber),
-
-                    CommercialRegistrationNumber =
-                        Normalize(
-                            dto.CommercialRegistrationNumber),
-
                     Country =
                         dto.Country.Trim(),
 
                     Currency =
-                        dto.Currency.Trim().ToUpperInvariant(),
+                        dto.Currency
+                            .Trim()
+                            .ToUpperInvariant(),
 
                     PrimaryColor =
                         dto.PrimaryColor.Trim(),
@@ -138,17 +193,35 @@ public class CompanyProfileService : ICompanyProfileService
                         dto.SecondaryColor.Trim()
                 };
 
+
             await _unitOfWork.CompanyProfiles
                 .AddAsync(profile);
         }
         else
         {
+            //
+            // Always synchronize protected identity
+            // fields from the license.
+            //
             profile.Name =
-                dto.Name.Trim();
+                license.CompanyName;
 
             profile.ShortName =
-                dto.ShortName.Trim();
+                license.ShortName;
 
+            profile.TaxRegistrationNumber =
+                Normalize(
+                    license.TaxRegistrationNumber);
+
+            profile.CommercialRegistrationNumber =
+                Normalize(
+                    license.CommercialRegistrationNumber);
+
+
+            //
+            // Only profile / branding fields
+            // come from the update request.
+            //
             profile.LogoUrl =
                 Normalize(dto.LogoUrl);
 
@@ -161,19 +234,13 @@ public class CompanyProfileService : ICompanyProfileService
             profile.Email =
                 Normalize(dto.Email);
 
-            profile.TaxRegistrationNumber =
-                Normalize(
-                    dto.TaxRegistrationNumber);
-
-            profile.CommercialRegistrationNumber =
-                Normalize(
-                    dto.CommercialRegistrationNumber);
-
             profile.Country =
                 dto.Country.Trim();
 
             profile.Currency =
-                dto.Currency.Trim().ToUpperInvariant();
+                dto.Currency
+                    .Trim()
+                    .ToUpperInvariant();
 
             profile.PrimaryColor =
                 dto.PrimaryColor.Trim();
@@ -184,50 +251,93 @@ public class CompanyProfileService : ICompanyProfileService
             profile.UpdatedAt =
                 DateTime.UtcNow;
 
+
             _unitOfWork.CompanyProfiles
                 .Update(profile);
         }
 
+
         await _unitOfWork.CompleteAsync();
 
-        return Map(profile);
+
+        return Map(
+            profile,
+            license);
     }
 
 
-    private static void Validate(
+    private static void EnsureCompanyIdentityIsAvailable(
+        LicenseStatus license)
+    {
+        if (!license.IsConfigured)
+        {
+            throw new InvalidOperationException(
+                "Salesync license is not configured.");
+        }
+
+
+        if (!license.IsValid)
+        {
+            throw new InvalidOperationException(
+                license.Message
+                ?? "Salesync license is invalid.");
+        }
+
+
+        if (string.IsNullOrWhiteSpace(
+                license.CompanyId))
+        {
+            throw new InvalidOperationException(
+                "License company id is missing.");
+        }
+
+
+        if (string.IsNullOrWhiteSpace(
+                license.CompanyName))
+        {
+            throw new InvalidOperationException(
+                "License company name is missing.");
+        }
+
+
+        if (string.IsNullOrWhiteSpace(
+                license.ShortName))
+        {
+            throw new InvalidOperationException(
+                "License company short name is missing.");
+        }
+    }
+
+
+    private static void ValidateProfileSettings(
         UpdateCompanyProfileDto dto)
     {
-        if (string.IsNullOrWhiteSpace(dto.Name))
-        {
-            throw new ArgumentException(
-                "Company name is required.");
-        }
-
-        if (string.IsNullOrWhiteSpace(dto.ShortName))
-        {
-            throw new ArgumentException(
-                "Company short name is required.");
-        }
-
-        if (string.IsNullOrWhiteSpace(dto.Country))
+        if (string.IsNullOrWhiteSpace(
+                dto.Country))
         {
             throw new ArgumentException(
                 "Country is required.");
         }
 
-        if (string.IsNullOrWhiteSpace(dto.Currency))
+
+        if (string.IsNullOrWhiteSpace(
+                dto.Currency))
         {
             throw new ArgumentException(
                 "Currency is required.");
         }
 
-        if (string.IsNullOrWhiteSpace(dto.PrimaryColor))
+
+        if (string.IsNullOrWhiteSpace(
+                dto.PrimaryColor))
         {
             throw new ArgumentException(
                 "Primary color is required.");
         }
 
-        if (string.IsNullOrWhiteSpace(dto.SecondaryColor))
+
+        if (string.IsNullOrWhiteSpace(
+                dto.SecondaryColor))
         {
             throw new ArgumentException(
                 "Secondary color is required.");
@@ -245,19 +355,37 @@ public class CompanyProfileService : ICompanyProfileService
 
 
     private static CompanyProfileDto Map(
-        CompanyProfile profile)
+        CompanyProfile profile,
+        LicenseStatus license)
     {
         return new CompanyProfileDto
         {
             Id =
                 profile.Id,
 
+            CompanyId =
+                license.CompanyId,
+
+            //
+            // Always return company identity
+            // from the signed license.
+            //
             Name =
-                profile.Name,
+                license.CompanyName,
 
             ShortName =
-                profile.ShortName,
+                license.ShortName,
 
+            TaxRegistrationNumber =
+                license.TaxRegistrationNumber,
+
+            CommercialRegistrationNumber =
+                license.CommercialRegistrationNumber,
+
+            //
+            // Branding / contact data
+            // comes from CompanyProfile.
+            //
             LogoUrl =
                 profile.LogoUrl,
 
@@ -269,12 +397,6 @@ public class CompanyProfileService : ICompanyProfileService
 
             Email =
                 profile.Email,
-
-            TaxRegistrationNumber =
-                profile.TaxRegistrationNumber,
-
-            CommercialRegistrationNumber =
-                profile.CommercialRegistrationNumber,
 
             Country =
                 profile.Country,

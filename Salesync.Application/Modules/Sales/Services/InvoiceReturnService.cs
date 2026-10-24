@@ -1,4 +1,5 @@
-﻿using AutoMapper;
+using Salesync.Application.Interfaces.Services;
+using AutoMapper;
 using Microsoft.EntityFrameworkCore;
 using Salesync.Application.Interfaces.Repositories;
 using Salesync.Application.Modules.Sales.Dtos.InvoiceReturn;
@@ -10,20 +11,24 @@ namespace Salesync.Application.Modules.Sales.Services
 {
     public class InvoiceReturnService : IInvoiceReturnService
     {
+        private readonly ISalesAccessScopeService _access;
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
 
         public InvoiceReturnService(
             IUnitOfWork unitOfWork,
-            IMapper mapper)
+            IMapper mapper,
+            ISalesAccessScopeService access)
         {
+            _access = access;
             _unitOfWork = unitOfWork;
             _mapper = mapper;
         }
         public async Task<IEnumerable<InvoiceReturnDto>> GetAllAsync()
         {
+            var accessScope = await _access.GetAsync();
             var returns = await _unitOfWork.InvoiceReturns
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId ?? 0))
                 .AsNoTracking()
                 .Include(x => x.Items)
                 .Include(x => x.Invoice)
@@ -39,11 +44,12 @@ namespace Salesync.Application.Modules.Sales.Services
         }
         public async Task<IEnumerable<InvoiceReturnDto>> GetByInvoiceIdAsync(int invoiceId)
         {
+            var accessScope = await _access.GetAsync();
             if (invoiceId <= 0)
                 throw new ArgumentException("Invalid invoice id.");
 
             var returns = await _unitOfWork.InvoiceReturns
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId ?? 0))
                 .AsNoTracking()
                 .Include(x => x.Items)
                 .Include(x => x.Invoice)
@@ -62,11 +68,12 @@ namespace Salesync.Application.Modules.Sales.Services
 
         public async Task<InvoiceReturnDto> GetByIdAsync(int id)
         {
+            var accessScope = await _access.GetAsync();
             if (id <= 0)
                 throw new ArgumentException("Invalid return id.");
 
             var invoiceReturn = await _unitOfWork.InvoiceReturns
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId ?? 0))
                 .AsNoTracking()
                 .Include(x => x.Items)
                 .Include(x => x.Invoice)
@@ -87,11 +94,13 @@ namespace Salesync.Application.Modules.Sales.Services
 
         public async Task<IEnumerable<InvoiceReturnDto>> GetBySalesRepIdAsync(int salesRepId)
         {
+            await _access.RequireSalesRepAsync(salesRepId);
+            var accessScope = await _access.GetAsync();
             if (salesRepId <= 0)
                 throw new ArgumentException("Invalid sales rep id.");
 
             var returns = await _unitOfWork.InvoiceReturns
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId ?? 0))
                 .AsNoTracking()
                 .Include(x => x.Items)
                 .Include(x => x.Invoice)
@@ -110,6 +119,8 @@ namespace Salesync.Application.Modules.Sales.Services
 
         public async Task<IEnumerable<MobileReturnableInvoiceDto>> GetReturnableInvoicesAsync(int salesRepId, int customerId)
         {
+            await _access.RequireSalesRepAsync(salesRepId);
+            var accessScope = await _access.GetAsync();
             if (salesRepId <= 0)
                 throw new ArgumentException("Invalid sales rep id.");
 
@@ -117,7 +128,7 @@ namespace Salesync.Application.Modules.Sales.Services
                 throw new ArgumentException("Invalid customer id.");
 
             var invoices = await _unitOfWork.Invoices
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId ?? 0))
                 .AsNoTracking()
                 .Include(x => x.InvoiceItems)
                 .Where(x =>
@@ -136,7 +147,7 @@ namespace Salesync.Application.Modules.Sales.Services
                 .ToList();
 
             var previousReturns = await _unitOfWork.InvoiceReturns
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId ?? 0))
                 .AsNoTracking()
                 .Include(x => x.Items)
                 .Where(x =>
@@ -217,6 +228,8 @@ namespace Salesync.Application.Modules.Sales.Services
 
         public async Task<MobileReturnableInvoiceDetailsDto> GetReturnableInvoiceDetailsAsync(int salesRepId, int invoiceId)
         {
+            await _access.RequireSalesRepAsync(salesRepId);
+            var accessScope = await _access.GetAsync();
             if (salesRepId <= 0)
                 throw new ArgumentException("Invalid sales rep id.");
 
@@ -224,7 +237,7 @@ namespace Salesync.Application.Modules.Sales.Services
                 throw new ArgumentException("Invalid invoice id.");
 
             var invoice = await _unitOfWork.Invoices
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId ?? 0))
                 .AsNoTracking()
                 .Include(x => x.InvoiceItems)
                 .Include(x => x.Customer)
@@ -239,7 +252,7 @@ namespace Salesync.Application.Modules.Sales.Services
                     "Confirmed invoice not found for current sales rep.");
 
             var previousReturns = await _unitOfWork.InvoiceReturns
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId ?? 0))
                 .AsNoTracking()
                 .Include(x => x.Items)
                 .Where(x =>
@@ -337,8 +350,12 @@ namespace Salesync.Application.Modules.Sales.Services
             };
         }
 
-        public async Task<InvoiceReturnDto> CreateAsync(CreateInvoiceReturnDto dto)
+        public Task<InvoiceReturnDto> CreateAsync(CreateInvoiceReturnDto dto) =>
+            _unitOfWork.ExecuteInTransactionAsync(() => CreateAsyncCore(dto));
+
+        private async Task<InvoiceReturnDto> CreateAsyncCore(CreateInvoiceReturnDto dto)
         {
+            var accessScope = await _access.GetAsync();
             if (dto.Items == null ||
                 dto.Items.Count == 0)
             {
@@ -367,7 +384,7 @@ namespace Salesync.Application.Modules.Sales.Services
             }
 
             var invoice = await _unitOfWork.Invoices
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId ?? 0))
                 .AsNoTracking()
                 .Include(x => x.InvoiceItems)
                 .FirstOrDefaultAsync(x =>
@@ -408,7 +425,7 @@ namespace Salesync.Application.Modules.Sales.Services
                     "Invoice is not assigned to a sales rep.");
 
             var returnSession = await _unitOfWork.SalesRepSessions
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId))
                 .AsNoTracking()
                 .FirstOrDefaultAsync(x =>
                     x.Id == dto.SalesRepSessionId.Value &&
@@ -434,7 +451,7 @@ namespace Salesync.Application.Modules.Sales.Services
             }
 
             var previousReturns = await _unitOfWork.InvoiceReturns
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId ?? 0))
                 .AsNoTracking()
                 .Include(x => x.Items)
                 .Where(x =>
@@ -658,14 +675,18 @@ namespace Salesync.Application.Modules.Sales.Services
                 invoiceReturn.Id);
         }
 
-        public async Task<InvoiceReturnDto> ApproveAsync(int id)
+        public Task<InvoiceReturnDto> ApproveAsync(int id) =>
+            _unitOfWork.ExecuteInTransactionAsync(() => ApproveAsyncCore(id));
+
+        private async Task<InvoiceReturnDto> ApproveAsyncCore(int id)
         {
+            var accessScope = await _access.GetAsync();
             if (id <= 0)
                 throw new ArgumentException(
                     "Invalid return id.");
 
             var invoiceReturn = await _unitOfWork.InvoiceReturns
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId ?? 0))
                 .Include(x => x.Items)
                 .Include(x => x.Invoice)
                 .FirstOrDefaultAsync(x =>
@@ -740,7 +761,7 @@ namespace Salesync.Application.Modules.Sales.Services
 
             var returnSessionExists =
                 await _unitOfWork.SalesRepSessions
-                    .GetQueryable()
+                    .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId))
                     .AsNoTracking()
                     .AnyAsync(x =>
                         x.Id ==
@@ -779,15 +800,19 @@ namespace Salesync.Application.Modules.Sales.Services
             return await GetByIdAsync(id);
         }
 
-        public async Task<InvoiceReturnDto> RejectAsync(int id)
+        public Task<InvoiceReturnDto> RejectAsync(int id) =>
+            _unitOfWork.ExecuteInTransactionAsync(() => RejectAsyncCore(id));
+
+        private async Task<InvoiceReturnDto> RejectAsyncCore(int id)
         {
+            var accessScope = await _access.GetAsync();
             if (id <= 0)
                 throw new ArgumentException(
                     "Invalid return id.");
 
             var invoiceReturn =
                 await _unitOfWork.InvoiceReturns
-                    .GetQueryable()
+                    .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId ?? 0))
                     .FirstOrDefaultAsync(x =>
                         x.Id == id &&
                         x.IsActive);
@@ -819,13 +844,17 @@ namespace Salesync.Application.Modules.Sales.Services
             return await GetByIdAsync(id);
         }
 
-        public async Task<InvoiceReturnDto> CancelAsync(int id)
+        public Task<InvoiceReturnDto> CancelAsync(int id) =>
+            _unitOfWork.ExecuteInTransactionAsync(() => CancelAsyncCore(id));
+
+        private async Task<InvoiceReturnDto> CancelAsyncCore(int id)
         {
+            var accessScope = await _access.GetAsync();
             if (id <= 0)
                 throw new ArgumentException("Invalid return id.");
 
             var invoiceReturn = await _unitOfWork.InvoiceReturns
-                    .GetQueryable()
+                    .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId ?? 0))
                     .FirstOrDefaultAsync(x =>
                         x.Id == id &&
                         x.IsActive);

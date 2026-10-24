@@ -1,4 +1,4 @@
-﻿using Salesync.Domain.Modules.Company.Entities;
+using Salesync.Domain.Modules.Company.Entities;
 using Salesync.Domain.Modules.DataImport.Entities;
 using Salesync.Domain.Modules.Inventory.Entities;
 using Salesync.Domain.Modules.LoadRequest.Entities;
@@ -143,6 +143,8 @@ namespace Salesync.Application.Interfaces.Repositories
         // =====================================================
 
         Task BeginTransactionAsync();
+        Task<T> ExecuteInTransactionAsync<T>(Func<Task<T>> action);
+        Task ExecuteInTransactionAsync(Func<Task> action);
 
         Task CommitTransactionAsync();
 

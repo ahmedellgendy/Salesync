@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Salesync.API.Responses;
 using Salesync.Application.Modules.Sales.Dtos.SalesRepSession;
@@ -56,9 +56,9 @@ namespace Salesync.API.Controllers.Sales
 
         [HttpPut("{id}/close")]
         [Authorize(Roles = "Admin,Supervisor,SalesRep")]
-        public async Task<IActionResult> CloseSessionAsync(int id)
+        public async Task<IActionResult> CloseSessionAsync(int id, [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] Salesync.Application.Modules.SalesRep.Dtos.Mobile.CloseSalesRepMobileDayDto? request)
         {
-            var result = await _sessionService.CloseSessionAsync(id);
+            var result = await _sessionService.CloseSessionAsync(id, request?.WarehouseId);
             return Ok(ApiResponse<SalesRepSessionDto>.SuccessResponse(result, "Session closed successfully"));
         }
     }

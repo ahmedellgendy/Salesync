@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using Microsoft.EntityFrameworkCore;
 using Salesync.Application.Interfaces.Repositories;
 using Salesync.Application.Interfaces.Services;
@@ -16,6 +16,7 @@ namespace Salesync.Application.Modules.UnloadRequest.Services
 {
     public class SalesRepUnloadRequestService : ISalesRepUnloadRequestService
     {
+        private readonly ISalesAccessScopeService _access;
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
         private readonly ICurrentUserService _currentUser;
@@ -23,15 +24,21 @@ namespace Salesync.Application.Modules.UnloadRequest.Services
         public SalesRepUnloadRequestService(
             IUnitOfWork unitOfWork,
             IMapper mapper,
-            ICurrentUserService currentUser)
+            ICurrentUserService currentUser,
+            ISalesAccessScopeService access)
         {
+            _access = access;
             _unitOfWork = unitOfWork;
             _mapper = mapper;
             _currentUser = currentUser;
         }
 
-        public async Task<SalesRepUnloadRequestDto> CreateAsync(CreateSalesRepUnloadRequestDto dto)
+        public Task<SalesRepUnloadRequestDto> CreateAsync(CreateSalesRepUnloadRequestDto dto) =>
+            _unitOfWork.ExecuteInTransactionAsync(() => CreateAsyncCore(dto));
+
+        private async Task<SalesRepUnloadRequestDto> CreateAsyncCore(CreateSalesRepUnloadRequestDto dto)
         {
+            var accessScope = await _access.GetAsync();
             if (dto.SalesRepSessionId <= 0)
                 throw new ArgumentException("Invalid sales rep session id.");
 
@@ -41,7 +48,7 @@ namespace Salesync.Application.Modules.UnloadRequest.Services
             var salesRep = await GetCurrentSalesRepAsync();
 
             var session = await _unitOfWork.SalesRepSessions
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId))
                 .AsNoTracking()
                 .FirstOrDefaultAsync(x =>
                     x.Id == dto.SalesRepSessionId &&
@@ -57,6 +64,7 @@ namespace Salesync.Application.Modules.UnloadRequest.Services
             if (session.IsStockSettled)
                 throw new InvalidOperationException("Stock is already settled for this session.");
 
+            await _access.RequireWarehouseAsync(dto.WarehouseId);
             var warehouse = await _unitOfWork.Warehouses
                 .GetQueryable()
                 .AsNoTracking()
@@ -68,7 +76,7 @@ namespace Salesync.Application.Modules.UnloadRequest.Services
                 throw new KeyNotFoundException("Warehouse not found.");
 
             var hasPendingRequest = await _unitOfWork.SalesRepUnloadRequests
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId))
                 .AsNoTracking()
                 .AnyAsync(x =>
                     x.SalesRepId == salesRep.Id &&
@@ -81,7 +89,7 @@ namespace Salesync.Application.Modules.UnloadRequest.Services
                 throw new InvalidOperationException("There is already an active unload request for this session.");
 
             var inventories = await _unitOfWork.SalesRepInventories
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId))
                 .AsNoTracking()
                 .Include(x => x.Product)
                 .Where(x =>
@@ -172,10 +180,11 @@ namespace Salesync.Application.Modules.UnloadRequest.Services
 
         public async Task<IEnumerable<SalesRepUnloadRequestDto>> GetMyRequestsAsync()
         {
+            var accessScope = await _access.GetAsync();
             var salesRep = await GetCurrentSalesRepAsync();
 
             var requests = await _unitOfWork.SalesRepUnloadRequests
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId))
                 .AsNoTracking()
                 .Include(x => x.Items)
                 .Where(x =>
@@ -196,11 +205,12 @@ namespace Salesync.Application.Modules.UnloadRequest.Services
 
         public async Task<SalesRepUnloadRequestDto> GetByIdAsync(int id)
         {
+            var accessScope = await _access.GetAsync();
             if (id <= 0)
                 throw new ArgumentException("Invalid unload request id.");
 
             var request = await _unitOfWork.SalesRepUnloadRequests
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId))
                 .AsNoTracking()
                 .Include(x => x.Items)
                 .FirstOrDefaultAsync(x =>
@@ -219,8 +229,9 @@ namespace Salesync.Application.Modules.UnloadRequest.Services
 
         public async Task<IEnumerable<SalesRepUnloadRequestDto>> GetPendingWarehouseRequestsAsync()
         {
+            var accessScope = await _access.GetAsync();
             var requests = await _unitOfWork.SalesRepUnloadRequests
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId))
                 .AsNoTracking()
                 .Include(x => x.Items)
                 .Where(x =>
@@ -239,8 +250,12 @@ namespace Salesync.Application.Modules.UnloadRequest.Services
             return dtos;
         }
 
-        public async Task<SalesRepUnloadRequestDto> ConfirmWarehouseAsync(int id,ConfirmSalesRepUnloadRequestDto dto)
+        public Task<SalesRepUnloadRequestDto> ConfirmWarehouseAsync(int id,ConfirmSalesRepUnloadRequestDto dto) =>
+            _unitOfWork.ExecuteInTransactionAsync(() => ConfirmWarehouseAsyncCore(id, dto));
+
+        private async Task<SalesRepUnloadRequestDto> ConfirmWarehouseAsyncCore(int id,ConfirmSalesRepUnloadRequestDto dto)
         {
+            var accessScope = await _access.GetAsync();
             if (id <= 0)
                 throw new ArgumentException("Invalid unload request id.");
 
@@ -248,7 +263,7 @@ namespace Salesync.Application.Modules.UnloadRequest.Services
                 throw new ArgumentException("Confirmation must contain at least one item.");
 
             var request = await _unitOfWork.SalesRepUnloadRequests
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId))
                 .Include(x => x.Items)
                 .FirstOrDefaultAsync(x =>
                     x.Id == id &&
@@ -257,11 +272,12 @@ namespace Salesync.Application.Modules.UnloadRequest.Services
             if (request is null)
                 throw new KeyNotFoundException($"Unload request with id {id} not found.");
 
+            await _access.RequireWarehouseAsync(request.WarehouseId);
             if (request.Status != UnloadRequestStatus.PendingWarehouse)
                 throw new InvalidOperationException("Only pending warehouse unload requests can be confirmed.");
 
             var session = await _unitOfWork.SalesRepSessions
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId))
                 .FirstOrDefaultAsync(x =>
                     x.Id == request.SalesRepSessionId &&
                     x.SalesRepId == request.SalesRepId &&
@@ -308,7 +324,7 @@ namespace Salesync.Application.Modules.UnloadRequest.Services
                     }
 
                     var salesRepInventory = await _unitOfWork.SalesRepInventories
-                        .GetQueryable()
+                        .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId))
                         .FirstOrDefaultAsync(x =>
                             x.SalesRepId == request.SalesRepId &&
                             x.ProductId == item.ProductId &&
@@ -457,13 +473,17 @@ namespace Salesync.Application.Modules.UnloadRequest.Services
             }
         }
 
-        public async Task CancelAsync(int id, string? reason)
+        public Task CancelAsync(int id, string? reason) =>
+            _unitOfWork.ExecuteInTransactionAsync(() => CancelAsyncCore(id, reason));
+
+        private async Task CancelAsyncCore(int id, string? reason)
         {
+            var accessScope = await _access.GetAsync();
             if (id <= 0)
                 throw new ArgumentException("Invalid unload request id.");
 
             var request = await _unitOfWork.SalesRepUnloadRequests
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId))
                 .FirstOrDefaultAsync(x =>
                     x.Id == id &&
                     x.IsActive);
@@ -489,6 +509,7 @@ namespace Salesync.Application.Modules.UnloadRequest.Services
 
         private async Task<Salesync.Domain.Modules.SalesRep.Entities.SalesRep> GetCurrentSalesRepAsync()
         {
+            var accessScope = await _access.GetAsync();
             if (string.IsNullOrWhiteSpace(_currentUser.UserId))
                 throw new UnauthorizedAccessException("User is not authenticated.");
 
@@ -506,9 +527,10 @@ namespace Salesync.Application.Modules.UnloadRequest.Services
         }
         public async Task<IEnumerable<SalesRepUnloadRequestDto>> GetAllAsync()
         {
+            var accessScope = await _access.GetAsync();
             var requests =
                 await _unitOfWork.SalesRepUnloadRequests
-                    .GetQueryable()
+                    .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId))
                     .AsNoTracking()
                     .Include(x => x.Items)
                     .Where(x => x.IsActive)
@@ -528,13 +550,14 @@ namespace Salesync.Application.Modules.UnloadRequest.Services
         }
         public async Task<SalesRepUnloadRequestDto> GetMyRequestByIdAsync(int id)
         {
+            var accessScope = await _access.GetAsync();
             if (id <= 0)
                 throw new ArgumentException("Invalid unload request id.");
 
             var salesRep = await GetCurrentSalesRepAsync();
 
             var request = await _unitOfWork.SalesRepUnloadRequests
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId))
                 .AsNoTracking()
                 .Include(x => x.Items)
                 .FirstOrDefaultAsync(x =>
@@ -552,15 +575,19 @@ namespace Salesync.Application.Modules.UnloadRequest.Services
             return dto;
         }
 
-        public async Task CancelMyRequestAsync(int id, string? reason)
+        public Task CancelMyRequestAsync(int id, string? reason) =>
+            _unitOfWork.ExecuteInTransactionAsync(() => CancelMyRequestAsyncCore(id, reason));
+
+        private async Task CancelMyRequestAsyncCore(int id, string? reason)
         {
+            var accessScope = await _access.GetAsync();
             if (id <= 0)
                 throw new ArgumentException("Invalid unload request id.");
 
             var salesRep = await GetCurrentSalesRepAsync();
 
             var request = await _unitOfWork.SalesRepUnloadRequests
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId))
                 .FirstOrDefaultAsync(x =>
                     x.Id == id &&
                     x.SalesRepId == salesRep.Id &&
@@ -587,6 +614,7 @@ namespace Salesync.Application.Modules.UnloadRequest.Services
 
         private async Task FillDisplayDataAsync(SalesRepUnloadRequestDto dto)
         {
+            var accessScope = await _access.GetAsync();
             var salesRep = await _unitOfWork.SalesReps
                 .GetQueryable()
                 .AsNoTracking()

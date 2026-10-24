@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using Microsoft.EntityFrameworkCore;
 using Salesync.Application.Interfaces.Repositories;
 using Salesync.Application.Interfaces.Services;
@@ -35,6 +35,7 @@ namespace Salesync.Application.Modules.SalesRep.Services
         private readonly ISalesRepUnloadRequestService _unloadRequestService;
         private readonly IInvoiceReturnService _invoiceReturnService;
         private readonly ISalesRepDayClosingService _dayClosingService;
+        private readonly IBusinessClock _clock;
 
         public SalesRepMobileService(
             IUnitOfWork unitOfWork,
@@ -46,7 +47,7 @@ namespace Salesync.Application.Modules.SalesRep.Services
             IInvoiceService invoiceService,
             ISalesRepUnloadRequestService unloadRequestService,
             IInvoiceReturnService invoiceReturnService,
-                ISalesRepDayClosingService dayClosingService)
+                ISalesRepDayClosingService dayClosingService, IBusinessClock clock)
 
         {
             _unitOfWork = unitOfWork;
@@ -59,6 +60,7 @@ namespace Salesync.Application.Modules.SalesRep.Services
             _unloadRequestService = unloadRequestService;
             _invoiceReturnService = invoiceReturnService;
             _dayClosingService = dayClosingService;
+            _clock = clock;
         }
 
         public async Task<SalesRepMobileProfileDto> GetProfileAsync()
@@ -90,22 +92,23 @@ namespace Salesync.Application.Modules.SalesRep.Services
         {
             var salesRep = await GetCurrentSalesRepAsync();
 
-            var today = DateTime.UtcNow.Date;
+            var today = _clock.Today;
 
-            var session = await _unitOfWork.SalesRepSessions
-                .GetQueryable()
-                .AsNoTracking()
-                .Where(x =>
-                    x.SalesRepId == salesRep.Id &&
-                    x.WorkingDate == today &&
-                    x.IsActive)
-                .OrderByDescending(x => x.Id)
-                .FirstOrDefaultAsync();
+            var sessions = _unitOfWork.SalesRepSessions.GetQueryable().AsNoTracking()
+                .Where(x => x.SalesRepId == salesRep.Id && x.IsActive);
+            var hasTodaySession = await sessions.AnyAsync(x => x.WorkingDate == today);
+            // An unfinished day continues to block starting a new one. Surface it
+            // instead of reporting "no session" just because midnight passed.
+            var session = await sessions.Where(x => x.Status != DayStatus.Closed && !x.EndTime.HasValue)
+                .OrderByDescending(x => x.StartTime).ThenByDescending(x => x.Id).FirstOrDefaultAsync()
+                ?? await sessions.Where(x => x.WorkingDate == today)
+                    .OrderByDescending(x => x.Id).FirstOrDefaultAsync();
 
             if (session is null)
             {
                 return new SalesRepMobileTodayDto
                 {
+                    BusinessDate = today,
                     HasTodaySession = false,
                     HasOpenSession = false,
                     IsDayClosed = false,
@@ -113,7 +116,7 @@ namespace Salesync.Application.Modules.SalesRep.Services
                 };
             }
 
-            var isDayClosed = session.EndTime.HasValue;
+            var isDayClosed = session.Status == DayStatus.Closed || session.EndTime.HasValue;
 
             var routeCustomers = await GetAssignedRouteCustomersAsync(salesRep.Id);
 
@@ -168,7 +171,9 @@ namespace Salesync.Application.Modules.SalesRep.Services
 
             return new SalesRepMobileTodayDto
             {
-                HasTodaySession = true,
+                BusinessDate = today,
+                HasUnclosedPreviousSession = !isDayClosed && session.WorkingDate.Date < today,
+                HasTodaySession = hasTodaySession,
                 HasOpenSession = !isDayClosed,
                 IsDayClosed = isDayClosed,
                 Session = _mapper.Map<SalesRepSessionDto>(session),
@@ -198,60 +203,11 @@ namespace Salesync.Application.Modules.SalesRep.Services
 
             return await _salesRepSessionService.StartSessionAsync(createSessionDto);
         }
-        public async Task<SalesRepSessionDto> CloseDayAsync(int sessionId)
+        public async Task<SalesRepSessionDto> CloseDayAsync(int sessionId, int? warehouseId = null)
         {
-            if (sessionId <= 0)
-                throw new ArgumentException("Invalid session id.");
-
-            var salesRep =
-                await GetCurrentSalesRepAsync();
-
-            var session =
-                await EnsureSessionBelongsToSalesRepAsync(
-                    sessionId,
-                    salesRep.Id);
-
-            var warehouseId =
-                await GetDayClosingWarehouseIdAsync(
-                    session.Id,
-                    salesRep.Id);
-
-            // 1. Close working session first.
-            var closedSession =
-                await _salesRepSessionService
-                    .CloseSessionAsync(sessionId);
-
-            // 2. Avoid duplicate day closing if this operation
-            //    is retried after the session was already processed.
-            var closingExists =
-                await _unitOfWork.SalesRepDayClosings
-                    .GetQueryable()
-                    .AsNoTracking()
-                    .AnyAsync(x =>
-                        x.SalesRepSessionId == sessionId &&
-                        x.IsActive &&
-                        x.Status != SalesRepDayClosingStatus.Cancelled);
-
-            if (!closingExists)
-            {
-                var closingDto =
-                    new CreateSalesRepDayClosingDto
-                    {
-                        SalesRepSessionId =
-                            sessionId,
-
-                        WarehouseId =
-                            warehouseId,
-
-                        Notes =
-                            "Created automatically when sales rep closed the day."
-                    };
-
-                await _dayClosingService
-                    .CreateAsync(closingDto);
-            }
-
-            return closedSession;
+            var salesRep = await GetCurrentSalesRepAsync();
+            await EnsureSessionBelongsToSalesRepAsync(sessionId, salesRep.Id, allowClosedSession: true);
+            return await _salesRepSessionService.CloseSessionAsync(sessionId, warehouseId);
         }
         public async Task<IEnumerable<SalesRepMobileCustomerDto>> GetCustomersAsync(int sessionId)
         {
@@ -447,12 +403,6 @@ namespace Salesync.Application.Modules.SalesRep.Services
             }
 
 
-            if (activeSession.IsStockSettled)
-            {
-                throw new InvalidOperationException(
-                    "Cannot collect payment after stock settlement.");
-            }
-
 
             var createPaymentDto =
                 new CreatePaymentDto
@@ -530,7 +480,10 @@ namespace Salesync.Application.Modules.SalesRep.Services
 
             return routes;
         }
-        public async Task<InvoiceDto> CreateInvoiceAsync(CreateSalesRepMobileInvoiceDto dto)
+        public Task<InvoiceDto> CreateInvoiceAsync(CreateSalesRepMobileInvoiceDto dto) =>
+            _unitOfWork.ExecuteInTransactionAsync(() => CreateInvoiceCoreAsync(dto));
+
+        private async Task<InvoiceDto> CreateInvoiceCoreAsync(CreateSalesRepMobileInvoiceDto dto)
         {
             if (dto.VisitId <= 0)
                 throw new ArgumentException("Invalid visit id.");
@@ -813,7 +766,7 @@ namespace Salesync.Application.Modules.SalesRep.Services
         }
         private async Task<SalesRepSession> GetCurrentOpenSessionAsync(int salesRepId)
         {
-            var today = DateTime.UtcNow.Date;
+            var today = _clock.Today;
 
             var session = await _unitOfWork.SalesRepSessions
                 .GetQueryable()
@@ -953,7 +906,7 @@ namespace Salesync.Application.Modules.SalesRep.Services
                     VisitType = visit?.VisitType,
 
                     HasVisitToday = visit != null,
-                    CanStartVisit = visit == null && !hasActiveVisit
+                    CanStartVisit = !hasActiveVisit
                 };
             });
         }

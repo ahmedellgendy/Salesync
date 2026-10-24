@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Salesync.API.Responses;
 using Salesync.Application.Modules.CustomerVisit.Dtos;
@@ -51,9 +51,9 @@ namespace Salesync.API.Controllers.Mobile
         }
 
         [HttpPut("day/{sessionId}/close")] // PUT: api/mobile/day/{sessionid}/close
-        public async Task<IActionResult> CloseDay(int sessionId)
+        public async Task<IActionResult> CloseDay(int sessionId, [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] CloseSalesRepMobileDayDto? request)
         {
-            var result = await _salesRepMobileService.CloseDayAsync(sessionId);
+            var result = await _salesRepMobileService.CloseDayAsync(sessionId, request?.WarehouseId);
             return Ok(ApiResponse<SalesRepSessionDto>.SuccessResponse(
                 result,
                 "Sales rep day closed successfully."));

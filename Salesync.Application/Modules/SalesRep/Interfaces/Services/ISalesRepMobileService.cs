@@ -1,4 +1,4 @@
-﻿using Salesync.Application.Modules.CustomerVisit.Dtos;
+using Salesync.Application.Modules.CustomerVisit.Dtos;
 using Salesync.Application.Modules.Sales.Dtos.Invoice;
 using Salesync.Application.Modules.Sales.Dtos.InvoiceReturn;
 using Salesync.Application.Modules.Sales.Dtos.Payment;
@@ -14,7 +14,7 @@ namespace Salesync.Application.Modules.SalesRep.Interfaces.Services
         Task<SalesRepMobileTodayDto> GetTodayAsync();
         Task<IEnumerable<SalesRepMobileCustomerDto>> GetCustomersAsync(int sessionId);
         Task<SalesRepSessionDto> StartDayAsync(StartSalesRepMobileDayDto dto);
-        Task<SalesRepSessionDto> CloseDayAsync(int sessionId);
+        Task<SalesRepSessionDto> CloseDayAsync(int sessionId, int? warehouseId = null);
         Task<CustomerVisitDto> StartVisitAsync(StartSalesRepMobileVisitDto dto);
         Task<CustomerVisitDto> CompleteVisitAsync(int visitId, CompleteSalesRepMobileVisitDto dto);
 

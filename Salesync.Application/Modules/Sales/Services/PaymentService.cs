@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Salesync.Application.Interfaces.Repositories;
@@ -12,13 +12,16 @@ namespace Salesync.Application.Modules.Sales.Services
 {
     public class PaymentService : IPaymentService
     {
+        private readonly ISalesAccessScopeService _access;
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
         private readonly IValidator<CreatePaymentDto> _createPaymentValidator;
         private readonly ICurrentUserService _currentUser;
 
-        public PaymentService(IUnitOfWork unitOfWork, IMapper mapper, IValidator<CreatePaymentDto> createPaymentValidator, ICurrentUserService currentUser)
+        public PaymentService(IUnitOfWork unitOfWork, IMapper mapper, IValidator<CreatePaymentDto> createPaymentValidator, ICurrentUserService currentUser,
+            ISalesAccessScopeService access)
         {
+            _access = access;
             _unitOfWork = unitOfWork;
             _mapper = mapper;
             _createPaymentValidator = createPaymentValidator;
@@ -27,8 +30,9 @@ namespace Salesync.Application.Modules.Sales.Services
 
         public async Task<IEnumerable<PaymentDto>> GetAllAsync()
         {
+            var accessScope = await _access.GetAsync();
             var payments = await _unitOfWork.Payments
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId ?? 0))
                 .AsNoTracking()
                 .Include(x => x.Invoice)
                 .Include(x => x.Customer)
@@ -49,11 +53,12 @@ namespace Salesync.Application.Modules.Sales.Services
 
         public async Task<PaymentDto> GetByIdAsync(int id)
         {
+            var accessScope = await _access.GetAsync();
             if (id <= 0)
                 throw new ArgumentException("Invalid payment id.");
 
             var payment = await _unitOfWork.Payments
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId ?? 0))
                 .AsNoTracking()
                 .Include(x => x.Invoice)
                 .Include(x => x.Customer)
@@ -74,11 +79,12 @@ namespace Salesync.Application.Modules.Sales.Services
         }
         public async Task<IEnumerable<PaymentDto>> GetByInvoiceIdAsync(int invoiceId)
         {
+            var accessScope = await _access.GetAsync();
             if (invoiceId <= 0)
                 throw new ArgumentException("Invalid invoice id.");
 
             var payments = await _unitOfWork.Payments
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId ?? 0))
                 .AsNoTracking()
                 .Include(x => x.Invoice)
                 .Include(x => x.Customer)
@@ -104,6 +110,7 @@ namespace Salesync.Application.Modules.Sales.Services
 
         public async Task<IEnumerable<OutstandingInvoiceDto>> GetCurrentSalesRepOutstandingInvoicesAsync()
         {
+            var accessScope = await _access.GetAsync();
             if (string.IsNullOrWhiteSpace(_currentUser.UserId))
             {
                 throw new UnauthorizedAccessException(
@@ -123,7 +130,7 @@ namespace Salesync.Application.Modules.Sales.Services
 
             var invoices =
                 await _unitOfWork.Invoices
-                    .GetQueryable()
+                    .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId ?? 0))
                     .AsNoTracking()
                     .Include(x => x.Customer)
                     .Where(x =>
@@ -170,8 +177,12 @@ namespace Salesync.Application.Modules.Sales.Services
             return invoices;
         }
 
-        public async Task<PaymentDto> CreateAsync(CreatePaymentDto dto)
+        public Task<PaymentDto> CreateAsync(CreatePaymentDto dto) =>
+            _unitOfWork.ExecuteInTransactionAsync(() => CreateAsyncCore(dto));
+
+        private async Task<PaymentDto> CreateAsyncCore(CreatePaymentDto dto)
         {
+            var accessScope = await _access.GetAsync();
             var validationResult =
                 await _createPaymentValidator.ValidateAsync(dto);
 
@@ -184,9 +195,10 @@ namespace Salesync.Application.Modules.Sales.Services
                     .GetByIdAsync(dto.InvoiceId)
                 ?? throw new KeyNotFoundException(
                     $"Invoice with id {dto.InvoiceId} not found.");
+            await _access.RequireSalesRepAsync(invoice.SalesRepId);
 
 
-            if (invoice.Status != InvoiceStatus.Confirmed)
+            if (!invoice.IsActive || invoice.Status != InvoiceStatus.Confirmed)
             {
                 throw new InvalidOperationException(
                     "Payment is allowed only for confirmed invoices.");
@@ -284,11 +296,11 @@ namespace Salesync.Application.Modules.Sales.Services
 
                 var activeSession =
                     await _unitOfWork.SalesRepSessions
-                        .GetQueryable()
+                        .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId))
                         .Where(x =>
                             x.SalesRepId == salesRep.Id &&
                             x.IsActive &&
-                            !x.EndTime.HasValue &&
+                            x.Status != DayStatus.Closed && !x.EndTime.HasValue &&
                             !x.IsTreasurySettled)
                         .OrderByDescending(x =>
                             x.StartTime)
@@ -301,12 +313,6 @@ namespace Salesync.Application.Modules.Sales.Services
                         "No active sales rep session was found.");
                 }
 
-
-                if (activeSession.IsStockSettled)
-                {
-                    throw new InvalidOperationException(
-                        "Cannot collect payment after the current session stock has been settled.");
-                }
 
 
                 paymentSessionId =
@@ -342,7 +348,7 @@ namespace Salesync.Application.Modules.Sales.Services
 
                 var paymentSession =
                     await _unitOfWork.SalesRepSessions
-                        .GetQueryable()
+                        .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId))
                         .FirstOrDefaultAsync(x =>
                             x.Id == dto.SalesRepSessionId.Value &&
                             x.SalesRepId == invoiceSalesRepId &&
@@ -356,18 +362,12 @@ namespace Salesync.Application.Modules.Sales.Services
                 }
 
 
-                if (paymentSession.EndTime.HasValue)
+                if (paymentSession.Status == DayStatus.Closed || paymentSession.EndTime.HasValue)
                 {
                     throw new InvalidOperationException(
                         "Cannot add payment to a closed sales rep session.");
                 }
 
-
-                if (paymentSession.IsStockSettled)
-                {
-                    throw new InvalidOperationException(
-                        "Cannot add payment after the sales rep session stock has been settled.");
-                }
 
 
                 if (paymentSession.IsTreasurySettled)

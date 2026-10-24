@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Salesync.Application.Interfaces.Repositories;
@@ -17,6 +17,7 @@ namespace Salesync.Application.Modules.LoadRequest.Services
 {
     public class LoadRequestService : ILoadRequestService
     {
+        private readonly ISalesAccessScopeService _access;
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
         private readonly ICurrentUserService _currentUser;
@@ -30,8 +31,10 @@ namespace Salesync.Application.Modules.LoadRequest.Services
             IValidator<CreateLoadRequestDto> createValidator,
             IValidator<ApproveLoadRequestDto> approveValidator,
             IValidator<ConfirmLoadRequestDto> confirmValidator,
-            IValidator<RejectLoadRequestDto> rejectValidator)
+            IValidator<RejectLoadRequestDto> rejectValidator,
+            ISalesAccessScopeService access)
         {
+            _access = access;
             _unitOfWork = unitOfWork;
             _mapper = mapper;
             _currentUser = currentUser;
@@ -44,8 +47,9 @@ namespace Salesync.Application.Modules.LoadRequest.Services
 
         public async Task<IEnumerable<LoadRequestDto>> GetAllAsync()
         {
+            var accessScope = await _access.GetAsync();
             var requests = await _unitOfWork.LoadRequests
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId))
                 .Include(x => x.SalesRep)
                 .Include(x => x.Warehouse)
                 .Include(x => x.Items)
@@ -58,8 +62,9 @@ namespace Salesync.Application.Modules.LoadRequest.Services
 
         public async Task<IEnumerable<LoadRequestDto>> GetPendingAsync()
         {
+            var accessScope = await _access.GetAsync();
             var requests = await _unitOfWork.LoadRequests
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId))
                 .Include(x => x.SalesRep)
                 .Include(x => x.Warehouse)
                 .Include(x => x.Items)
@@ -72,8 +77,9 @@ namespace Salesync.Application.Modules.LoadRequest.Services
 
         public async Task<IEnumerable<LoadRequestDto>> GetApprovedAsync()
         {
+            var accessScope = await _access.GetAsync();
             var requests = await _unitOfWork.LoadRequests
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId))
                 .Include(x => x.SalesRep)
                 .Include(x => x.Warehouse)
                 .Include(x => x.Items)
@@ -86,6 +92,7 @@ namespace Salesync.Application.Modules.LoadRequest.Services
 
         public async Task<LoadRequestDto> GetByIdAsync(int id)
         {
+            var accessScope = await _access.GetAsync();
             var request = await GetRequestWithDetailsAsync(id);
 
             var dto = _mapper.Map<LoadRequestDto>(request);
@@ -126,8 +133,10 @@ namespace Salesync.Application.Modules.LoadRequest.Services
         }
         public async Task<IEnumerable<LoadRequestDto>> GetBySalesRepAsync(int salesRepId)
         {
+            await _access.RequireSalesRepAsync(salesRepId);
+            var accessScope = await _access.GetAsync();
             var requests = await _unitOfWork.LoadRequests
-                            .GetQueryable()
+                            .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId))
                             .Include(x => x.SalesRep)
                             .Include(x => x.Warehouse)
                             .Include(x => x.Items)
@@ -138,8 +147,12 @@ namespace Salesync.Application.Modules.LoadRequest.Services
             return _mapper.Map<IEnumerable<LoadRequestDto>>(requests);
         }
 
-        public async Task<LoadRequestDto> CreateAsync(CreateLoadRequestDto dto)
+        public Task<LoadRequestDto> CreateAsync(CreateLoadRequestDto dto) =>
+            _unitOfWork.ExecuteInTransactionAsync(() => CreateAsyncCore(dto));
+
+        private async Task<LoadRequestDto> CreateAsyncCore(CreateLoadRequestDto dto)
         {
+            var accessScope = await _access.GetAsync();
             var validationResult = await _createValidator.ValidateAsync(dto);
 
             if (!validationResult.IsValid)
@@ -149,7 +162,9 @@ namespace Salesync.Application.Modules.LoadRequest.Services
                 throw new UnauthorizedAccessException("Current user is not authenticated.");
 
             var salesRep = await GetLoadRequestSalesRepAsync(dto.SalesRepId);
+            await _access.RequireSalesRepAsync(salesRep.Id);
 
+            await _access.RequireWarehouseAsync(dto.WarehouseId);
             var warehouse = await _unitOfWork.Warehouses.GetByIdAsync(dto.WarehouseId)
                 ?? throw new KeyNotFoundException($"Warehouse with id {dto.WarehouseId} not found.");
 
@@ -223,8 +238,12 @@ namespace Salesync.Application.Modules.LoadRequest.Services
             return await GetByIdAsync(request.Id);
         }
 
-        public async Task<LoadRequestDto> ApproveAsync(int id, ApproveLoadRequestDto dto)
+        public Task<LoadRequestDto> ApproveAsync(int id, ApproveLoadRequestDto dto) =>
+            _unitOfWork.ExecuteInTransactionAsync(() => ApproveAsyncCore(id, dto));
+
+        private async Task<LoadRequestDto> ApproveAsyncCore(int id, ApproveLoadRequestDto dto)
         {
+            var accessScope = await _access.GetAsync();
             var validationResult = await _approveValidator.ValidateAsync(dto);
 
             if (!validationResult.IsValid)
@@ -270,8 +289,12 @@ namespace Salesync.Application.Modules.LoadRequest.Services
             return await GetByIdAsync(request.Id);
         }
 
-        public async Task<LoadRequestDto> RejectAsync(int id, RejectLoadRequestDto dto)
+        public Task<LoadRequestDto> RejectAsync(int id, RejectLoadRequestDto dto) =>
+            _unitOfWork.ExecuteInTransactionAsync(() => RejectAsyncCore(id, dto));
+
+        private async Task<LoadRequestDto> RejectAsyncCore(int id, RejectLoadRequestDto dto)
         {
+            var accessScope = await _access.GetAsync();
             var validationResult = await _rejectValidator.ValidateAsync(dto);
 
             if (!validationResult.IsValid)
@@ -294,8 +317,12 @@ namespace Salesync.Application.Modules.LoadRequest.Services
             return await GetByIdAsync(request.Id);
         }
 
-        public async Task<LoadRequestDto> ConfirmWarehouseAsync(int id, ConfirmLoadRequestDto dto)
+        public Task<LoadRequestDto> ConfirmWarehouseAsync(int id, ConfirmLoadRequestDto dto) =>
+            _unitOfWork.ExecuteInTransactionAsync(() => ConfirmWarehouseAsyncCore(id, dto));
+
+        private async Task<LoadRequestDto> ConfirmWarehouseAsyncCore(int id, ConfirmLoadRequestDto dto)
         {
+            var accessScope = await _access.GetAsync();
             var validationResult = await _confirmValidator.ValidateAsync(dto);
 
             if (!validationResult.IsValid)
@@ -388,8 +415,12 @@ namespace Salesync.Application.Modules.LoadRequest.Services
             }
         }
 
-        public async Task CancelAsync(int id)
+        public Task CancelAsync(int id) =>
+            _unitOfWork.ExecuteInTransactionAsync(() => CancelAsyncCore(id));
+
+        private async Task CancelAsyncCore(int id)
         {
+            var accessScope = await _access.GetAsync();
             var request = await GetRequestWithDetailsAsync(id);
 
             if (request.Status == LoadRequestStatus.WarehouseConfirmed)
@@ -416,6 +447,7 @@ namespace Salesync.Application.Modules.LoadRequest.Services
 
         public async Task<IEnumerable<SalesRepInventoryDto>> GetSalesRepInventoryAsync(int salesRepId)
         {
+            var accessScope = await _access.GetAsync();
             if (salesRepId <= 0)
                 throw new InvalidOperationException("SalesRepId is required.");
 
@@ -428,7 +460,7 @@ namespace Salesync.Application.Modules.LoadRequest.Services
                 throw new InvalidOperationException("Cannot get inventory for inactive sales rep.");
 
             var inventory = await _unitOfWork.SalesRepInventories
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId))
                 .AsNoTracking()
                 .Include(x => x.SalesRep)
                 .Include(x => x.Product)
@@ -441,6 +473,7 @@ namespace Salesync.Application.Modules.LoadRequest.Services
 
         public async Task<IEnumerable<SalesRepInventoryMovementDto>> GetSalesRepInventoryMovementsAsync(int salesRepId, int? productId = null)
         {
+            var accessScope = await _access.GetAsync();
             if (salesRepId <= 0)
                 throw new InvalidOperationException("SalesRepId is required.");
 
@@ -456,7 +489,7 @@ namespace Salesync.Application.Modules.LoadRequest.Services
                 throw new InvalidOperationException("Cannot get inventory movements for inactive sales rep.");
 
             var query = _unitOfWork.SalesRepInventoryMovements
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId))
                 .Include(x => x.SalesRep)
                 .Include(x => x.Product)
                 .Where(x => x.SalesRepId == salesRepId && x.IsActive)
@@ -476,8 +509,9 @@ namespace Salesync.Application.Modules.LoadRequest.Services
 
         private async Task<LoadRequestEntity> GetRequestWithDetailsAsync(int id)
         {
+            var accessScope = await _access.GetAsync();
             var request = await _unitOfWork.LoadRequests
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId))
                 .Include(x => x.SalesRep)
                 .Include(x => x.Warehouse)
                 .Include(x => x.Items)
@@ -486,11 +520,13 @@ namespace Salesync.Application.Modules.LoadRequest.Services
             if (request == null)
                 throw new KeyNotFoundException($"Load request with id {id} not found.");
 
+            await _access.RequireWarehouseAsync(request.WarehouseId);
             return request;
         }
 
         private async Task<SalesRepEntity> GetLoadRequestSalesRepAsync(int? dtoSalesRepId)
         {
+            var accessScope = await _access.GetAsync();
             var isSalesRepUser = string.Equals(_currentUser.Role, "SalesRep", StringComparison.OrdinalIgnoreCase);
 
             if (isSalesRepUser)
@@ -559,11 +595,12 @@ namespace Salesync.Application.Modules.LoadRequest.Services
           string? sourceNumber = null,
           string? notes = null)
         {
+            var accessScope = await _access.GetAsync();
             if (quantity <= 0)
                 throw new InvalidOperationException("Quantity must be greater than zero.");
 
             var inventory = await _unitOfWork.SalesRepInventories
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId))
                 .FirstOrDefaultAsync(x =>
                     x.SalesRepId == salesRepId &&
                     x.ProductId == productId &&
@@ -615,6 +652,8 @@ namespace Salesync.Application.Modules.LoadRequest.Services
 
         private async Task EnsureSalesRepInventoryAccessAsync(int salesRepId)
         {
+            await _access.RequireSalesRepAsync(salesRepId);
+            var accessScope = await _access.GetAsync();
             var isSalesRepUser = string.Equals(
                 _currentUser.Role,
                 "SalesRep",
@@ -634,6 +673,7 @@ namespace Salesync.Application.Modules.LoadRequest.Services
 
         private async Task EnsureWarehouseStockAvailableAsync(int warehouseId, IEnumerable<LoadRequestItem> requestItems, IEnumerable<ConfirmLoadRequestItemDto> confirmedItems)
         {
+            var accessScope = await _access.GetAsync();
             var requestItemsList =
                 requestItems.ToList();
 

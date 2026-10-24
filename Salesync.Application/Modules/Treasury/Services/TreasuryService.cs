@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Salesync.Application.Interfaces.Repositories;
@@ -13,6 +13,7 @@ namespace Salesync.Application.Modules.Treasury.Services
 {
     public class TreasuryService : ITreasuryService
     {
+        private readonly ISalesAccessScopeService _access;
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
         private readonly ICurrentUserService _currentUser;
@@ -30,8 +31,10 @@ namespace Salesync.Application.Modules.Treasury.Services
             IValidator<ReceiveDayClosingCashDto> receiveCashValidator,
             IValidator<CreateTreasuryCashOutDto> createCashOutValidator,
             IValidator<CreateExpenseCategoryDto> createExpenseCategoryValidator,
-            IValidator<UpdateExpenseCategoryDto> updateExpenseCategoryValidator)
+            IValidator<UpdateExpenseCategoryDto> updateExpenseCategoryValidator,
+            ISalesAccessScopeService access)
         {
+            _access = access;
             _unitOfWork = unitOfWork;
             _mapper = mapper;
             _currentUser = currentUser;
@@ -44,8 +47,9 @@ namespace Salesync.Application.Modules.Treasury.Services
 
         public async Task<IEnumerable<CashBoxDto>> GetCashBoxesAsync()
         {
+            var accessScope = await _access.GetAsync();
             var cashBoxes = await _unitOfWork.CashBoxes
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || (x.BranchId.HasValue && accessScope.BranchIds.Contains(x.BranchId.Value)))
                 .AsNoTracking()
                 .Where(x => x.IsActive)
                 .OrderBy(x => x.Name)
@@ -56,11 +60,12 @@ namespace Salesync.Application.Modules.Treasury.Services
 
         public async Task<CashBoxDto> GetCashBoxByIdAsync(int id)
         {
+            var accessScope = await _access.GetAsync();
             if (id <= 0)
                 throw new ArgumentException("Invalid cash box id.");
 
             var cashBox = await _unitOfWork.CashBoxes
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || (x.BranchId.HasValue && accessScope.BranchIds.Contains(x.BranchId.Value)))
                 .AsNoTracking()
                 .FirstOrDefaultAsync(x => x.Id == id && x.IsActive);
 
@@ -70,15 +75,21 @@ namespace Salesync.Application.Modules.Treasury.Services
             return _mapper.Map<CashBoxDto>(cashBox);
         }
 
-        public async Task<CashBoxDto> CreateCashBoxAsync(CreateCashBoxDto dto)
+        public Task<CashBoxDto> CreateCashBoxAsync(CreateCashBoxDto dto) =>
+            _unitOfWork.ExecuteInTransactionAsync(() => CreateCashBoxAsyncCore(dto));
+
+        private async Task<CashBoxDto> CreateCashBoxAsyncCore(CreateCashBoxDto dto)
         {
+            var accessScope = await _access.GetAsync();
+            if (!accessScope.AllowsAll && (!dto.BranchId.HasValue || !accessScope.BranchIds.Contains(dto.BranchId.Value)))
+                throw new Salesync.Application.Common.Exceptions.ForbiddenException("Cash box branch is outside your scope.");
             var validationResult = await _createCashBoxValidator.ValidateAsync(dto);
 
             if (!validationResult.IsValid)
                 throw new ValidationException(validationResult.Errors);
 
             var codeExists = await _unitOfWork.CashBoxes
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || (x.BranchId.HasValue && accessScope.BranchIds.Contains(x.BranchId.Value)))
                 .AnyAsync(x => x.Code == dto.Code);
 
             if (codeExists)
@@ -112,8 +123,12 @@ namespace Salesync.Application.Modules.Treasury.Services
             return _mapper.Map<CashBoxDto>(cashBox);
         }
 
-        public async Task<CashReceiptDto> ReceiveDayClosingCashAsync(int dayClosingId, ReceiveDayClosingCashDto dto)
+        public Task<CashReceiptDto> ReceiveDayClosingCashAsync(int dayClosingId, ReceiveDayClosingCashDto dto) =>
+            _unitOfWork.ExecuteInTransactionAsync(() => ReceiveDayClosingCashAsyncCore(dayClosingId, dto));
+
+        private async Task<CashReceiptDto> ReceiveDayClosingCashAsyncCore(int dayClosingId, ReceiveDayClosingCashDto dto)
         {
+            var accessScope = await _access.GetAsync();
             if (dayClosingId <= 0)
                 throw new ArgumentException(
                     "Invalid day closing id.");
@@ -134,7 +149,7 @@ namespace Salesync.Application.Modules.Treasury.Services
 
             var closing =
                 await _unitOfWork.SalesRepDayClosings
-                    .GetQueryable()
+                    .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId))
                     .Include(x => x.SalesRepSession)
                     .FirstOrDefaultAsync(x =>
                         x.Id == dayClosingId &&
@@ -173,7 +188,7 @@ namespace Salesync.Application.Modules.Treasury.Services
 
             var cashBox =
                 await _unitOfWork.CashBoxes
-                    .GetQueryable()
+                    .GetQueryable().Where(x => accessScope.AllowsAll || (x.BranchId.HasValue && accessScope.BranchIds.Contains(x.BranchId.Value)))
                     .FirstOrDefaultAsync(x =>
                         x.Id == dto.CashBoxId &&
                         x.IsActive);
@@ -181,6 +196,10 @@ namespace Salesync.Application.Modules.Treasury.Services
             if (cashBox == null)
                 throw new KeyNotFoundException(
                     $"Cash box with id {dto.CashBoxId} not found.");
+
+            var repBranch = await _unitOfWork.SalesReps.GetQueryable().Where(x => x.Id == closing.SalesRepId).Select(x => x.BranchId).SingleAsync();
+            if (cashBox.BranchId.HasValue && cashBox.BranchId != repBranch)
+                throw new InvalidOperationException("CASHBOX_BRANCH_MISMATCH: Cash box and representative branches must match.");
 
             var hasReceipt =
                 await _unitOfWork.CashReceipts
@@ -432,6 +451,8 @@ namespace Salesync.Application.Modules.Treasury.Services
 
         public async Task<IEnumerable<SalesRepCashLedgerDto>> GetSalesRepLedgerAsync(int salesRepId)
         {
+            await _access.RequireSalesRepAsync(salesRepId);
+            var accessScope = await _access.GetAsync();
             if (salesRepId <= 0)
                 throw new ArgumentException("Invalid sales rep id.");
 
@@ -447,6 +468,8 @@ namespace Salesync.Application.Modules.Treasury.Services
 
         public async Task<decimal> GetSalesRepCashBalanceAsync(int salesRepId)
         {
+            await _access.RequireSalesRepAsync(salesRepId);
+            var accessScope = await _access.GetAsync();
             if (salesRepId <= 0)
                 throw new ArgumentException("Invalid sales rep id.");
 
@@ -455,12 +478,13 @@ namespace Salesync.Application.Modules.Treasury.Services
 
         public async Task<IEnumerable<TreasuryTransactionDto>> GetTransactionsAsync(int? cashBoxId = null, DateTime? fromDate = null, DateTime? toDate = null)
         {
+            var accessScope = await _access.GetAsync();
             var query =
                 _unitOfWork.TreasuryTransactions
                     .GetQueryable()
                     .AsNoTracking()
                     .Include(x => x.ExpenseCategory)
-                    .Where(x => x.IsActive);
+                    .Where(x => x.IsActive && (accessScope.AllowsAll || (x.CashBox.BranchId.HasValue && accessScope.BranchIds.Contains(x.CashBox.BranchId.Value))));
 
             if (cashBoxId.HasValue)
             {
@@ -524,8 +548,12 @@ namespace Salesync.Application.Modules.Treasury.Services
                 .ToList();
         }
 
-        public async Task<TreasuryCashOutDto> CreateCashOutAsync(CreateTreasuryCashOutDto dto)
+        public Task<TreasuryCashOutDto> CreateCashOutAsync(CreateTreasuryCashOutDto dto) =>
+            _unitOfWork.ExecuteInTransactionAsync(() => CreateCashOutAsyncCore(dto));
+
+        private async Task<TreasuryCashOutDto> CreateCashOutAsyncCore(CreateTreasuryCashOutDto dto)
         {
+            var accessScope = await _access.GetAsync();
             var validationResult =
                 await _createCashOutValidator.ValidateAsync(dto);
 
@@ -542,7 +570,7 @@ namespace Salesync.Application.Modules.Treasury.Services
 
             var cashBox =
                 await _unitOfWork.CashBoxes
-                    .GetQueryable()
+                    .GetQueryable().Where(x => accessScope.AllowsAll || (x.BranchId.HasValue && accessScope.BranchIds.Contains(x.BranchId.Value)))
                     .FirstOrDefaultAsync(x =>
                         x.Id == dto.CashBoxId &&
                         x.IsActive);
@@ -711,6 +739,7 @@ namespace Salesync.Application.Modules.Treasury.Services
 
         public async Task<IEnumerable<ExpenseCategoryDto>> GetExpenseCategoriesAsync()
         {
+            var accessScope = await _access.GetAsync();
             var categories =
                 await _unitOfWork.ExpenseCategories
                     .GetQueryable()
@@ -724,6 +753,7 @@ namespace Salesync.Application.Modules.Treasury.Services
 
         public async Task<ExpenseCategoryDto> GetExpenseCategoryByIdAsync(int id)
         {
+            var accessScope = await _access.GetAsync();
             if (id <= 0)
                 throw new ArgumentException(
                     "Invalid expense category id.");
@@ -744,8 +774,12 @@ namespace Salesync.Application.Modules.Treasury.Services
                 category);
         }
 
-        public async Task<ExpenseCategoryDto> CreateExpenseCategoryAsync(CreateExpenseCategoryDto dto)
+        public Task<ExpenseCategoryDto> CreateExpenseCategoryAsync(CreateExpenseCategoryDto dto) =>
+            _unitOfWork.ExecuteInTransactionAsync(() => CreateExpenseCategoryAsyncCore(dto));
+
+        private async Task<ExpenseCategoryDto> CreateExpenseCategoryAsyncCore(CreateExpenseCategoryDto dto)
         {
+            var accessScope = await _access.GetAsync();
             var validationResult =
                 await _createExpenseCategoryValidator
                     .ValidateAsync(dto);
@@ -799,6 +833,7 @@ namespace Salesync.Application.Modules.Treasury.Services
 
         public async Task<ExpenseCategoryDto> UpdateExpenseCategoryAsync(int id, UpdateExpenseCategoryDto dto)
         {
+            var accessScope = await _access.GetAsync();
             if (id <= 0)
                 throw new ArgumentException(
                     "Invalid expense category id.");
@@ -861,8 +896,12 @@ namespace Salesync.Application.Modules.Treasury.Services
                 category);
         }
 
-        public async Task<CashBoxDto> SetOpeningBalanceAsync(int cashBoxId, SetCashBoxOpeningBalanceDto dto)
+        public Task<CashBoxDto> SetOpeningBalanceAsync(int cashBoxId, SetCashBoxOpeningBalanceDto dto) =>
+            _unitOfWork.ExecuteInTransactionAsync(() => SetOpeningBalanceCoreAsync(cashBoxId, dto));
+
+        private async Task<CashBoxDto> SetOpeningBalanceCoreAsync(int cashBoxId, SetCashBoxOpeningBalanceDto dto)
         {
+            var accessScope = await _access.GetAsync();
             if (cashBoxId <= 0)
                 throw new ArgumentException("Invalid cash box id.");
 
@@ -883,7 +922,7 @@ namespace Salesync.Application.Modules.Treasury.Services
 
             var cashBox =
                 await _unitOfWork.CashBoxes
-                    .GetQueryable()
+                    .GetQueryable().Where(x => accessScope.AllowsAll || (x.BranchId.HasValue && accessScope.BranchIds.Contains(x.BranchId.Value)))
                     .FirstOrDefaultAsync(x =>
                         x.Id == cashBoxId &&
                         x.IsActive);
@@ -1005,6 +1044,8 @@ namespace Salesync.Application.Modules.Treasury.Services
 
         private async Task<decimal> GetCurrentSalesRepCashBalanceAsync(int salesRepId)
         {
+            await _access.RequireSalesRepAsync(salesRepId);
+            var accessScope = await _access.GetAsync();
             return await _unitOfWork.SalesRepCashLedgers
                 .GetQueryable()
                 .Where(x => x.SalesRepId == salesRepId && x.IsActive)

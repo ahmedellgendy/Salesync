@@ -1,4 +1,4 @@
-﻿using Salesync.Application.Modules.Sales.Dtos.SalesRepSession;
+using Salesync.Application.Modules.Sales.Dtos.SalesRepSession;
 
 namespace Salesync.Application.Modules.Sales.Interfaces
 {
@@ -7,7 +7,7 @@ namespace Salesync.Application.Modules.Sales.Interfaces
         Task<SalesRepSessionDto> GetByIdAsync(int id);
         Task<IEnumerable<SalesRepSessionDto>> GetBySalesRepAsync(int SalesRepId);
         Task<SalesRepSessionDto> StartSessionAsync(CreateSalesRepSessionDto dto);
-        Task<SalesRepSessionDto> CloseSessionAsync(int id);
+        Task<SalesRepSessionDto> CloseSessionAsync(int id, int? warehouseId = null);
         Task<IEnumerable<SalesRepSessionDto>> GetActiveSessionsAsync();
         Task<IEnumerable<SalesRepSessionDto>> GetClosedSessionsAsync();
 

@@ -1,4 +1,6 @@
-﻿using FluentValidation;
+using Salesync.Application.Interfaces.Services;
+using Salesync.Application.Services;
+using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using Salesync.Application.Modules.Company.Interfaces;
 using Salesync.Application.Modules.Company.Services;
@@ -38,6 +40,8 @@ namespace Salesync.Application
     {
         public static IServiceCollection AddApplicationServices(this IServiceCollection services)
         {
+            services.AddScoped<ISalesAccessScopeService, SalesAccessScopeService>();
+            services.AddScoped<MobileWorkflowQueryService>();
             // Register application services here
             services.AddValidatorsFromAssemblyContaining<ApplicationAssemblyMarker>();
 

@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Salesync.Application.Common.Licensing;
@@ -29,6 +29,8 @@ namespace Salesync.Infrastructure.DependencyInjection
 
             // Register repositories
             services.AddScoped<IUnitOfWork, UnitOfWork>();
+            services.AddSingleton<Salesync.Application.Interfaces.Services.IBusinessClock>(new Salesync.Application.Services.BusinessClock(
+                TimeProvider.System, configuration["Sales:BusinessTimeZone"] ?? "Africa/Cairo"));
             services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
 
             services.AddScoped<IAuthService, AuthService>();

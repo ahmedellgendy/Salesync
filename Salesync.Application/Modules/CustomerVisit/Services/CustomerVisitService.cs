@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Salesync.Application.Interfaces.Repositories;
@@ -15,6 +15,7 @@ namespace Salesync.Application.Modules.CustomerVisit.Services
 {
     public class CustomerVisitService : ICustomerVisitService
     {
+        private readonly ISalesAccessScopeService _access;
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
         private readonly IValidator<StartCustomerVisitDto> _startValidator;
@@ -26,8 +27,10 @@ namespace Salesync.Application.Modules.CustomerVisit.Services
             IMapper mapper,
             IValidator<StartCustomerVisitDto> startValidator,
             IValidator<CompleteCustomerVisitDto> completeValidator,
-            ICurrentUserService currentUser)
+            ICurrentUserService currentUser,
+            ISalesAccessScopeService access)
         {
+            _access = access;
             _unitOfWork = unitOfWork;
             _mapper = mapper;
             _startValidator = startValidator;
@@ -37,9 +40,10 @@ namespace Salesync.Application.Modules.CustomerVisit.Services
 
         public async Task<IEnumerable<CustomerVisitDto>> GetAllAsync(CustomerVisitFilterDto filter)
         {
+            var accessScope = await _access.GetAsync();
             filter ??= new CustomerVisitFilterDto();
 
-            var query = GetCustomerVisitsQuery();
+            var query = GetCustomerVisitsQuery().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId));
 
             if (filter.SalesRepId.HasValue)
                 query = query.Where(x => x.SalesRepId == filter.SalesRepId.Value);
@@ -76,10 +80,11 @@ namespace Salesync.Application.Modules.CustomerVisit.Services
 
         public async Task<CustomerVisitDto> GetByIdAsync(int id)
         {
+            var accessScope = await _access.GetAsync();
             if (id <= 0)
                 throw new ArgumentException("Invalid customer visit id.");
 
-            var visit = await GetCustomerVisitsQuery()
+            var visit = await GetCustomerVisitsQuery().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId))
                 .FirstOrDefaultAsync(x => x.Id == id);
 
             if (visit == null)
@@ -92,12 +97,14 @@ namespace Salesync.Application.Modules.CustomerVisit.Services
 
         public async Task<IEnumerable<CustomerVisitDto>> GetBySalesRepAsync(int salesRepId)
         {
+            await _access.RequireSalesRepAsync(salesRepId);
+            var accessScope = await _access.GetAsync();
             if (salesRepId <= 0)
                 throw new ArgumentException("Invalid sales rep id.");
 
             await EnsureSalesRepCanAccessVisitAsync(salesRepId);
 
-            var visits = await GetCustomerVisitsQuery()
+            var visits = await GetCustomerVisitsQuery().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId))
                 .Where(x => x.SalesRepId == salesRepId)
                 .OrderByDescending(x => x.VisitDate)
                 .ToListAsync();
@@ -107,10 +114,11 @@ namespace Salesync.Application.Modules.CustomerVisit.Services
 
         public async Task<IEnumerable<CustomerVisitDto>> GetByCustomerAsync(int customerId)
         {
+            var accessScope = await _access.GetAsync();
             if (customerId <= 0)
                 throw new ArgumentException("Invalid customer id.");
 
-            var query = GetCustomerVisitsQuery()
+            var query = GetCustomerVisitsQuery().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId))
                 .Where(x => x.CustomerId == customerId);
 
             query = await ApplySalesRepAccessFilterAsync(query);
@@ -124,12 +132,14 @@ namespace Salesync.Application.Modules.CustomerVisit.Services
 
         public async Task<CustomerVisitDto> StartAsync(StartCustomerVisitDto dto)
         {
+            var accessScope = await _access.GetAsync();
             var validationResult = await _startValidator.ValidateAsync(dto);
 
             if (!validationResult.IsValid)
                 throw new ValidationException(validationResult.Errors);
 
             var salesRep = await GetVisitSalesRepAsync(dto.SalesRepId);
+            await _access.RequireSalesRepAsync(salesRep.Id);
 
             await EnsureCustomerExistsAsync(dto.CustomerId);
 
@@ -144,12 +154,10 @@ namespace Salesync.Application.Modules.CustomerVisit.Services
             if (route == null)
                 throw new KeyNotFoundException($"Route with id {dto.RouteId.Value} not found.");
 
-            if (route.AssignedSalesRepId.HasValue &&
-                route.AssignedSalesRepId.Value != salesRep.Id)
-            {
-                throw new UnauthorizedAccessException(
-                    "Sales rep cannot start a visit on a route assigned to another sales rep.");
-            }
+            var assigned = route.AssignedSalesRepId == salesRep.Id || await _unitOfWork.Routes.GetQueryable()
+                .AnyAsync(r => r.Id == route.Id && r.SalesRepRoutes.Any(x => x.SalesRepId == salesRep.Id && x.IsActive && x.IsCurrent && !x.UnassignedDate.HasValue));
+            if (!assigned)
+                throw new Salesync.Application.Common.Exceptions.ForbiddenException("Route is not assigned to this sales rep.");
 
             await EnsureCustomerBelongsToRouteAsync(dto.RouteId.Value, dto.CustomerId);
 
@@ -178,8 +186,12 @@ namespace Salesync.Application.Modules.CustomerVisit.Services
             return await GetByIdAsync(visit.Id);
         }
 
-        public async Task<CustomerVisitDto> CompleteAsync(int id, CompleteCustomerVisitDto dto)
+        public Task<CustomerVisitDto> CompleteAsync(int id, CompleteCustomerVisitDto dto) =>
+            _unitOfWork.ExecuteInTransactionAsync(() => CompleteAsyncCore(id, dto));
+
+        private async Task<CustomerVisitDto> CompleteAsyncCore(int id, CompleteCustomerVisitDto dto)
         {
+            var accessScope = await _access.GetAsync();
             if (id <= 0)
                 throw new ArgumentException("Invalid customer visit id.");
 
@@ -189,7 +201,7 @@ namespace Salesync.Application.Modules.CustomerVisit.Services
                 throw new ValidationException(validationResult.Errors);
 
             var visit = await _unitOfWork.CustomerVisits
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId))
                 .FirstOrDefaultAsync(x => x.Id == id && x.IsActive);
 
             if (visit == null)
@@ -222,13 +234,17 @@ namespace Salesync.Application.Modules.CustomerVisit.Services
             return await GetByIdAsync(visit.Id);
         }
 
-        public async Task CancelAsync(int id)
+        public Task CancelAsync(int id) =>
+            _unitOfWork.ExecuteInTransactionAsync(() => CancelAsyncCore(id));
+
+        private async Task CancelAsyncCore(int id)
         {
+            var accessScope = await _access.GetAsync();
             if (id <= 0)
                 throw new ArgumentException("Invalid customer visit id.");
 
             var visit = await _unitOfWork.CustomerVisits
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId))
                 .FirstOrDefaultAsync(x => x.Id == id && x.IsActive);
 
             if (visit == null)
@@ -266,6 +282,7 @@ namespace Salesync.Application.Modules.CustomerVisit.Services
 
         private async Task<SalesRepEntity> GetVisitSalesRepAsync(int? dtoSalesRepId)
         {
+            var accessScope = await _access.GetAsync();
             if (_currentUser.Role == "SalesRep")
             {
                 var currentSalesRep = await _unitOfWork.SalesReps
@@ -297,6 +314,7 @@ namespace Salesync.Application.Modules.CustomerVisit.Services
 
         private async Task EnsureCustomerExistsAsync(int customerId)
         {
+            var accessScope = await _access.GetAsync();
             var exists = await _unitOfWork.Customers
                 .GetQueryable()
                 .AnyAsync(x => x.Id == customerId && x.IsActive);
@@ -307,8 +325,9 @@ namespace Salesync.Application.Modules.CustomerVisit.Services
 
         private async Task EnsureSalesRepSessionIsStartedAsync(int salesRepSessionId, int salesRepId)
         {
+            var accessScope = await _access.GetAsync();
             var sessionExists = await _unitOfWork.SalesRepSessions
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId))
                 .AnyAsync(x =>
                     x.Id == salesRepSessionId &&
                     x.SalesRepId == salesRepId &&
@@ -321,8 +340,9 @@ namespace Salesync.Application.Modules.CustomerVisit.Services
 
         private async Task EnsureNoActiveVisitAsync(int salesRepId)
         {
+            var accessScope = await _access.GetAsync();
             var hasActiveVisit = await _unitOfWork.CustomerVisits
-                .GetQueryable()
+                .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId))
                 .AnyAsync(x =>
                     x.SalesRepId == salesRepId &&
                     x.Status == VisitStatus.InProgress &&
@@ -336,13 +356,14 @@ namespace Salesync.Application.Modules.CustomerVisit.Services
             CustomerVisitEntity visit,
             CompleteCustomerVisitDto dto)
         {
+            var accessScope = await _access.GetAsync();
             if (dto.VisitType == VisitType.Negative)
                 return;
 
             if (dto.InvoiceId.HasValue)
             {
                 var invoiceExists = await _unitOfWork.Invoices
-                    .GetQueryable()
+                    .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId ?? 0))
                     .AnyAsync(x =>
                         x.Id == dto.InvoiceId.Value &&
                         x.CustomerId == visit.CustomerId &&
@@ -357,7 +378,7 @@ namespace Salesync.Application.Modules.CustomerVisit.Services
             if (dto.PaymentId.HasValue)
             {
                 var paymentExists = await _unitOfWork.Payments
-                    .GetQueryable()
+                    .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId ?? 0))
                     .AnyAsync(x =>
                         x.Id == dto.PaymentId.Value &&
                         x.CustomerId == visit.CustomerId &&
@@ -372,7 +393,7 @@ namespace Salesync.Application.Modules.CustomerVisit.Services
             if (dto.InvoiceReturnId.HasValue)
             {
                 var returnExists = await _unitOfWork.InvoiceReturns
-                    .GetQueryable()
+                    .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId ?? 0))
                     .AnyAsync(x =>
                         x.Id == dto.InvoiceReturnId.Value &&
                         x.CustomerId == visit.CustomerId &&
@@ -387,6 +408,8 @@ namespace Salesync.Application.Modules.CustomerVisit.Services
 
         private async Task EnsureSalesRepCanAccessVisitAsync(int salesRepId)
         {
+            await _access.RequireSalesRepAsync(salesRepId);
+            var accessScope = await _access.GetAsync();
             if (_currentUser.Role != "SalesRep")
                 return;
 
@@ -404,6 +427,7 @@ namespace Salesync.Application.Modules.CustomerVisit.Services
 
         private async Task<IQueryable<CustomerVisitEntity>> ApplySalesRepAccessFilterAsync(IQueryable<CustomerVisitEntity> query)
         {
+            var accessScope = await _access.GetAsync();
             if (_currentUser.Role != "SalesRep")
                 return query;
 
@@ -423,6 +447,7 @@ namespace Salesync.Application.Modules.CustomerVisit.Services
 
         private async Task EnsureCustomerBelongsToRouteAsync(int routeId, int customerId)
         {
+            var accessScope = await _access.GetAsync();
             var customerExistsInRoute = await _unitOfWork.RouteCustomers
                 .GetQueryable()
                 .AsNoTracking()

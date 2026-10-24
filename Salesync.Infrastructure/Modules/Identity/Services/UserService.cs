@@ -92,6 +92,15 @@ namespace Salesync.Infrastructure.Modules.Identity.Services
         public async Task<UserDto> CreateUserAsync(
             CreateUserDto createUserDto)
         {
+            if (string.Equals(
+                  createUserDto.Role,
+                  "SalesRep",
+                  StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    "SalesRep accounts must be created through the SalesRep creation flow.");
+            }
+
             // License check before creating a new active user
             await EnsureCanAddActiveUserAsync();
 

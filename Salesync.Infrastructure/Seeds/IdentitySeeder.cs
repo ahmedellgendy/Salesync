@@ -36,11 +36,54 @@ namespace Salesync.Infrastructure.Seeds
 
         public static async Task SeedAdminUserAsync(IServiceProvider serviceProvider)
         {
-            var userManager = serviceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var userManager =
+                serviceProvider.GetRequiredService<UserManager<ApplicationUser>>();
 
-            var adminUser = await userManager.FindByNameAsync("ahmed.elgendy");
-            if (adminUser != null && !await userManager.IsInRoleAsync(adminUser, "Admin"))
-                await userManager.AddToRoleAsync(adminUser, "Admin");
+            var adminUser =
+                await userManager.FindByNameAsync("ahmed.elgendy");
+
+            if (adminUser is null)
+            {
+                adminUser = new ApplicationUser
+                {
+                    UserName = "ahmed.elgendy",
+                    Email = "ahmed@salesync.local",
+                    FullName = "Ahmed Elgendy",
+                    IsActive = true,
+                    EmailConfirmed = true
+                };
+
+                var createResult =
+                    await userManager.CreateAsync(
+                        adminUser,
+                        "Ahmed123");
+
+                if (!createResult.Succeeded)
+                {
+                    throw new Exception(
+                        string.Join(
+                            " | ",
+                            createResult.Errors.Select(x => x.Description)));
+                }
+            }
+
+            if (!await userManager.IsInRoleAsync(
+                    adminUser,
+                    "Admin"))
+            {
+                var roleResult =
+                    await userManager.AddToRoleAsync(
+                        adminUser,
+                        "Admin");
+
+                if (!roleResult.Succeeded)
+                {
+                    throw new Exception(
+                        string.Join(
+                            " | ",
+                            roleResult.Errors.Select(x => x.Description)));
+                }
+            }
         }
 
         public static async Task SeedSupervisorUserAsync(IServiceProvider serviceProvider)

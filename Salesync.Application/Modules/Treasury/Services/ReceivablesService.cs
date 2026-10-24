@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Salesync.Application.Interfaces.Repositories;
 using Salesync.Application.Interfaces.Services;
 using Salesync.Application.Modules.Treasury.Dtos.Receivables;
@@ -12,15 +12,17 @@ namespace Salesync.Application.Modules.Treasury.Services
     public class ReceivablesService
         : IReceivablesService
     {
+        private readonly ISalesAccessScopeService _access;
         private readonly IUnitOfWork _unitOfWork;
         private readonly ICurrentUserService _currentUser;
 
 
         public ReceivablesService(
             IUnitOfWork unitOfWork,
-            ICurrentUserService currentUser)
+            ICurrentUserService currentUser, ISalesAccessScopeService access)
 
         {
+            _access = access;
             _unitOfWork = unitOfWork;
             _currentUser = currentUser;
 
@@ -34,6 +36,7 @@ namespace Salesync.Application.Modules.Treasury.Services
         public async Task<ReceivablesSummaryDto>
             GetSummaryAsync()
         {
+            var accessScope = await _access.GetAsync();
             var customers =
                 await GetCustomerReceivablesAsync();
 
@@ -79,9 +82,10 @@ namespace Salesync.Application.Modules.Treasury.Services
 
         public async Task<IEnumerable<CustomerReceivableDto>> GetCustomerReceivablesAsync()
         {
+            var accessScope = await _access.GetAsync();
             var invoices =
                 await _unitOfWork.Invoices
-                    .GetQueryable()
+                    .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId ?? 0))
                     .AsNoTracking()
                     .Include(x => x.Customer)
                     .Where(x =>
@@ -175,6 +179,7 @@ namespace Salesync.Application.Modules.Treasury.Services
 
         public async Task<IEnumerable<CustomerReceivableInvoiceDto>> GetCustomerReceivableDetailsAsync(int customerId)
         {
+            var accessScope = await _access.GetAsync();
             if (customerId <= 0)
             {
                 throw new ArgumentException(
@@ -200,7 +205,7 @@ namespace Salesync.Application.Modules.Treasury.Services
 
             var invoices =
                 await _unitOfWork.Invoices
-                    .GetQueryable()
+                    .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId ?? 0))
                     .AsNoTracking()
                     .Include(x => x.SalesRep)
                     .Where(x =>
@@ -267,9 +272,10 @@ namespace Salesync.Application.Modules.Treasury.Services
 
         public async Task<IEnumerable<SalesRepReceivableDto>> GetSalesRepReceivablesAsync()
         {
+            var accessScope = await _access.GetAsync();
             var salesReps =
                 await _unitOfWork.SalesReps
-                    .GetQueryable()
+                    .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.Id))
                     .AsNoTracking()
                     .Where(x =>
                         x.IsActive)
@@ -286,7 +292,7 @@ namespace Salesync.Application.Modules.Treasury.Services
             var ledgerBalances =
                 await _unitOfWork
                     .SalesRepCashLedgers
-                    .GetQueryable()
+                    .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId))
                     .AsNoTracking()
                     .Where(x =>
                         x.IsActive)
@@ -363,8 +369,13 @@ namespace Salesync.Application.Modules.Treasury.Services
         }
 
 
-        public async Task<SalesRepDebtPaymentResultDto> PaySalesRepDebtAsync(int salesRepId, PaySalesRepDebtDto dto)
+        public Task<SalesRepDebtPaymentResultDto> PaySalesRepDebtAsync(int salesRepId, PaySalesRepDebtDto dto) =>
+            _unitOfWork.ExecuteInTransactionAsync(() => PaySalesRepDebtCoreAsync(salesRepId, dto));
+
+        private async Task<SalesRepDebtPaymentResultDto> PaySalesRepDebtCoreAsync(int salesRepId, PaySalesRepDebtDto dto)
         {
+            var accessScope = await _access.GetAsync();
+            await _access.RequireSalesRepAsync(salesRepId);
             if (salesRepId <= 0)
                 throw new ArgumentException(
                     "Invalid sales rep id.");
@@ -384,7 +395,7 @@ namespace Salesync.Application.Modules.Treasury.Services
 
             var salesRep =
                 await _unitOfWork.SalesReps
-                    .GetQueryable()
+                    .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.Id))
                     .FirstOrDefaultAsync(x =>
                         x.Id == salesRepId &&
                         x.IsActive);
@@ -397,7 +408,7 @@ namespace Salesync.Application.Modules.Treasury.Services
             var currentBalance =
                 await _unitOfWork
                     .SalesRepCashLedgers
-                    .GetQueryable()
+                    .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId))
                     .Where(x =>
                         x.SalesRepId == salesRepId &&
                         x.IsActive)
@@ -424,7 +435,7 @@ namespace Salesync.Application.Modules.Treasury.Services
 
             var cashBox =
                 await _unitOfWork.CashBoxes
-                    .GetQueryable()
+                    .GetQueryable().Where(x => accessScope.AllowsAll || (x.BranchId.HasValue && accessScope.BranchIds.Contains(x.BranchId.Value)))
                     .FirstOrDefaultAsync(x =>
                         x.Id == dto.CashBoxId &&
                         x.IsActive);
@@ -433,6 +444,9 @@ namespace Salesync.Application.Modules.Treasury.Services
                 throw new KeyNotFoundException(
                     $"Cash box with id {dto.CashBoxId} not found.");
 
+
+            if (cashBox.BranchId.HasValue && cashBox.BranchId != salesRep.BranchId)
+                throw new InvalidOperationException("CASHBOX_BRANCH_MISMATCH: Cash box and representative branches must match.");
 
             var now =
                 DateTime.UtcNow;

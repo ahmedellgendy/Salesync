@@ -52,6 +52,9 @@ builder.Services.AddInfrastructureServices(builder.Configuration);
 builder.Services.AddMasterDataModule(builder.Configuration);
 builder.Services.AddIdentityServices(builder.Configuration);
 builder.Services.AddApplicationServices();
+builder.Services.AddScoped<Salesync.API.Filters.FinancialOperationFilter>();
+builder.Services.Configure<Microsoft.AspNetCore.Mvc.MvcOptions>(options =>
+    options.Filters.Add<Salesync.API.Filters.FinancialOperationFilter>());
 
 builder.Services.Configure<CompanySettings>(builder.Configuration.GetSection("Company"));
 builder.Services.Configure<LicenseSettings>(builder.Configuration.GetSection("License"));
@@ -123,10 +126,10 @@ if (app.Environment.IsDevelopment())
 }
 
 
-app.UseStaticFiles();
-app.UseExceptionHandler();
 app.UseHttpsRedirection();
 app.UseCors("SalesyncPwaPolicy");
+app.UseStaticFiles();
+app.UseExceptionHandler();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
