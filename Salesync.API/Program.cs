@@ -80,7 +80,9 @@ builder.Services.AddCors(options =>
             .WithOrigins(
                 "https://localhost:7264",
                 "http://localhost:5009",
-                "http://192.168.137.106:7264")
+                "http://192.168.137.106:7264",
+                "http://salesyncpwa.runasp.net",
+                "https://salesyncpwa.runasp.net")
             .AllowAnyHeader()
             .AllowAnyMethod();
     });
@@ -128,5 +130,12 @@ app.UseCors("SalesyncPwaPolicy");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+
+app.MapGet("/", () => Results.Ok(new
+{
+    service = "Salesync API",
+    status = "Running",
+    environment = app.Environment.EnvironmentName
+}));
 
 app.Run();

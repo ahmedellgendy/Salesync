@@ -14,8 +14,7 @@ namespace Salesync.Infrastructure.Licensing
         public LicenseService(
             ILicenseFileProvider licenseFileProvider,
             ILicenseSignatureVerifier signatureVerifier,
-                UserManager<ApplicationUser> userManager)
-
+            UserManager<ApplicationUser> userManager)
         {
             _licenseFileProvider =
                 licenseFileProvider;
@@ -23,7 +22,8 @@ namespace Salesync.Infrastructure.Licensing
             _signatureVerifier =
                 signatureVerifier;
 
-            _userManager = userManager;
+            _userManager =
+                userManager;
         }
 
 
@@ -63,13 +63,39 @@ namespace Salesync.Infrastructure.Licensing
                 {
                     IsConfigured = true,
                     IsValid = false,
-                    CompanyId = payload.CompanyId,
-                    Plan = payload.Plan,
-                    SubscriptionType =payload.SubscriptionType,
-                    ValidFrom = payload.ValidFrom,
-                    ValidTo = payload.ValidTo,
-                    MaxUsers = payload.MaxUsers,
-                    Message = "Salesync license signature is invalid."
+
+                    CompanyId =
+                        payload.CompanyId,
+
+                    CompanyName =
+                        payload.CompanyName,
+
+                    ShortName =
+                        payload.ShortName,
+
+                    TaxRegistrationNumber =
+                        payload.TaxRegistrationNumber,
+
+                    CommercialRegistrationNumber =
+                        payload.CommercialRegistrationNumber,
+
+                    Plan =
+                        payload.Plan,
+
+                    SubscriptionType =
+                        payload.SubscriptionType,
+
+                    ValidFrom =
+                        payload.ValidFrom,
+
+                    ValidTo =
+                        payload.ValidTo,
+
+                    MaxUsers =
+                        payload.MaxUsers,
+
+                    Message =
+                        "Salesync license signature is invalid."
                 };
             }
 
@@ -80,6 +106,24 @@ namespace Salesync.Infrastructure.Licensing
                 return Invalid(
                     payload,
                     "License company id is missing.");
+            }
+
+
+            if (string.IsNullOrWhiteSpace(
+                    payload.CompanyName))
+            {
+                return Invalid(
+                    payload,
+                    "License company name is missing.");
+            }
+
+
+            if (string.IsNullOrWhiteSpace(
+                    payload.ShortName))
+            {
+                return Invalid(
+                    payload,
+                    "License company short name is missing.");
             }
 
 
@@ -143,11 +187,23 @@ namespace Salesync.Infrastructure.Licensing
                 CompanyId =
                     payload.CompanyId,
 
+                CompanyName =
+                    payload.CompanyName,
+
+                ShortName =
+                    payload.ShortName,
+
+                TaxRegistrationNumber =
+                    payload.TaxRegistrationNumber,
+
+                CommercialRegistrationNumber =
+                    payload.CommercialRegistrationNumber,
+
                 Plan =
                     payload.Plan,
 
                 SubscriptionType =
-                  payload.SubscriptionType,
+                    payload.SubscriptionType,
 
                 ValidFrom =
                     payload.ValidFrom,
@@ -166,6 +222,8 @@ namespace Salesync.Infrastructure.Licensing
                             : "Salesync license is valid."
             };
         }
+
+
         public async Task<LicenseStatusDto> GetDetailedStatusAsync()
         {
             var status =
@@ -207,6 +265,18 @@ namespace Salesync.Infrastructure.Licensing
                 CompanyId =
                     status.CompanyId,
 
+                CompanyName =
+                    status.CompanyName,
+
+                ShortName =
+                    status.ShortName,
+
+                TaxRegistrationNumber =
+                    status.TaxRegistrationNumber,
+
+                CommercialRegistrationNumber =
+                    status.CommercialRegistrationNumber,
+
                 Plan =
                     status.Plan,
 
@@ -235,6 +305,7 @@ namespace Salesync.Infrastructure.Licensing
                     status.Message ?? string.Empty
             };
         }
+
 
         public void EnsureLicenseIsValid()
         {
@@ -324,13 +395,39 @@ namespace Salesync.Infrastructure.Licensing
             {
                 IsConfigured = true,
                 IsValid = false,
-                CompanyId = payload.CompanyId,
-                Plan = payload.Plan,
-                SubscriptionType = payload.SubscriptionType,
-                ValidFrom = payload.ValidFrom,
-                ValidTo = payload.ValidTo,
-                MaxUsers = payload.MaxUsers,
-                Message = message
+
+                CompanyId =
+                    payload.CompanyId,
+
+                CompanyName =
+                    payload.CompanyName,
+
+                ShortName =
+                    payload.ShortName,
+
+                TaxRegistrationNumber =
+                    payload.TaxRegistrationNumber,
+
+                CommercialRegistrationNumber =
+                    payload.CommercialRegistrationNumber,
+
+                Plan =
+                    payload.Plan,
+
+                SubscriptionType =
+                    payload.SubscriptionType,
+
+                ValidFrom =
+                    payload.ValidFrom,
+
+                ValidTo =
+                    payload.ValidTo,
+
+                MaxUsers =
+                    payload.MaxUsers,
+
+                Message =
+                    message
             };
         }
     }

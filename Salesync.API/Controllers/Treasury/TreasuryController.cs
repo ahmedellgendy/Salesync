@@ -163,5 +163,22 @@ namespace Salesync.API.Controllers.Treasury
                         result,
                         "Expense category updated successfully."));
         }
+
+        [HttpPost("cashboxes/{id}/opening-balance")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> SetOpeningBalance(
+    int id,
+    [FromBody] SetCashBoxOpeningBalanceDto dto)
+        {
+            var result =
+                await _treasuryService.SetOpeningBalanceAsync(
+                    id,
+                    dto);
+
+            return Ok(
+                ApiResponse<CashBoxDto>.SuccessResponse(
+                    result,
+                    "Opening balance set successfully."));
+        }
     }
 }

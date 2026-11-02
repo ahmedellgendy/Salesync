@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore.Storage;
 using Salesync.Application.Interfaces.Repositories;
+using Salesync.Domain.Modules.Company.Entities;
 using Salesync.Domain.Modules.DataImport.Entities;
 using Salesync.Domain.Modules.Inventory.Entities;
 using Salesync.Domain.Modules.LoadRequest.Entities;
@@ -19,6 +20,12 @@ namespace Salesync.Infrastructure.Repositories.Common
         private readonly SalesyncDbContext _context;
 
         private IDbContextTransaction? _transaction;
+
+        // =====================================================
+        // COMPANY
+        // =====================================================
+
+        public IGenericRepository<CompanyProfile> CompanyProfiles { get; }
 
 
         // =====================================================
@@ -147,6 +154,10 @@ namespace Salesync.Infrastructure.Repositories.Common
             _context =
                 context;
 
+
+            // Company
+            CompanyProfiles =
+                new GenericRepository<CompanyProfile>(_context);
 
             // Master Data
             Branches =

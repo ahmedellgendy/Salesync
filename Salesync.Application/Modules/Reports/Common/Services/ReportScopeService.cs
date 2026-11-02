@@ -19,10 +19,15 @@ namespace Salesync.Application.Modules.Reports.Common.Services
             _currentUser = currentUser;
         }
 
-        public async Task<ReportScope> GetCurrentScopeAsync(CancellationToken cancellationToken = default)
+        public async Task<ReportScope> GetCurrentScopeAsync(
+            CancellationToken cancellationToken = default)
         {
-            var userId = _currentUser.UserId;
-            var role = _currentUser.Role;
+            var userId =
+                _currentUser.UserId;
+
+            var role =
+                _currentUser.Role;
+
 
             if (string.IsNullOrWhiteSpace(userId))
             {
@@ -30,17 +35,25 @@ namespace Salesync.Application.Modules.Reports.Common.Services
                     "Authenticated user was not found.");
             }
 
+
             if (string.IsNullOrWhiteSpace(role))
             {
                 throw new UnauthorizedAccessException(
                     "User role was not found.");
             }
 
-            if (role.Equals("Admin", StringComparison.OrdinalIgnoreCase) || role.Equals("Management", StringComparison.OrdinalIgnoreCase))
+
+            if (role.Equals(
+                    "Admin",
+                    StringComparison.OrdinalIgnoreCase) ||
+                role.Equals(
+                    "Management",
+                    StringComparison.OrdinalIgnoreCase))
             {
                 return await BuildFullBusinessScopeAsync(
                     cancellationToken);
             }
+
 
             if (role.Equals(
                     "Supervisor",
@@ -51,20 +64,26 @@ namespace Salesync.Application.Modules.Reports.Common.Services
                     cancellationToken);
             }
 
+
             throw new UnauthorizedAccessException(
                 "The current user is not allowed to access reports.");
         }
 
-        private async Task<ReportScope> BuildSupervisorScopeAsync(string userId, CancellationToken cancellationToken)
+
+        private async Task<ReportScope> BuildSupervisorScopeAsync(
+            string userId,
+            CancellationToken cancellationToken)
         {
-            var supervisor = await _unitOfWork.SalesReps
-                .GetQueryable()
-                .AsNoTracking()
-                .FirstOrDefaultAsync(
-                    x =>
-                        x.UserId == userId &&
-                        x.IsActive,
-                    cancellationToken);
+            var supervisor =
+                await _unitOfWork.SalesReps
+                    .GetQueryable()
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(
+                        x =>
+                            x.UserId == userId &&
+                            x.IsActive,
+                        cancellationToken);
+
 
             if (supervisor is null)
             {
@@ -72,64 +91,91 @@ namespace Salesync.Application.Modules.Reports.Common.Services
                     "Supervisor profile for the current user was not found.");
             }
 
-            var allowedSalesReps = await _unitOfWork.SalesReps
-                .GetQueryable()
-                .AsNoTracking()
-                .Where(x =>
-                    x.SupervisorId == supervisor.Id &&
-                    x.IsActive)
-                .Select(x => new
-                {
-                    x.Id,
-                    x.BranchId
-                })
-                .ToListAsync(cancellationToken);
+
+            var allowedSalesReps =
+                await _unitOfWork.SalesReps
+                    .GetQueryable()
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.SupervisorId == supervisor.Id &&
+                        x.IsActive)
+                    .Select(x => new
+                    {
+                        x.Id,
+                        x.BranchId,
+                        x.BusinessUnitId
+                    })
+                    .ToListAsync(
+                        cancellationToken);
+
 
             return new ReportScope
             {
-                AllowedSalesRepIds = allowedSalesReps
-                    .Select(x => x.Id)
-                    .ToList(),
+                AllowedSalesRepIds =
+                    allowedSalesReps
+                        .Select(x => x.Id)
+                        .Distinct()
+                        .ToList(),
 
-                AllowedBranchIds = allowedSalesReps
-                    .Select(x => x.BranchId)
-                    .Distinct()
-                    .ToList()
+                AllowedBranchIds =
+                    allowedSalesReps
+                        .Select(x => x.BranchId)
+                        .Distinct()
+                        .ToList(),
+
+                AllowedBusinessUnitIds =
+                    allowedSalesReps
+                        .Where(x =>
+                            x.BusinessUnitId.HasValue)
+                        .Select(x =>
+                            x.BusinessUnitId!.Value)
+                        .Distinct()
+                        .ToList()
             };
         }
 
-        private async Task<ReportScope> BuildFullBusinessScopeAsync(CancellationToken cancellationToken)
+
+        private async Task<ReportScope> BuildFullBusinessScopeAsync(
+            CancellationToken cancellationToken)
         {
-            var allowedSalesReps = await _unitOfWork.SalesReps
-                .GetQueryable()
-                .AsNoTracking()
-                .Where(x =>
-                    x.IsActive &&
-                    x.SupervisorId.HasValue)
-                .Select(x => new
-                {
-                    x.Id,
-                    x.BranchId,
-                    x.BusinessUnitId
-                })
-                .ToListAsync(cancellationToken);
+            var allowedSalesReps =
+                await _unitOfWork.SalesReps
+                    .GetQueryable()
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.IsActive)
+                    .Select(x => new
+                    {
+                        x.Id,
+                        x.BranchId,
+                        x.BusinessUnitId
+                    })
+                    .ToListAsync(
+                        cancellationToken);
+
 
             return new ReportScope
             {
-                AllowedSalesRepIds = allowedSalesReps
-                    .Select(x => x.Id)
-                    .ToList(),
+                AllowedSalesRepIds =
+                    allowedSalesReps
+                        .Select(x => x.Id)
+                        .Distinct()
+                        .ToList(),
 
-                AllowedBranchIds = allowedSalesReps
-                    .Select(x => x.BranchId)
-                    .Distinct()
-                    .ToList(),
+                AllowedBranchIds =
+                    allowedSalesReps
+                        .Select(x => x.BranchId)
+                        .Distinct()
+                        .ToList(),
 
-                AllowedBusinessUnitIds = allowedSalesReps
-                    .Where(x => x.BusinessUnitId.HasValue)
-                    .Select(x => x.BusinessUnitId!.Value)
-                    .Distinct()
-                    .ToList()
+                AllowedBusinessUnitIds =
+                    allowedSalesReps
+                        .Where(x =>
+                            x.BusinessUnitId.HasValue)
+                        .Select(x =>
+                            x.BusinessUnitId!.Value)
+                        .Distinct()
+                        .ToList()
             };
         }
     }

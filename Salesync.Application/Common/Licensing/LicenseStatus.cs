@@ -12,7 +12,16 @@
 
         public string CompanyId { get; set; } = string.Empty;
 
+        public string CompanyName { get; set; } = string.Empty;
+
+        public string ShortName { get; set; } = string.Empty;
+
+        public string? TaxRegistrationNumber { get; set; }
+
+        public string? CommercialRegistrationNumber { get; set; }
+
         public string Plan { get; set; } = string.Empty;
+
         public string SubscriptionType { get; set; } = string.Empty;
 
         public DateTime? ValidFrom { get; set; }

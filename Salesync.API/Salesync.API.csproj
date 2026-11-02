@@ -24,4 +24,12 @@
     <ProjectReference Include="..\Salesync.Infrastructure\Salesync.Infrastructure.csproj" />
   </ItemGroup>
 
+
+  <ItemGroup>
+    <Content Include="Licensing\salesync.license">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+
 </Project>

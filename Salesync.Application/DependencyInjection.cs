@@ -1,5 +1,7 @@
 ﻿using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
+using Salesync.Application.Modules.Company.Interfaces;
+using Salesync.Application.Modules.Company.Services;
 using Salesync.Application.Modules.CustomerVisit.Interfaces;
 using Salesync.Application.Modules.CustomerVisit.Services;
 using Salesync.Application.Modules.DataImport.Interfaces;
@@ -38,6 +40,9 @@ namespace Salesync.Application
         {
             // Register application services here
             services.AddValidatorsFromAssemblyContaining<ApplicationAssemblyMarker>();
+
+            // Register Company Service
+            services.AddScoped<ICompanyProfileService, CompanyProfileService>();
 
             // Register SalesRep Service
             services.AddScoped<ISalesRepService, SalesRepService>();
