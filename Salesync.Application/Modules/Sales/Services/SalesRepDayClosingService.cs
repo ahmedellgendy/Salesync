@@ -133,6 +133,10 @@ namespace Salesync.Application.Modules.Sales.Services
                 throw new InvalidOperationException(
                     "Stock must be fully settled before submitting day closing.");
 
+            if (await _unitOfWork.InvoiceReturns.GetQueryable().AnyAsync(x =>
+                x.SalesRepSessionId == session.Id && x.IsActive && x.Status == ReturnStatus.Pending))
+                throw new InvalidOperationException("PENDING_RETURNS: Resolve pending returns before submitting day closing.");
+
             if (await _unitOfWork.SalesRepInventories.GetQueryable().AnyAsync(x =>
                 x.SalesRepId == session.SalesRepId && x.IsActive && x.Quantity != 0))
                 throw new InvalidOperationException("STOCK_REMAINING: Stock must be fully settled.");

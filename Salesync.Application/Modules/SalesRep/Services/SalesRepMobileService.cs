@@ -135,6 +135,7 @@ namespace Salesync.Application.Modules.SalesRep.Services
                 .Where(x =>
                     x.SalesRepId == salesRep.Id &&
                     x.SalesRepSessionId == session.Id &&
+                    x.Status == InvoiceStatus.Confirmed &&
                     x.IsActive)
                 .ToListAsync();
 
@@ -144,6 +145,7 @@ namespace Salesync.Application.Modules.SalesRep.Services
                 .Where(x =>
                     x.SalesRepId == salesRep.Id &&
                     x.SalesRepSessionId == session.Id &&
+                    x.Status == PaymentStatus.Paid &&
                     x.IsActive)
                 .ToListAsync();
 
@@ -164,7 +166,14 @@ namespace Salesync.Application.Modules.SalesRep.Services
 
             var salesTotal = invoices.Sum(x => x.TotalAmount);
             var paidTotal = payments.Sum(x => x.Amount);
-            var remainingTotal = invoices.Sum(x => x.TotalAmount - x.PaidAmount);
+            var remainingTotal = invoices.Sum(x => x.TotalAmount - x.PaidAmount - x.CreditAppliedAmount);
+
+            // Same posting-session and active-receipt predicates as the closing
+            // calculator. A GET never updates the persisted session snapshot.
+            var receivedReturnAmount = await _unitOfWork.InvoiceReturnReceipts
+                .GetQueryable().AsNoTracking()
+                .Where(x => x.SalesRepSessionId == session.Id && x.IsActive)
+                .SumAsync(x => x.TotalAmount);
 
             if (remainingTotal < 0)
                 remainingTotal = 0;
@@ -187,6 +196,7 @@ namespace Salesync.Application.Modules.SalesRep.Services
 
                 PaidTotal = paidTotal,
                 RemainingTotal = remainingTotal,
+                ReceivedReturnAmount = receivedReturnAmount,
 
                 PaymentsCount = payments.Count
             };
@@ -222,7 +232,9 @@ namespace Salesync.Application.Modules.SalesRep.Services
 
             var visits = await GetSessionVisitsAsync(sessionId, salesRep.Id);
 
-            return BuildMobileCustomers(routeCustomers, visits);
+            var customers = BuildMobileCustomers(routeCustomers, visits).ToList();
+            await PopulateInvoiceOutstandingAsync(customers, salesRep.Id);
+            return customers;
         }
         public async Task<IEnumerable<SalesRepMobileInvoiceDto>> GetInvoicesAsync(int sessionId)
         {
@@ -259,7 +271,8 @@ namespace Salesync.Application.Modules.SalesRep.Services
                         TaxAmount = invoice.TaxAmount,
                         TotalAmount = invoice.TotalAmount,
                         PaidAmount = invoice.PaidAmount,
-                        RemainingAmount = invoice.TotalAmount - invoice.PaidAmount,
+                        CreditAppliedAmount = invoice.CreditAppliedAmount,
+                        RemainingAmount = invoice.TotalAmount - invoice.PaidAmount - invoice.CreditAppliedAmount,
                         CreatedAt = invoice.CreatedAt,
                         Notes = invoice.Notes
                     }
@@ -304,7 +317,7 @@ namespace Salesync.Application.Modules.SalesRep.Services
             dto.SalesRepName = salesRep.Name;
             dto.SalesRepPhone = salesRep.Phone;
 
-            dto.RemainingAmount = dto.TotalAmount - dto.PaidAmount;
+            dto.RemainingAmount = dto.TotalAmount - dto.PaidAmount - dto.CreditAppliedAmount;
             dto.DueDate = dto.DueDate ?? invoice.CreatedAt;
             dto.ReturnsAmount = dto.ReturnsAmount < 0 ? 0 : dto.ReturnsAmount;
 
@@ -865,6 +878,29 @@ namespace Salesync.Application.Modules.SalesRep.Services
                 })
                 .ToListAsync();
         }
+        // Read projection only: invoice counters already include payments and posted return credits.
+        // No session filter: unpaid invoices remain due after their workday closes.
+        private async Task PopulateInvoiceOutstandingAsync(List<SalesRepMobileCustomerDto> customers, int salesRepId)
+        {
+            var customerIds = customers.Select(x => x.CustomerId).Distinct().ToList();
+            if (customerIds.Count == 0) return;
+
+            var amounts = await _unitOfWork.Invoices.GetQueryable().AsNoTracking()
+                .Where(x => x.IsActive && x.Status == InvoiceStatus.Confirmed
+                    && x.SalesRepId == salesRepId && customerIds.Contains(x.CustomerId))
+                .GroupBy(x => x.CustomerId)
+                .Select(g => new
+                {
+                    CustomerId = g.Key,
+                    Amount = g.Sum(x => x.TotalAmount - x.PaidAmount - x.CreditAppliedAmount > 0m
+                        ? x.TotalAmount - x.PaidAmount - x.CreditAppliedAmount : 0m)
+                })
+                .ToDictionaryAsync(x => x.CustomerId, x => x.Amount);
+
+            foreach (var customer in customers)
+                customer.InvoiceOutstandingAmount = amounts.GetValueOrDefault(customer.CustomerId);
+        }
+
         private static IEnumerable<SalesRepMobileCustomerDto> BuildMobileCustomers(List<RouteCustomerMobileProjection> routeCustomers, List<CustomerVisitMobileProjection> visits)
         {
             var latestVisitByCustomer = visits
@@ -933,7 +969,9 @@ namespace Salesync.Application.Modules.SalesRep.Services
 
             var visits = await GetSessionVisitsAsync(sessionId, salesRep.Id);
 
-            return BuildMobileCustomers(selectedRouteCustomers, visits);
+            var customers = BuildMobileCustomers(selectedRouteCustomers, visits).ToList();
+            await PopulateInvoiceOutstandingAsync(customers, salesRep.Id);
+            return customers;
         }
         private async Task EnsureInvoiceItemsAvailableAsync(int salesRepId, List<CreateSalesRepMobileInvoiceItemDto> items)
         {

@@ -28,10 +28,13 @@ public sealed class Actor : ICurrentUserService
 public sealed class TestDb(DbContextOptions<SalesyncDbContext> options) : SalesyncDbContext(options)
 {
     public bool FailClosingInsert { get; set; }
+    public bool FailReturnStock { get; set; }
     public bool FailTreasuryAudit { get; set; }
     public bool FailVisitCompletion { get; set; }
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
+        if (FailReturnStock && ChangeTracker.Entries<Salesync.Domain.Modules.Inventory.Entities.StockMovement>().Any(x => x.State == EntityState.Added))
+            throw new InvalidOperationException("Injected return stock failure");
         if (FailClosingInsert && ChangeTracker.Entries<SalesRepDayClosing>().Any(x => x.State == EntityState.Added))
             throw new InvalidOperationException("Injected closing insert failure");
         if (FailTreasuryAudit && ChangeTracker.Entries<Salesync.Domain.Modules.Treasury.Entities.TreasuryTransaction>().Any(x => x.State == EntityState.Added))

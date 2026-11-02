@@ -137,7 +137,7 @@ namespace Salesync.Application.Modules.Sales.Services
                         x.IsActive &&
                         x.Status == InvoiceStatus.Confirmed &&
                         x.SalesRepId == salesRep.Id &&
-                        x.PaidAmount < x.TotalAmount)
+                        x.PaidAmount < x.TotalAmount - x.CreditAppliedAmount)
                     .OrderByDescending(x =>
                         x.CreatedAt)
                     .Select(x =>
@@ -161,12 +161,12 @@ namespace Salesync.Application.Modules.Sales.Services
                             TotalAmount =
                                 x.TotalAmount,
 
-                            PaidAmount =
-                                x.PaidAmount,
+                            PaidAmount = x.PaidAmount,
+                            CreditAppliedAmount = x.CreditAppliedAmount,
 
                             OutstandingAmount =
                                 x.TotalAmount -
-                                x.PaidAmount,
+                                x.PaidAmount - x.CreditAppliedAmount,
 
                             OriginalSalesRepSessionId =
                                 x.SalesRepSessionId ?? 0
@@ -214,7 +214,7 @@ namespace Salesync.Application.Modules.Sales.Services
 
             var remaining =
                 invoice.TotalAmount -
-                invoice.PaidAmount;
+                invoice.PaidAmount - invoice.CreditAppliedAmount;
 
 
             if (remaining <= 0)
@@ -431,7 +431,7 @@ namespace Salesync.Application.Modules.Sales.Services
 
 
             invoice.PaymentStatus =
-                invoice.PaidAmount >= invoice.TotalAmount
+                invoice.PaidAmount + invoice.CreditAppliedAmount >= invoice.TotalAmount
                     ? PaymentStatus.Paid
                     : PaymentStatus.PartiallyPaid;
 

@@ -1,4 +1,4 @@
-﻿using Salesync.Domain.Common;
+using Salesync.Domain.Common;
 using Salesync.Domain.Common.Enums.Sales;
 using Salesync.Domain.Modules.MasterData.Entities;
 using SalesRepEntity = Salesync.Domain.Modules.SalesRep.Entities.SalesRep;
@@ -17,6 +17,7 @@ namespace Salesync.Domain.Modules.Sales.Entities
         public decimal DiscountAmount { get; set; }
         public decimal TaxAmount { get; set; }
         public decimal TotalAmount { get; set; }
+        public decimal CreditAppliedAmount { get; set; }
         public decimal PaidAmount { get; set; } 
         public int? SalesRepId { get; set; }
         public int? SalesRepSessionId { get; set; }

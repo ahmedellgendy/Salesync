@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Salesync.Application.Interfaces.Repositories;
 using Salesync.Application.Modules.Sales.Interfaces;
 using Salesync.Application.Modules.Sales.Models;
@@ -100,11 +100,10 @@ namespace Salesync.Application.Modules.Sales.Services
 
         private async Task<decimal> CalculateTotalReturnAmountAsync(int salesRepSessionId)
         {
-            return await _unitOfWork.InvoiceReturns
+            return await _unitOfWork.InvoiceReturnReceipts
                 .GetQueryable()
                 .Where(x =>
                     x.SalesRepSessionId == salesRepSessionId &&
-                    x.Status == ReturnStatus.Approved &&
                     x.IsActive)
                 .SumAsync(x => x.TotalAmount);
         }
@@ -182,7 +181,7 @@ namespace Salesync.Application.Modules.Sales.Services
                     x.SalesRepSessionId == salesRepSessionId &&
                     x.Status == InvoiceStatus.Confirmed &&
                     x.IsActive)
-                .SumAsync(x => x.TotalAmount - x.PaidAmount);
+                .SumAsync(x => x.TotalAmount - x.PaidAmount - x.CreditAppliedAmount);
         }
 
     }

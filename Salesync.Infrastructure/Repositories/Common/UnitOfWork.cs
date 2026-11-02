@@ -64,6 +64,8 @@ namespace Salesync.Infrastructure.Repositories.Common
 
         public IGenericRepository<InvoiceItem> InvoiceItems { get; }
 
+        public IGenericRepository<InvoiceReturnReceipt> InvoiceReturnReceipts { get; }
+        public IGenericRepository<InvoiceReturnReceiptItem> InvoiceReturnReceiptItems { get; }
         public IGenericRepository<InvoiceReturn> InvoiceReturns { get; }
 
         public IGenericRepository<InvoiceReturnItem> InvoiceReturnItems { get; }
@@ -196,6 +198,8 @@ namespace Salesync.Infrastructure.Repositories.Common
             InvoiceItems =
                 new GenericRepository<InvoiceItem>(_context);
 
+            InvoiceReturnReceipts = new GenericRepository<InvoiceReturnReceipt>(_context);
+            InvoiceReturnReceiptItems = new GenericRepository<InvoiceReturnReceiptItem>(_context);
             InvoiceReturns =
                 new GenericRepository<InvoiceReturn>(_context);
 

@@ -156,6 +156,7 @@ namespace Salesync.Application.Modules.Sales.Services
                     x.Status != ReturnStatus.Rejected &&
                     x.Status != ReturnStatus.Cancelled)
                 .ToListAsync();
+            await UseFinalReceivedQuantitiesAsync(previousReturns);
 
             var result = new List<MobileReturnableInvoiceDto>();
 
@@ -261,6 +262,7 @@ namespace Salesync.Application.Modules.Sales.Services
                     x.Status != ReturnStatus.Rejected &&
                     x.Status != ReturnStatus.Cancelled)
                 .ToListAsync();
+            await UseFinalReceivedQuantitiesAsync(previousReturns);
 
             var items = new List<MobileReturnableInvoiceItemDto>();
 
@@ -460,6 +462,7 @@ namespace Salesync.Application.Modules.Sales.Services
                     x.Status != ReturnStatus.Rejected &&
                     x.Status != ReturnStatus.Cancelled)
                 .ToListAsync();
+            await UseFinalReceivedQuantitiesAsync(previousReturns);
 
             /*
              * InvoiceItem.NetAmount already includes item-level discount.
@@ -677,6 +680,24 @@ namespace Salesync.Application.Modules.Sales.Services
 
         public Task<InvoiceReturnDto> ApproveAsync(int id) =>
             _unitOfWork.ExecuteInTransactionAsync(() => ApproveAsyncCore(id));
+
+        // Finalized short receipts release unreceived quantities for a future return.
+        // Legacy received records with no receipt ledger retain their historical reservation.
+        private async Task UseFinalReceivedQuantitiesAsync(List<InvoiceReturn> returns)
+        {
+            var ids = returns.Where(x => x.Status == ReturnStatus.ReceivedAtWarehouse).Select(x => x.Id).ToList();
+            if (ids.Count == 0) return;
+            var receipts = await _unitOfWork.InvoiceReturnReceipts.GetQueryable().AsNoTracking()
+                .Where(x => ids.Contains(x.InvoiceReturnId)).Include(x => x.Items).ToListAsync();
+            foreach (var record in returns.Where(x => receipts.Any(y => y.InvoiceReturnId == x.Id)))
+            foreach (var item in record.Items)
+            {
+                var lines = receipts.Where(x => x.InvoiceReturnId == record.Id).SelectMany(x => x.Items)
+                    .Where(x => x.InvoiceReturnItemId == item.Id).ToList();
+                item.Quantity = lines.Sum(x => x.Quantity);
+                item.BonusQuantity = lines.Sum(x => x.BonusQuantity);
+            }
+        }
 
         private async Task<InvoiceReturnDto> ApproveAsyncCore(int id)
         {

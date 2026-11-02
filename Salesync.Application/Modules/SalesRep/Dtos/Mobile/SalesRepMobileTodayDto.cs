@@ -22,6 +22,9 @@ namespace Salesync.Application.Modules.SalesRep.Dtos.Mobile
         public decimal PaidTotal { get; set; }
         public decimal RemainingTotal { get; set; }
 
+        /// <summary>Active posted return receipts assigned to the selected session; not its persisted closing snapshot.</summary>
+        public decimal ReceivedReturnAmount { get; set; }
+
         public int PaymentsCount { get; set; }
     }
 }

@@ -1,4 +1,4 @@
-﻿using Salesync.Domain.Common.Enums.Sales;
+using Salesync.Domain.Common.Enums.Sales;
 
 namespace Salesync.Application.Modules.Reports.Supervisor.Dtos
 {
@@ -24,6 +24,7 @@ namespace Salesync.Application.Modules.Reports.Supervisor.Dtos
 
         public decimal TotalAmount { get; set; }
         public decimal PaidAmount { get; set; }
+        public decimal CreditAppliedAmount { get; set; }
 
         public decimal RemainingAmount { get; set; }
     }

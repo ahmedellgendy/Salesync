@@ -1,4 +1,4 @@
-﻿namespace Salesync.Application.Modules.Treasury.Dtos.Receivables
+namespace Salesync.Application.Modules.Treasury.Dtos.Receivables
 {
     public class CustomerReceivableInvoiceDto
     {
@@ -12,6 +12,7 @@
         public decimal TotalAmount { get; set; }
 
         public decimal PaidAmount { get; set; }
+        public decimal CreditAppliedAmount { get; set; }
 
         public decimal OutstandingAmount { get; set; }
 

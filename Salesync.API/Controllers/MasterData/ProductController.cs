@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Salesync.API.Responses;
 using Salesync.Application.Modules.MasterData.Dtos.ProductDto;
 using Salesync.Application.Modules.MasterData.Interfaces.Services;
@@ -7,6 +8,7 @@ namespace Salesync.API.Controllers.MasterData
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize(Roles = "Admin,Supervisor,SalesRep,Warehouse,Treasury,Management")]
     public class ProductController : ControllerBase
     {
         private readonly IProductService _productService;
@@ -46,6 +48,7 @@ namespace Salesync.API.Controllers.MasterData
         }
 
         [HttpPost]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Create(
             [FromBody] CreateProductDto createProductDto)
         {
@@ -63,6 +66,7 @@ namespace Salesync.API.Controllers.MasterData
         }
 
         [HttpPut("{id:int}")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Update(
             int id,
             [FromBody] UpdateProductDto updateProductDto)
@@ -88,6 +92,7 @@ namespace Salesync.API.Controllers.MasterData
         }
 
         [HttpDelete("{id:int}")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Delete(int id)
         {
             await _productService.DeleteAsync(id);

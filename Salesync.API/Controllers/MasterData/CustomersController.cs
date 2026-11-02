@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Salesync.API.Responses;
 using Salesync.Application.Modules.MasterData.Dtos.CustomerDto;
 using Salesync.Application.Modules.MasterData.Interfaces.Services;
@@ -8,6 +9,7 @@ namespace Salesync.API.Controllers.MasterData
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize(Roles = "Admin,Supervisor,SalesRep,Warehouse,Treasury,Management")]
     public class CustomersController : ControllerBase
     {
         private readonly ICustomerService _customerService;
@@ -45,6 +47,7 @@ namespace Salesync.API.Controllers.MasterData
         }
 
         [HttpPost] // POST: api/customers
+        [Authorize(Roles = "Admin,Supervisor")]
         public async Task<IActionResult> Create([FromBody] CreateCustomerDto createCustomerDto)
         {
             var createdCustomer = await _customerService.CreateAsync(createCustomerDto);
@@ -56,6 +59,7 @@ namespace Salesync.API.Controllers.MasterData
         }
 
         [HttpPut("{id}")] // PUT: api/customers/{id}
+        [Authorize(Roles = "Admin,Supervisor")]
         public async Task<IActionResult> Update(int id, [FromBody] UpdateCustomerDto updateCustomerDto)
         {
             // Check the ID in the URL matches the ID in the body
@@ -71,6 +75,7 @@ namespace Salesync.API.Controllers.MasterData
         }
 
         [HttpDelete("{id}")] // DELETE: api/customers/{id}
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Delete(int id)
         {
 

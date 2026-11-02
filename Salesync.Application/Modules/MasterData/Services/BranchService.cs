@@ -1,4 +1,6 @@
-﻿using AutoMapper;
+using Microsoft.EntityFrameworkCore;
+using Salesync.Application.Interfaces.Services;
+using AutoMapper;
 using FluentValidation;
 using Salesync.Application.Interfaces.Repositories;
 using Salesync.Application.Modules.MasterData.Dtos.BranchDto;
@@ -10,25 +12,31 @@ namespace Salesync.Application.Modules.MasterData.Services
     public class BranchService : IBranchService
     {
         private readonly IUnitOfWork _unitOfWork;
+        private readonly ISalesAccessScopeService _access;
         private readonly IMapper _mapper;
         private readonly IValidator<CreateBranchDto> _createValidator;
         private readonly IValidator<UpdateBranchDto> _updateValidator;
 
-        public BranchService(IUnitOfWork unitOfWork, IMapper mapper, IValidator<CreateBranchDto> createValidator, IValidator<UpdateBranchDto> updateValidator)
+        public BranchService(IUnitOfWork unitOfWork, IMapper mapper, IValidator<CreateBranchDto> createValidator, IValidator<UpdateBranchDto> updateValidator, ISalesAccessScopeService access)
         {
             _unitOfWork = unitOfWork;
+            _access = access;
             _mapper = mapper;
             _createValidator = createValidator;
             _updateValidator = updateValidator;
         }
         public async Task<IEnumerable<BranchDto>> GetAllAsync()
         {
-            var branches = await _unitOfWork.Branches.GetAllAsync();
+            var scope = await _access.GetAsync();
+            var branches = await _unitOfWork.Branches.GetQueryable().AsNoTracking()
+                .Where(x => scope.AllowsAll || scope.BranchIds.Contains(x.Id)).ToListAsync();
             return _mapper.Map<IEnumerable<BranchDto>>(branches);
         }
         public async Task<BranchDto?> GetBranchByIdAsync(int id)
         {
-            var branch = await _unitOfWork.Branches.GetByIdAsync(id);
+            var scope = await _access.GetAsync();
+            var branch = await _unitOfWork.Branches.GetQueryable().AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == id && (scope.AllowsAll || scope.BranchIds.Contains(x.Id)));
             if (branch == null || !branch.IsActive)
                 return null;
             return _mapper.Map<BranchDto?>(branch);

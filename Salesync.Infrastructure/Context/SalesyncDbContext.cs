@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Salesync.Domain.Modules.Company.Entities;
 using Salesync.Domain.Modules.DataImport.Entities;
@@ -47,6 +47,8 @@ namespace Salesync.Infrastructure.Data
         public DbSet<SalesRepSession> SalesRepSessions { get; set; }
         public DbSet<Invoice> Invoices { get; set; }
         public DbSet<InvoiceItem> InvoiceItems { get; set; }
+        public DbSet<InvoiceReturnReceipt> InvoiceReturnReceipts { get; set; }
+        public DbSet<InvoiceReturnReceiptItem> InvoiceReturnReceiptItems { get; set; }
         public DbSet<InvoiceReturn> InvoiceReturns { get; set; }
         public DbSet<InvoiceReturnItem> InvoiceReturnItems { get; set; }
         public DbSet<Payment> Payments { get; set; }

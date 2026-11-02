@@ -52,6 +52,8 @@ namespace Salesync.Application.Interfaces.Repositories
 
         IGenericRepository<InvoiceItem> InvoiceItems { get; }
 
+        IGenericRepository<InvoiceReturnReceipt> InvoiceReturnReceipts { get; }
+        IGenericRepository<InvoiceReturnReceiptItem> InvoiceReturnReceiptItems { get; }
         IGenericRepository<InvoiceReturn> InvoiceReturns { get; }
 
         IGenericRepository<InvoiceReturnItem> InvoiceReturnItems { get; }

@@ -105,7 +105,8 @@ namespace Salesync.Application.Modules.Treasury.Services
 
                             x.TotalAmount,
 
-                            x.PaidAmount
+                            x.PaidAmount,
+                            x.CreditAppliedAmount
                         })
                     .ToListAsync();
 
@@ -133,7 +134,7 @@ namespace Salesync.Application.Modules.Treasury.Services
                             Math.Max(
                                 0m,
                                 totalInvoiceAmount -
-                                totalPaidAmount);
+                                totalPaidAmount - group.Sum(x => x.CreditAppliedAmount));
 
 
                         return new CustomerReceivableDto
@@ -225,7 +226,7 @@ namespace Salesync.Application.Modules.Treasury.Services
                         Math.Max(
                             0m,
                             x.TotalAmount -
-                            x.PaidAmount);
+                            x.PaidAmount - x.CreditAppliedAmount);
 
 
                     return new CustomerReceivableInvoiceDto
@@ -242,8 +243,8 @@ namespace Salesync.Application.Modules.Treasury.Services
                         TotalAmount =
                             x.TotalAmount,
 
-                        PaidAmount =
-                            x.PaidAmount,
+                        PaidAmount = x.PaidAmount,
+                        CreditAppliedAmount = x.CreditAppliedAmount,
 
                         OutstandingAmount =
                             outstanding,

@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Salesync.Application.Interfaces.Repositories;
@@ -387,9 +387,7 @@ namespace Salesync.Application.Modules.Inventory.Services
                         true
                 };
 
-            _unitOfWork.StockBalances
-                .Update(
-                    balance);
+            // Balance is tracked, including newly added balances with a temporary key.
 
             await _unitOfWork.StockMovements
                 .AddAsync(
@@ -458,6 +456,11 @@ namespace Salesync.Application.Modules.Inventory.Services
             }
 
             // =================================================
+            // Quarantine stock cannot be issued as sales/van loading stock.
+            if (warehouse.Type == Salesync.Domain.Common.Enums.MasterData.WarehouseType.Damaged &&
+                source is StockMovementSource.Invoice or StockMovementSource.LoadRequest)
+                throw new InvalidOperationException("Quarantined stock cannot be sold or loaded to a representative.");
+
             // Balance
             // =================================================
 

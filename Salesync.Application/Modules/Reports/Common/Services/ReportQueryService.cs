@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Salesync.Application.Interfaces.Repositories;
 using Salesync.Application.Modules.Reports.Common.Interfaces;
 using Salesync.Application.Modules.Reports.Common.Models;
@@ -86,13 +86,12 @@ namespace Salesync.Application.Modules.Reports.Common.Services
             DateTime toDateExclusive,
             CancellationToken cancellationToken = default)
         {
-            return await _unitOfWork.InvoiceReturns
+            return await _unitOfWork.InvoiceReturnReceipts
                 .GetQueryable()
                 .AsNoTracking()
                 .Where(x =>
                     x.SalesRepId.HasValue &&
                     salesRepIds.Contains(x.SalesRepId.Value) &&
-                    x.Status == ReturnStatus.Approved &&
                     x.CreatedAt >= fromDate &&
                     x.CreatedAt < toDateExclusive)
                 .SumAsync(
@@ -179,13 +178,12 @@ namespace Salesync.Application.Modules.Reports.Common.Services
                 })
                 .ToListAsync(cancellationToken);
 
-            var returnStats = await _unitOfWork.InvoiceReturns
+            var returnStats = await _unitOfWork.InvoiceReturnReceipts
                 .GetQueryable()
                 .AsNoTracking()
                 .Where(x =>
                     x.SalesRepId.HasValue &&
                     salesRepIds.Contains(x.SalesRepId.Value) &&
-                    x.Status == ReturnStatus.Approved &&
                     x.CreatedAt >= fromDate &&
                     x.CreatedAt < toDateExclusive)
                 .GroupBy(x => x.SalesRepId!.Value)
@@ -462,13 +460,12 @@ namespace Salesync.Application.Modules.Reports.Common.Services
                 })
                 .ToListAsync(cancellationToken);
 
-            var returnStats = await _unitOfWork.InvoiceReturns
+            var returnStats = await _unitOfWork.InvoiceReturnReceipts
                 .GetQueryable()
                 .AsNoTracking()
                 .Where(x =>
                     x.SalesRepId.HasValue &&
                     salesRepIds.Contains(x.SalesRepId.Value) &&
-                    x.Status == ReturnStatus.Approved &&
                     x.CreatedAt >= fromDate &&
                     x.CreatedAt < toDateExclusive)
                 .GroupBy(x => x.CreatedAt.Date)
@@ -572,13 +569,12 @@ namespace Salesync.Application.Modules.Reports.Common.Services
                 })
                 .ToListAsync(cancellationToken);
 
-            var returnStats = await _unitOfWork.InvoiceReturns
+            var returnStats = await _unitOfWork.InvoiceReturnReceipts
                 .GetQueryable()
                 .AsNoTracking()
                 .Where(x =>
                     x.SalesRepId.HasValue &&
                     salesRepIds.Contains(x.SalesRepId.Value) &&
-                    x.Status == ReturnStatus.Approved &&
                     x.CreatedAt >= fromDate &&
                     x.CreatedAt < toDateExclusive)
                 .GroupBy(x => x.SalesRep!.BranchId)
@@ -709,13 +705,12 @@ namespace Salesync.Application.Modules.Reports.Common.Services
                 })
                 .ToListAsync(cancellationToken);
 
-            var returnStats = await _unitOfWork.InvoiceReturns
+            var returnStats = await _unitOfWork.InvoiceReturnReceipts
                 .GetQueryable()
                 .AsNoTracking()
                 .Where(x =>
                     x.SalesRepId.HasValue &&
                     salesRepIds.Contains(x.SalesRepId.Value) &&
-                    x.Status == ReturnStatus.Approved &&
                     x.CreatedAt >= fromDate &&
                     x.CreatedAt < toDateExclusive)
                 .GroupBy(x => x.CustomerId)
@@ -818,16 +813,15 @@ namespace Salesync.Application.Modules.Reports.Common.Services
                 })
                 .ToListAsync(cancellationToken);
 
-            var returnStats = await _unitOfWork.InvoiceReturnItems
+            var returnStats = await _unitOfWork.InvoiceReturnReceiptItems
                 .GetQueryable()
                 .AsNoTracking()
                 .Where(x =>
-                    x.InvoiceReturn.SalesRepId.HasValue &&
+                    x.Receipt.SalesRepId.HasValue &&
                     salesRepIds.Contains(
-                        x.InvoiceReturn.SalesRepId.Value) &&
-                    x.InvoiceReturn.Status == ReturnStatus.Approved &&
-                    x.InvoiceReturn.CreatedAt >= fromDate &&
-                    x.InvoiceReturn.CreatedAt < toDateExclusive)
+                        x.Receipt.SalesRepId.Value) &&
+                    x.Receipt.CreatedAt >= fromDate &&
+                    x.Receipt.CreatedAt < toDateExclusive)
                 .GroupBy(x => new
                 {
                     x.ProductId,

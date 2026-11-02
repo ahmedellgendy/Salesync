@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Salesync.API.Responses;
 using Salesync.Application.Modules.MasterData.Dtos.WarehouseDto;
 using Salesync.Application.Modules.MasterData.Interfaces.Services;
@@ -7,6 +8,7 @@ namespace Salesync.API.Controllers.MasterData
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize(Roles = "Admin,Supervisor,SalesRep,Warehouse,Treasury,Management")]
     public class WarehouseController : ControllerBase
     {
         private readonly IWarehouseService _warehouseService;
@@ -52,6 +54,7 @@ namespace Salesync.API.Controllers.MasterData
         }
 
         [HttpPost]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Create(
             [FromBody] CreateWarehouseDto warehouseDto)
         {
@@ -68,6 +71,7 @@ namespace Salesync.API.Controllers.MasterData
         }
 
         [HttpPut("{id}")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Update(
             int id,
             [FromBody] UpdateWarehouseDto warehouseDto)
@@ -86,6 +90,7 @@ namespace Salesync.API.Controllers.MasterData
         }
 
         [HttpDelete("{id}")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Delete(int id)
         {
             await _warehouseService.DeleteAsync(id);

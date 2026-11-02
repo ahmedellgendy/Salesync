@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Salesync.Application.Interfaces.Repositories;
 using Salesync.Application.Modules.Reports.Common.Interfaces;
 using Salesync.Application.Modules.Reports.Common.Models;
@@ -170,9 +170,10 @@ namespace Salesync.Application.Modules.Reports.Supervisor.Services
 
                     TotalAmount = x.TotalAmount,
                     PaidAmount = x.PaidAmount,
+                            CreditAppliedAmount = x.CreditAppliedAmount,
 
                     RemainingAmount =
-                        x.TotalAmount - x.PaidAmount
+                        x.TotalAmount - x.PaidAmount - x.CreditAppliedAmount
                 },
                 cancellationToken);
         }

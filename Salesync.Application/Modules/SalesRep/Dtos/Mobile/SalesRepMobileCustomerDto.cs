@@ -15,6 +15,7 @@
         public decimal? Latitude { get; set; }
         public decimal? Longitude { get; set; }
         public decimal? CurrentBalance { get; set; }
+        public decimal InvoiceOutstandingAmount { get; set; }
         public decimal? CreditLimit { get; set; }
         public int VisitSequence { get; set; }
         public string? VisitDays { get; set; }

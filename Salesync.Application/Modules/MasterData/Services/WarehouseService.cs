@@ -1,4 +1,5 @@
-﻿using AutoMapper;
+using Salesync.Application.Interfaces.Services;
+using AutoMapper;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Salesync.Application.Interfaces.Repositories;
@@ -11,6 +12,7 @@ namespace Salesync.Application.Modules.MasterData.Services
     public class WarehouseService : IWarehouseService
     {
         private readonly IUnitOfWork _unitOfWork;
+        private readonly ISalesAccessScopeService _access;
         private readonly IMapper _mapper;
         private readonly IValidator<CreateWarehouseDto> _createValidator;
         private readonly IValidator<UpdateWarehouseDto> _updateValidator;
@@ -19,9 +21,10 @@ namespace Salesync.Application.Modules.MasterData.Services
             IUnitOfWork unitOfWork,
             IMapper mapper,
             IValidator<CreateWarehouseDto> createValidator,
-            IValidator<UpdateWarehouseDto> updateValidator)
+            IValidator<UpdateWarehouseDto> updateValidator, ISalesAccessScopeService access)
         {
             _unitOfWork = unitOfWork;
+            _access = access;
             _mapper = mapper;
             _createValidator = createValidator;
             _updateValidator = updateValidator;
@@ -29,10 +32,11 @@ namespace Salesync.Application.Modules.MasterData.Services
 
         public async Task<IEnumerable<WarehouseDto>> GetAllAsync()
         {
+            var scope = await _access.GetAsync();
             var warehouses = await _unitOfWork.Warehouses
                 .GetQueryable()
                 .AsNoTracking()
-                .Where(x => x.IsActive)
+                .Where(x => x.IsActive && (scope.AllowsAll || scope.BranchIds.Contains(x.BranchId)))
                 .Include(x => x.Branch)
                 .OrderBy(x => x.Name)
                 .ToListAsync();
@@ -45,13 +49,13 @@ namespace Salesync.Application.Modules.MasterData.Services
             if (id <= 0)
                 throw new ArgumentException("Invalid warehouse id.");
 
+            var scope = await _access.GetAsync();
             var warehouse = await _unitOfWork.Warehouses
                 .GetQueryable()
                 .AsNoTracking()
                 .Include(x => x.Branch)
                 .FirstOrDefaultAsync(x =>
-                    x.Id == id &&
-                    x.IsActive);
+                    x.Id == id && x.IsActive && (scope.AllowsAll || scope.BranchIds.Contains(x.BranchId)));
 
             return warehouse == null
                 ? null

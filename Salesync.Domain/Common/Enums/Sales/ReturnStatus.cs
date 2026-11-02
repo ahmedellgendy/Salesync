@@ -1,4 +1,4 @@
-﻿namespace Salesync.Domain.Common.Enums.Sales
+namespace Salesync.Domain.Common.Enums.Sales
 {
     public enum ReturnStatus
     {
@@ -6,6 +6,7 @@
         Approved = 2,
         Rejected = 3,
         ReceivedAtWarehouse = 4,
+        PartiallyReceived = 6,
         Cancelled = 5
     }
 

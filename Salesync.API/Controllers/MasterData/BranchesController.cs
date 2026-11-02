@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Salesync.API.Responses;
 using Salesync.Application.Modules.MasterData.Dtos.BranchDto;
 using Salesync.Application.Modules.MasterData.Interfaces.Services;
@@ -8,6 +9,7 @@ namespace Salesync.API.Controllers.MasterData
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize(Roles = "Admin,Supervisor,SalesRep,Warehouse,Treasury,Management")]
     public class BranchesController : ControllerBase
     {
         private readonly IBranchService _branchService;
@@ -44,6 +46,7 @@ namespace Salesync.API.Controllers.MasterData
         }
 
         [HttpPost] // POST: api/branches
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> CreateAsync([FromBody] CreateBranchDto createBranchDto)
         {
             var createdBranch = await _branchService.CreateBranchAsync(createBranchDto);
@@ -56,6 +59,7 @@ namespace Salesync.API.Controllers.MasterData
         }
 
         [HttpPut("{id}")] // PUT: api/branches/{id}
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> UpdateBranch(int id, [FromBody] UpdateBranchDto updateBranchDto)
         {
             var updatedBranch = await _branchService.UpdateBranchAsync(id, updateBranchDto);
@@ -67,6 +71,7 @@ namespace Salesync.API.Controllers.MasterData
         }
 
         [HttpDelete("{id}")] // Delete: api/branches/{id}
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Delete(int id)
         {
             await _branchService.DeleteAsync(id);

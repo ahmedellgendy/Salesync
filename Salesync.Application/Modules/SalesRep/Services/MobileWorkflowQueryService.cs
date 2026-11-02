@@ -72,6 +72,8 @@ public sealed class MobileWorkflowQueryService(IUnitOfWork unit, ISalesAccessSco
         var remaining = await unit.SalesRepInventories.GetQueryable().AnyAsync(x => x.SalesRepId == rep && x.IsActive && x.Quantity != 0);
         var unloads = unit.SalesRepUnloadRequests.GetQueryable().AsNoTracking().Where(x => x.SalesRepSessionId == sessionId && x.IsActive);
         var pending = await unloads.AnyAsync(x => x.Status == UnloadRequestStatus.PendingWarehouse || x.Status == UnloadRequestStatus.Draft);
+        var pendingReturns = await unit.InvoiceReturns.GetQueryable().AnyAsync(x =>
+            x.SalesRepSessionId == sessionId && x.IsActive && x.Status == ReturnStatus.Pending);
         var warehouses = await unloads.Where(x => x.Status == UnloadRequestStatus.Confirmed || x.Status == UnloadRequestStatus.PartiallyConfirmed)
             .Select(x => x.WarehouseId).Distinct().ToListAsync();
         var scope = await access.GetAsync();
@@ -87,6 +89,7 @@ public sealed class MobileWorkflowQueryService(IUnitOfWork unit, ISalesAccessSco
             new("OPEN_VISITS", "إنهاء الزيارات المفتوحة", !open),
             new("STOCK_REMAINING", "تسوية البضاعة المتبقية", !remaining),
             new("PENDING_UNLOAD", "تأكيد المخزن لطلبات التفريغ", !pending),
+            new("PENDING_RETURNS", "اعتماد أو رفض المرتجعات المعلقة من الإدارة", !pendingReturns),
             new("WAREHOUSE_REQUIRED", "اختيار مخزن التسوية المصرح به", warehouseValid),
             new("SETTLEMENT_INCONSISTENT", "اتساق مستند التسوية", records.Count <= 1),
         };

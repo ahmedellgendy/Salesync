@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using Salesync.Application.Modules.CustomerVisit.Dtos;
 using Salesync.Application.Modules.Inventory.Dtos;
 using Salesync.Application.Modules.LoadRequest.Dtos;
@@ -107,7 +107,7 @@ namespace Salesync.Application.Mappings
               .ForMember(dest => dest.SalesRepPhone, opt => opt.MapFrom(src => src.SalesRep != null ? src.SalesRep.Phone : null))
               .ForMember(dest => dest.DueDate, opt => opt.MapFrom(src => src.CreatedAt))
               .ForMember(dest => dest.ReturnsAmount, opt => opt.MapFrom(src => 0m))
-              .ForMember(dest => dest.RemainingAmount, opt => opt.MapFrom(src => src.TotalAmount - src.PaidAmount));
+              .ForMember(dest => dest.RemainingAmount, opt => opt.MapFrom(src => src.TotalAmount - src.PaidAmount - src.CreditAppliedAmount));
 
             CreateMap<CreateInvoiceDto, Invoice>();
             CreateMap<UpdateInvoiceDto, Invoice>()

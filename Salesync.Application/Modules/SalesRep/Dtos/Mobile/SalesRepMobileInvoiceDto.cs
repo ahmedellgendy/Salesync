@@ -1,4 +1,4 @@
-﻿namespace Salesync.Application.Modules.SalesRep.Dtos.Mobile
+namespace Salesync.Application.Modules.SalesRep.Dtos.Mobile
 {
     public class SalesRepMobileInvoiceDto
     {
@@ -27,6 +27,7 @@
         public decimal TotalAmount { get; set; }
 
         public decimal PaidAmount { get; set; }
+        public decimal CreditAppliedAmount { get; set; }
 
         public decimal RemainingAmount { get; set; }
 

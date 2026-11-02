@@ -1,4 +1,7 @@
-﻿using AutoMapper;
+using Microsoft.EntityFrameworkCore;
+using Salesync.Application.Interfaces.Services;
+using Salesync.Application.Common.Exceptions;
+using AutoMapper;
 using FluentValidation;
 using Salesync.Application.Interfaces.Repositories;
 using Salesync.Application.Modules.MasterData.Dtos.CustomerDto;
@@ -10,6 +13,8 @@ namespace Salesync.Application.Modules.MasterData.Services
     public class CustomerService : ICustomerService
     {
         private readonly IUnitOfWork _unitOfWork;
+        private readonly ISalesAccessScopeService _access;
+        private readonly ICurrentUserService _actor;
         private readonly IMapper _mapper;
         private readonly IValidator<CreateCustomerDto> _createValidator;
         private readonly IValidator<UpdateCustomerDto> _updateValidator;
@@ -18,9 +23,11 @@ namespace Salesync.Application.Modules.MasterData.Services
             IUnitOfWork unitOfWork,
             IMapper mapper,
             IValidator<CreateCustomerDto> createValidator,
-            IValidator<UpdateCustomerDto> updateValidator)
+            IValidator<UpdateCustomerDto> updateValidator, ISalesAccessScopeService access, ICurrentUserService actor)
         {
             _unitOfWork = unitOfWork;
+            _access = access;
+            _actor = actor;
             _mapper = mapper;
             _createValidator = createValidator;
             _updateValidator = updateValidator;
@@ -29,7 +36,7 @@ namespace Salesync.Application.Modules.MasterData.Services
         public async Task<IEnumerable<CustomerDto>> GetAllAsync()
         {
             var customers =
-                await _unitOfWork.Customers.GetAllAsync();
+                await (await VisibleCustomersAsync()).AsNoTracking().ToListAsync();
 
             var result =
                 new List<CustomerDto>();
@@ -48,7 +55,7 @@ namespace Salesync.Application.Modules.MasterData.Services
         public async Task<CustomerDto?> GetByIdAsync(int id)
         {
             var customer =
-                await _unitOfWork.Customers.GetByIdAsync(id);
+                await (await VisibleCustomersAsync()).FirstOrDefaultAsync(x => x.Id == id);
 
             if (customer is null)
                 return null;
@@ -59,6 +66,8 @@ namespace Salesync.Application.Modules.MasterData.Services
         public async Task<CustomerDto> CreateAsync(
             CreateCustomerDto createCustomerDto)
         {
+            await RequireCustomerWriterAsync();
+            createCustomerDto.BranchId = await WriteBranchAsync(createCustomerDto.BranchId);
             var validationResult =
                 await _createValidator.ValidateAsync(
                     createCustomerDto);
@@ -111,6 +120,7 @@ namespace Salesync.Application.Modules.MasterData.Services
             int id,
             UpdateCustomerDto updateCustomerDto)
         {
+            await RequireCustomerWriterAsync();
             var validationResult =
                 await _updateValidator.ValidateAsync(
                     updateCustomerDto);
@@ -122,13 +132,16 @@ namespace Salesync.Application.Modules.MasterData.Services
             }
 
             var customer =
-                await _unitOfWork.Customers.GetByIdAsync(id);
+                await (await VisibleCustomersAsync()).FirstOrDefaultAsync(x => x.Id == id);
 
             if (customer is null)
             {
                 throw new KeyNotFoundException(
                     $"Customer with id '{id}' not found.");
             }
+
+            if (_actor.Role == "Supervisor")
+                updateCustomerDto.BranchId = await WriteBranchAsync(updateCustomerDto.BranchId ?? customer.BranchId);
 
             var allCustomers =
                 await _unitOfWork.Customers.GetAllAsync();
@@ -168,8 +181,9 @@ namespace Salesync.Application.Modules.MasterData.Services
 
         public async Task DeleteAsync(int id)
         {
+            if (_actor.Role != "Admin") throw new ForbiddenException("Only administration can delete customers.");
             var customer =
-                await _unitOfWork.Customers.GetByIdAsync(id);
+                await (await VisibleCustomersAsync()).FirstOrDefaultAsync(x => x.Id == id);
 
             if (customer is null)
             {
@@ -180,6 +194,35 @@ namespace Salesync.Application.Modules.MasterData.Services
             _unitOfWork.Customers.Delete(customer);
 
             await _unitOfWork.CompleteAsync();
+        }
+
+        private async Task<IQueryable<Customer>> VisibleCustomersAsync()
+        {
+            var scope = await _access.GetAsync();
+            var query = _unitOfWork.Customers.GetQueryable();
+            if (scope.AllowsAll) return query;
+            var assigned = _unitOfWork.RouteCustomers.GetQueryable().Where(rc => rc.IsActive && rc.Route.IsActive &&
+                ((rc.Route.AssignedSalesRepId.HasValue && scope.SalesRepIds.Contains(rc.Route.AssignedSalesRepId.Value)) ||
+                 rc.Route.SalesRepRoutes.Any(a => a.IsActive && a.IsCurrent && !a.UnassignedDate.HasValue && scope.SalesRepIds.Contains(a.SalesRepId))));
+            // Mobile representatives see their assigned routes; branch staff retain branch master-data access.
+            return query.Where(c => assigned.Any(rc => rc.CustomerId == c.Id) ||
+                (_actor.Role != "SalesRep" && c.BranchId.HasValue && scope.BranchIds.Contains(c.BranchId.Value)));
+        }
+
+        private async Task RequireCustomerWriterAsync()
+        {
+            await _access.GetAsync();
+            if (_actor.Role is not ("Admin" or "Supervisor")) throw new ForbiddenException("Customer maintenance requires administration or supervision.");
+        }
+
+        private async Task<int?> WriteBranchAsync(int? branchId)
+        {
+            var scope = await _access.GetAsync();
+            if (scope.AllowsAll) return branchId;
+            branchId ??= scope.BranchIds.Length == 1 ? scope.BranchIds[0] : null;
+            if (!branchId.HasValue || !scope.BranchIds.Contains(branchId.Value))
+                throw new ForbiddenException("Customer branch is outside your authorized scope.");
+            return branchId;
         }
 
         private async Task ValidatePriceListAsync(

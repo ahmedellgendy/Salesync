@@ -117,6 +117,11 @@ namespace Salesync.Application.Modules.Sales.Services
             if (session.Status == DayStatus.Closed && existingClosing != null)
                 return _mapper.Map<SalesRepSessionDto>(session);
             if (existingClosing != null) throw new InvalidOperationException("SETTLEMENT_INCONSISTENT: Session requires review.");
+            // Approval/rejection belongs to administration. Do not freeze a
+            // settlement while a return can still change the session totals.
+            if (await _unitOfWork.InvoiceReturns.GetQueryable().AnyAsync(x =>
+                x.SalesRepSessionId == id && x.IsActive && x.Status == ReturnStatus.Pending))
+                throw new InvalidOperationException("PENDING_RETURNS: Resolve pending returns before closing the day.");
             if (await _unitOfWork.CustomerVisits.GetQueryable().AnyAsync(x => x.SalesRepSessionId == id &&
                 x.IsActive && x.Status == VisitStatus.InProgress && !x.EndTime.HasValue))
                 throw new InvalidOperationException("OPEN_VISITS: Complete the open visits before closing.");
@@ -173,11 +178,10 @@ namespace Salesync.Application.Modules.Sales.Services
                     p.IsActive)
                 .ToListAsync();
 
-            var returns = await _unitOfWork.InvoiceReturns
+            var returns = await _unitOfWork.InvoiceReturnReceipts
                 .GetQueryable().Where(x => accessScope.AllowsAll || accessScope.SalesRepIds.Contains(x.SalesRepId ?? 0))
                 .Where(r =>
                     r.SalesRepSessionId == id &&
-                    r.Status == ReturnStatus.Approved &&
                     r.IsActive)
                 .ToListAsync();
 

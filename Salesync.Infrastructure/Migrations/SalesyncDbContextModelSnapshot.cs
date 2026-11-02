@@ -1371,6 +1371,12 @@ namespace Salesync.Infrastructure.Migrations
                     b.Property<string>("CreatedBy")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<decimal>("CreditAppliedAmount")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)")
+                        .HasDefaultValue(0m);
+
                     b.Property<int>("CustomerId")
                         .HasColumnType("int");
 
@@ -1683,6 +1689,182 @@ namespace Salesync.Infrastructure.Migrations
                     b.HasIndex("ProductId");
 
                     b.ToTable("InvoiceReturnItems", (string)null);
+                });
+
+            modelBuilder.Entity("Salesync.Domain.Modules.Sales.Entities.InvoiceReturnReceipt", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("AppliedToInvoiceAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<bool>("CloseRemaining")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("CreditNoteNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<decimal>("CustomerCreditAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("InvoiceId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("InvoiceReturnId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ReceiptNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("RequestHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<int?>("SalesRepId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("SalesRepSessionId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreditNoteNumber")
+                        .IsUnique();
+
+                    b.HasIndex("InvoiceId");
+
+                    b.HasIndex("InvoiceReturnId");
+
+                    b.HasIndex("OperationId")
+                        .IsUnique();
+
+                    b.HasIndex("ReceiptNumber")
+                        .IsUnique();
+
+                    b.HasIndex("SalesRepId");
+
+                    b.HasIndex("CustomerId", "CreatedAt");
+
+                    b.ToTable("InvoiceReturnReceipts", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ReturnReceipt_Amounts", "[TotalAmount] >= 0 AND [AppliedToInvoiceAmount] >= 0 AND [CustomerCreditAmount] >= 0 AND [TotalAmount] = [AppliedToInvoiceAmount] + [CustomerCreditAmount]");
+                        });
+                });
+
+            modelBuilder.Entity("Salesync.Domain.Modules.Sales.Entities.InvoiceReturnReceiptItem", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BonusQuantity")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Condition")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("InvoiceReturnItemId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("ItemCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ProductName")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ReceiptId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("WarehouseId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InvoiceReturnItemId");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("WarehouseId");
+
+                    b.HasIndex("ReceiptId", "InvoiceReturnItemId")
+                        .IsUnique();
+
+                    b.ToTable("InvoiceReturnReceiptItems", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ReturnReceiptItem_Quantity", "[Quantity] >= 0 AND [BonusQuantity] >= 0 AND ([Quantity] > 0 OR [BonusQuantity] > 0) AND [TotalAmount] >= 0");
+                        });
                 });
 
             modelBuilder.Entity("Salesync.Domain.Modules.Sales.Entities.OperationExecution", b =>
@@ -3483,6 +3665,75 @@ namespace Salesync.Infrastructure.Migrations
                     b.Navigation("Product");
                 });
 
+            modelBuilder.Entity("Salesync.Domain.Modules.Sales.Entities.InvoiceReturnReceipt", b =>
+                {
+                    b.HasOne("Salesync.Domain.Modules.MasterData.Entities.Customer", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Salesync.Domain.Modules.Sales.Entities.Invoice", "Invoice")
+                        .WithMany()
+                        .HasForeignKey("InvoiceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Salesync.Domain.Modules.Sales.Entities.InvoiceReturn", "InvoiceReturn")
+                        .WithMany()
+                        .HasForeignKey("InvoiceReturnId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Salesync.Domain.Modules.SalesRep.Entities.SalesRep", "SalesRep")
+                        .WithMany()
+                        .HasForeignKey("SalesRepId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("Invoice");
+
+                    b.Navigation("InvoiceReturn");
+
+                    b.Navigation("SalesRep");
+                });
+
+            modelBuilder.Entity("Salesync.Domain.Modules.Sales.Entities.InvoiceReturnReceiptItem", b =>
+                {
+                    b.HasOne("Salesync.Domain.Modules.Sales.Entities.InvoiceReturnItem", "InvoiceReturnItem")
+                        .WithMany()
+                        .HasForeignKey("InvoiceReturnItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Salesync.Domain.Modules.MasterData.Entities.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Salesync.Domain.Modules.Sales.Entities.InvoiceReturnReceipt", "Receipt")
+                        .WithMany("Items")
+                        .HasForeignKey("ReceiptId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Salesync.Domain.Modules.MasterData.Entities.Warehouse", "Warehouse")
+                        .WithMany()
+                        .HasForeignKey("WarehouseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("InvoiceReturnItem");
+
+                    b.Navigation("Product");
+
+                    b.Navigation("Receipt");
+
+                    b.Navigation("Warehouse");
+                });
+
             modelBuilder.Entity("Salesync.Domain.Modules.Sales.Entities.Payment", b =>
                 {
                     b.HasOne("Salesync.Domain.Modules.MasterData.Entities.Customer", "Customer")
@@ -3802,6 +4053,11 @@ namespace Salesync.Infrastructure.Migrations
                 });
 
             modelBuilder.Entity("Salesync.Domain.Modules.Sales.Entities.InvoiceReturn", b =>
+                {
+                    b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("Salesync.Domain.Modules.Sales.Entities.InvoiceReturnReceipt", b =>
                 {
                     b.Navigation("Items");
                 });

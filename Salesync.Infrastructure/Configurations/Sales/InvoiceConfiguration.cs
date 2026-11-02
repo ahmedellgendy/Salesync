@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Salesync.Domain.Modules.Sales.Entities;
 
@@ -30,6 +30,7 @@ namespace Salesync.Infrastructure.Configurations.Sales
                 .HasPrecision(18, 2);
             builder.Property(i => i.TotalAmount)
                 .HasPrecision(18, 2);
+            builder.Property(i => i.CreditAppliedAmount).HasPrecision(18, 2).HasDefaultValue(0m);
             builder.Property(i => i.PaidAmount)
                 .HasPrecision(18, 2);
             builder.Property(i => i.Notes)

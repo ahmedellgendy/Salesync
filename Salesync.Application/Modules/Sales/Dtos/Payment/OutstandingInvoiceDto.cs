@@ -1,4 +1,4 @@
-﻿namespace Salesync.Application.Modules.Sales.Dtos.Payment
+namespace Salesync.Application.Modules.Sales.Dtos.Payment
 {
     public class OutstandingInvoiceDto
     {
@@ -17,6 +17,7 @@
         public decimal TotalAmount { get; set; }
 
         public decimal PaidAmount { get; set; }
+        public decimal CreditAppliedAmount { get; set; }
 
         public decimal OutstandingAmount { get; set; }
 

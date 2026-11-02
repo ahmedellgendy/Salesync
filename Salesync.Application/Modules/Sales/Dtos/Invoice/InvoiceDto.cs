@@ -1,4 +1,4 @@
-﻿using Salesync.Application.Modules.Sales.Dtos.InvoiceItem;
+using Salesync.Application.Modules.Sales.Dtos.InvoiceItem;
 using Salesync.Domain.Common.Enums.Sales;
 
 namespace Salesync.Application.Modules.Sales.Dtos.Invoice
@@ -32,6 +32,7 @@ namespace Salesync.Application.Modules.Sales.Dtos.Invoice
         public decimal ReturnsAmount { get; set; }
         public decimal TotalAmount { get; set; }
         public decimal PaidAmount { get; set; }
+        public decimal CreditAppliedAmount { get; set; }
         public decimal RemainingAmount { get; set; }
 
         public string? Notes { get; set; }
